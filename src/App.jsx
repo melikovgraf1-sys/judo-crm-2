@@ -920,36 +920,254 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
           </div>
         ))}
       </div>
-      {open && <LeadModal lead={open} onClose={() => setOpen(null)} staff={db.staff} />}
+      {open && (
+        <LeadModal
+          lead={open}
+          onClose={() => setOpen(null)}
+          staff={db.staff}
+          db={db}
+          setDB={setDB}
+        />
+      )}
     </div>
   );
 }
 
-function LeadModal({ lead, onClose, staff }: { lead: Lead; onClose: () => void; staff: StaffMember[] }) {
+function LeadModal(
+  {
+    lead,
+    onClose,
+    staff,
+    db,
+    setDB,
+  }: {
+    lead: Lead;
+    onClose: () => void;
+    staff: StaffMember[];
+    db: DB;
+    setDB: (db: DB) => void;
+  },
+) {
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState<Partial<Lead>>(lead);
+  useEffect(() => setForm(lead), [lead]);
+
+  const save = () => {
+    const nextLead: Lead = { ...lead, ...form, updatedAt: todayISO() };
+    const next = {
+      ...db,
+      leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
+    };
+    setDB(next); saveDB(next); setEdit(false); onClose();
+  };
+
+  const remove = () => {
+    if (!confirm("Удалить лид?")) return;
+    const next = {
+      ...db,
+      leads: db.leads.filter(l => l.id !== lead.id),
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.name}`, when: todayISO() }],
+    };
+    setDB(next); saveDB(next); onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
-        <div className="font-semibold text-lg">{lead.name}</div>
-        <div className="text-sm space-y-1">
-          {lead.parentName && <div><span className="text-slate-500">Имя родителя:</span> {lead.parentName}</div>}
-          {lead.firstName && <div><span className="text-slate-500">Имя:</span> {lead.firstName}</div>}
-          {lead.lastName && <div><span className="text-slate-500">Фамилия:</span> {lead.lastName}</div>}
-          {lead.birthDate && <div><span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}</div>}
-          {lead.birthDate && <div><span className="text-slate-500">Возраст:</span> {calcAge(lead.birthDate)}</div>}
-          {lead.startDate && <div><span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}</div>}
-          {lead.area && <div><span className="text-slate-500">Район:</span> {lead.area}</div>}
-          {lead.group && <div><span className="text-slate-500">Группа:</span> {lead.group}</div>}
-          <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
-          {lead.contact && <div><span className="text-slate-500">Контакт:</span> {lead.contact}</div>}
-          {lead.notes && <div><span className="text-slate-500">Заметки:</span> {lead.notes}</div>}
-          <div><span className="text-slate-500">Ответственный:</span> {staff.find(s => s.id===lead.managerId)?.name || "—"}</div>
-          <div><span className="text-slate-500">Этап:</span> {lead.stage}</div>
-          <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>
-          <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
-        </div>
-        <div className="flex justify-end">
-          <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
-        </div>
+        {edit ? (
+          <>
+            <div className="font-semibold text-lg">Редактирование лида</div>
+            <div className="grid sm:grid-cols-2 gap-2 text-sm">
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Имя лида"
+                value={form.name || ""}
+                onChange={e => setForm({ ...form, name: e.target.value })}
+              />
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Имя родителя"
+                value={form.parentName || ""}
+                onChange={e => setForm({ ...form, parentName: e.target.value })}
+              />
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Имя"
+                value={form.firstName || ""}
+                onChange={e => setForm({ ...form, firstName: e.target.value })}
+              />
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Фамилия"
+                value={form.lastName || ""}
+                onChange={e => setForm({ ...form, lastName: e.target.value })}
+              />
+              <input
+                type="date"
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.birthDate ? form.birthDate.slice(0,10) : ""}
+                onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })}
+              />
+              <input
+                type="date"
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.startDate ? form.startDate.slice(0,10) : ""}
+                onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })}
+              />
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.area || ""}
+                onChange={e => setForm({ ...form, area: (e.target.value: any) })}
+              >
+                <option value="">—</option>
+                {db.settings.areas.map(a => (
+                  <option key={a}>{a}</option>
+                ))}
+              </select>
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.group || ""}
+                onChange={e => setForm({ ...form, group: (e.target.value: any) })}
+              >
+                <option value="">—</option>
+                {db.settings.groups.map(g => (
+                  <option key={g}>{g}</option>
+                ))}
+              </select>
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Контакт"
+                value={form.contact || ""}
+                onChange={e => setForm({ ...form, contact: e.target.value })}
+              />
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.source}
+                onChange={e => setForm({ ...form, source: (e.target.value: any) })}
+              >
+                <option>Telegram</option>
+                <option>WhatsApp</option>
+                <option>Instagram</option>
+              </select>
+              <textarea
+                className="px-3 py-2 rounded-md border border-slate-300 sm:col-span-2"
+                placeholder="Заметки"
+                value={form.notes || ""}
+                onChange={e => setForm({ ...form, notes: e.target.value })}
+              />
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300 sm:col-span-2"
+                value={form.managerId || ""}
+                onChange={e => setForm({ ...form, managerId: e.target.value })}
+              >
+                <option value="">Ответственный</option>
+                {staff.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="font-semibold text-lg">{lead.name}</div>
+            <div className="text-sm space-y-1">
+              {lead.parentName && (
+                <div>
+                  <span className="text-slate-500">Имя родителя:</span> {lead.parentName}
+                </div>
+              )}
+              {lead.firstName && (
+                <div>
+                  <span className="text-slate-500">Имя:</span> {lead.firstName}
+                </div>
+              )}
+              {lead.lastName && (
+                <div>
+                  <span className="text-slate-500">Фамилия:</span> {lead.lastName}
+                </div>
+              )}
+              {lead.birthDate && (
+                <div>
+                  <span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}
+                </div>
+              )}
+              {lead.birthDate && (
+                <div>
+                  <span className="text-slate-500">Возраст:</span> {calcAge(lead.birthDate)}
+                </div>
+              )}
+              {lead.startDate && (
+                <div>
+                  <span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}
+                </div>
+              )}
+              {lead.area && (
+                <div>
+                  <span className="text-slate-500">Район:</span> {lead.area}
+                </div>
+              )}
+              {lead.group && (
+                <div>
+                  <span className="text-slate-500">Группа:</span> {lead.group}
+                </div>
+              )}
+              <div>
+                <span className="text-slate-500">Источник:</span> {lead.source}
+              </div>
+              {lead.contact && (
+                <div>
+                  <span className="text-slate-500">Контакт:</span> {lead.contact}
+                </div>
+              )}
+              {lead.notes && (
+                <div>
+                  <span className="text-slate-500">Заметки:</span> {lead.notes}
+                </div>
+              )}
+              <div>
+                <span className="text-slate-500">Ответственный:</span> {staff.find(s => s.id===lead.managerId)?.name || "—"}
+              </div>
+              <div>
+                <span className="text-slate-500">Этап:</span> {lead.stage}
+              </div>
+              <div>
+                <span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}
+              </div>
+              <div>
+                <span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}
+              </div>
+            </div>
+            <div className="flex justify-between gap-2">
+              <button
+                onClick={remove}
+                className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50"
+              >
+                Удалить
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEdit(true)}
+                  className="px-3 py-2 rounded-md border border-slate-300"
+                >
+                  Редактировать
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-3 py-2 rounded-md border border-slate-300"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
