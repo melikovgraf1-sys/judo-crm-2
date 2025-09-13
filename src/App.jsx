@@ -92,9 +92,12 @@ interface TaskItem {
   id: string;
   title: string;
   due: string; // ISO
+  assigneeType?: "client" | "staff";
   assigneeId?: string;
   status: "open" | "done";
-  type?: "оплата ученика" | "оплата аренды" | "день рождения" | "другое";
+  topic?: "оплата" | "аренда" | "день рождения" | "другое";
+  area?: Area;
+  group?: Group;
 }
 
 interface StaffMember {
@@ -292,8 +295,8 @@ function makeSeedDB(): DB {
   }
 
   const tasks: TaskItem[] = [
-    { id: uid(), title: "Оплата аренды — Центр", due: new Date(Date.now() + 5 * 86400000).toISOString(), assigneeId: staff.find(s => s.role === "Менеджер")?.id, status: "open", type: "оплата аренды" },
-    { id: uid(), title: "Поздравить с ДР — Иван", due: new Date(Date.now() + 2 * 86400000).toISOString(), assigneeId: staff.find(s => s.role === "Менеджер")?.id, status: "open", type: "день рождения" },
+    { id: uid(), title: "Оплата аренды — Центр", due: new Date(Date.now() + 5 * 86400000).toISOString(), assigneeType: "staff", assigneeId: staff.find(s => s.role === "Администратор")?.id, status: "open", topic: "аренда", area: "Центр" },
+    { id: uid(), title: "Поздравить с ДР — Иван", due: new Date(Date.now() + 2 * 86400000).toISOString(), assigneeType: "staff", assigneeId: staff.find(s => s.role === "Администратор")?.id, status: "open", topic: "день рождения" },
   ];
 
   const settings: Settings = {
@@ -1203,10 +1206,19 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
               <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
               <div>
                 <button onClick={() => setEdit({ ...t })} className="font-medium text-left hover:underline">{t.title}</button>
-                <div className="text-xs text-slate-500">К сроку: {fmtDate(t.due)}{t.type ? ` · ${t.type}`: ""}</div>
+                <div className="text-xs text-slate-500">
+                  К сроку: {fmtDate(t.due)}
+                  {t.topic ? ` · ${t.topic}` : ""}
+                  {t.area ? ` · ${t.area}` : ""}
+                  {t.group ? ` · ${t.group}` : ""}
+                </div>
               </div>
             </div>
-            <div className="text-xs text-slate-500">{db.staff.find(s => s.id===t.assigneeId)?.name || "—"}</div>
+            <div className="text-xs text-slate-500">
+              {t.assigneeType === "client"
+                ? (() => { const c = db.clients.find(c => c.id === t.assigneeId); return c ? `${c.firstName} ${c.lastName ?? ""}`.trim() : "—"; })()
+                : db.staff.find(s => s.id === t.assigneeId)?.name || "—"}
+            </div>
           </div>
         ))}
       </div>
@@ -1218,6 +1230,45 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="space-y-2">
               <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
               <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: parseDateInput(e.target.value) })} />
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.assigneeId ? `${edit.assigneeType}:${edit.assigneeId}` : ""} onChange={e => {
+                const val = e.target.value;
+                if (!val) setEdit({ ...edit, assigneeType: undefined, assigneeId: undefined });
+                else {
+                  const [type, id] = val.split(":");
+                  setEdit({ ...edit, assigneeType: type as "client" | "staff", assigneeId: id });
+                }
+              }}>
+                <option value="">Ответственный</option>
+                <optgroup label="Администраторы">
+                  {db.staff.filter(s => s.role === "Администратор").map(s => (
+                    <option key={s.id} value={`staff:${s.id}`}>{s.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Клиенты">
+                  {db.clients.map(c => (
+                    <option key={c.id} value={`client:${c.id}`}>{c.firstName} {c.lastName || ""}</option>
+                  ))}
+                </optgroup>
+              </select>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.topic || ""} onChange={e => setEdit({ ...edit, topic: e.target.value as TaskItem["topic"] })}>
+                <option value="">Тема</option>
+                <option value="оплата">Оплата</option>
+                <option value="аренда">Аренда</option>
+                <option value="день рождения">День рождения</option>
+                <option value="другое">Другое</option>
+              </select>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.area || ""} onChange={e => setEdit({ ...edit, area: e.target.value as Area })}>
+                <option value="">Район</option>
+                {db.settings.areas.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.group || ""} onChange={e => setEdit({ ...edit, group: e.target.value as Group })}>
+                <option value="">Группа</option>
+                {db.settings.groups.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
             </div>
             <div className="flex justify-between">
               <button onClick={() => remove(edit.id)} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
@@ -1361,7 +1412,18 @@ export default function App() {
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
   };
   const addQuickTask = () => {
-    const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
+    const admin = db.staff.find(s => s.role === "Администратор");
+    const t: TaskItem = {
+      id: uid(),
+      title: "Новая задача",
+      due: todayISO(),
+      status: "open",
+      assigneeType: admin ? "staff" : undefined,
+      assigneeId: admin?.id,
+      topic: "другое",
+      area: db.settings.areas[0],
+      group: db.settings.groups[0],
+    };
     const next = { ...db, tasks: [t, ...db.tasks] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Задача создана", "success");
   };
