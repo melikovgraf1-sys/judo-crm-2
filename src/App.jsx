@@ -1122,7 +1122,7 @@ function LeadModal(
           <>
             <div className="font-semibold text-lg">Редактирование лида</div>
             <div className="grid sm:grid-cols-2 gap-2 text-sm">
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Имя лида</span>
                 <input
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1130,7 +1130,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, name: e.target.value })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Имя родителя</span>
                 <input
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1138,7 +1138,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, parentName: e.target.value })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Имя</span>
                 <input
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1146,7 +1146,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, firstName: e.target.value })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Фамилия</span>
                 <input
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1154,7 +1154,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, lastName: e.target.value })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Дата рождения</span>
                 <input
                   type="date"
@@ -1163,7 +1163,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Старт</span>
                 <input
                   type="date"
@@ -1172,7 +1172,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Район</span>
                 <select
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1185,7 +1185,7 @@ function LeadModal(
                   ))}
                 </select>
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Группа</span>
                 <select
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1198,7 +1198,7 @@ function LeadModal(
                   ))}
                 </select>
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Контакт</span>
                 <input
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1206,7 +1206,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, contact: e.target.value })}
                 />
               </label>
-              <label className="space-y-1">
+              <label className="flex flex-col space-y-1">
                 <span className="text-xs text-slate-500">Источник</span>
                 <select
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1218,7 +1218,7 @@ function LeadModal(
                   <option>Instagram</option>
                 </select>
               </label>
-              <label className="space-y-1 sm:col-span-2">
+              <label className="flex flex-col space-y-1 sm:col-span-2">
                 <span className="text-xs text-slate-500">Заметки</span>
                 <textarea
                   className="px-3 py-2 rounded-md border border-slate-300"
@@ -1226,7 +1226,7 @@ function LeadModal(
                   onChange={e => setForm({ ...form, notes: e.target.value })}
                 />
               </label>
-              <label className="space-y-1 sm:col-span-2">
+              <label className="flex flex-col space-y-1 sm:col-span-2">
                 <span className="text-xs text-slate-500">Ответственный</span>
                 <select
                   className="px-3 py-2 rounded-md border border-slate-300"
