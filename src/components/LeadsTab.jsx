@@ -1,5 +1,8 @@
 // @flow
 import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
 import { todayISO, saveDB, uid, fmtDate } from "../App";
 import type { DB, Lead, LeadStage, StaffMember } from "../App";
@@ -65,11 +68,23 @@ function LeadModal(
   },
 ) {
   const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState<Partial<Lead>>(lead);
-  useEffect(() => setForm(lead), [lead]);
 
-  const save = () => {
-    const nextLead: Lead = { ...lead, ...form, updatedAt: todayISO() };
+  const schema = yup.object({
+    name: yup.string().required("Имя обязательно"),
+    contact: yup.string().required("Контакт обязателен"),
+    parentName: yup.string().nullable(),
+  });
+
+  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm({
+    resolver: yupResolver(schema),
+    mode: "onChange",
+    defaultValues: lead,
+  });
+
+  useEffect(() => reset(lead), [lead, reset]);
+
+  const save = (data: any) => {
+    const nextLead: Lead = { ...lead, ...data, updatedAt: todayISO() };
     const next = {
       ...db,
       leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
@@ -109,15 +124,17 @@ function LeadModal(
           <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
         </div>
         {edit && (
-          <div className="space-y-2 pt-2 border-t border-slate-200">
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={form.name || ""} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Имя" />
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={form.parentName || ""} onChange={e => setForm({ ...form, parentName: e.target.value })} placeholder="Родитель" />
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={form.contact || ""} onChange={e => setForm({ ...form, contact: e.target.value })} placeholder="Контакт" />
+          <form onSubmit={handleSubmit(save)} className="space-y-2 pt-2 border-t border-slate-200">
+            <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("name")} placeholder="Имя" />
+            {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
+            <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("parentName")} placeholder="Родитель" />
+            <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("contact")} placeholder="Контакт" />
+            {errors.contact && <span className="text-xs text-rose-600">{errors.contact.message}</span>}
             <div className="flex justify-end gap-2">
-              <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
-              <button onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button type="submit" disabled={!isValid} className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400">Сохранить</button>
+              <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
             </div>
-          </div>
+          </form>
         )}
       </div>
     </div>
