@@ -1,6 +1,7 @@
 // @flow
 import React from "react";
-import { saveUI, can } from "../App";
+import { NavLink } from "react-router-dom";
+import { can } from "../App";
 
 const TABS = [
   { key: "dashboard", title: "Дашборд" },
@@ -12,21 +13,27 @@ const TABS = [
   { key: "settings", title: "Настройки", need: r => can(r, "settings") },
 ];
 
-export default function Tabs({ ui, setUI, role }) {
+export const TAB_TITLES = TABS.reduce((acc, t) => ({ ...acc, [t.key]: t.title }), {});
+
+export default function Tabs({ role }) {
   const visible = TABS.filter(t => !t.need || t.need(role));
   return (
     <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">
       <div className="flex gap-1 p-2">
         {visible.map(t => (
-          <button
+          <NavLink
             key={t.key}
-            onClick={() => { const u = { ...ui, activeTab: t.key, breadcrumbs: [t.title] }; setUI(u); saveUI(u); }}
-            className={`px-3 py-2 rounded-md text-sm ${ui.activeTab === t.key ? "bg-white text-sky-700 border border-sky-200" : "text-slate-700 hover:bg-white/80"}`}
+            to={`/${t.key}`}
+            className={({ isActive }) =>
+              `px-3 py-2 rounded-md text-sm ${
+                isActive ? "bg-white text-sky-700 border border-sky-200" : "text-slate-700 hover:bg-white/80"
+              }`}
           >
             {t.title}
-          </button>
+          </NavLink>
         ))}
       </div>
     </div>
   );
 }
+
