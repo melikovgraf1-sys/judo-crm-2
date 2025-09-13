@@ -72,6 +72,13 @@ interface ScheduleSlot {
 interface Lead {
   id: string;
   name: string;
+  parentName?: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string; // ISO
+  startDate?: string; // ISO
+  area?: Area;
+  group?: Group;
   contact?: string;
   source: ContactChannel;
   stage: LeadStage;
@@ -141,6 +148,10 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 const todayISO = () => new Date().toISOString();
 const fmtDate = (iso: string) => new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
 const fmtMoney = (v: number, c: Currency) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(v);
+const calcAge = (iso: string) => {
+  const d = new Date(iso);
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+};
 const parseDateInput = (value: string) => {
   if (!value) return "";
   const d = new Date(value);
@@ -240,13 +251,26 @@ function makeSeedDB(): DB {
   const leadsSources: ContactChannel[] = ["Instagram", "WhatsApp", "Telegram"];
   const leadStages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const leads: Lead[] = Array.from({ length: rnd(8, 12) }).map(() => {
-    const name = firstNames[rnd(0, firstNames.length - 1)] + " (лид)";
+    const fn = firstNames[rnd(0, firstNames.length - 1)];
+    const ln = lastNames[rnd(0, lastNames.length - 1)];
+    const name = fn + " (лид)";
     const stage = leadStages[rnd(0, leadStages.length - 1)];
     const now = new Date();
     const created = new Date(now.getTime() - rnd(1, 20) * 86400000);
+    const birth = new Date();
+    birth.setFullYear(birth.getFullYear() - rnd(5, 14));
+    const start = new Date();
+    start.setDate(start.getDate() + rnd(1, 30));
     return {
       id: uid(),
       name,
+      parentName: Math.random() < 0.5 ? "Родитель " + ln : undefined,
+      firstName: fn,
+      lastName: ln,
+      birthDate: birth.toISOString(),
+      startDate: start.toISOString(),
+      area: areas[rnd(0, areas.length - 1)],
+      group: groups[rnd(0, groups.length - 1)],
       source: leadsSources[rnd(0, leadsSources.length - 1)],
       contact: Math.random() < 0.7 ? "+90" + rnd(500000000, 599999999) : undefined,
       stage,
@@ -875,6 +899,14 @@ function LeadModal({ lead, onClose, staff }: { lead: Lead; onClose: () => void; 
       <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
         <div className="font-semibold text-lg">{lead.name}</div>
         <div className="text-sm space-y-1">
+          {lead.parentName && <div><span className="text-slate-500">Имя родителя:</span> {lead.parentName}</div>}
+          {lead.firstName && <div><span className="text-slate-500">Имя:</span> {lead.firstName}</div>}
+          {lead.lastName && <div><span className="text-slate-500">Фамилия:</span> {lead.lastName}</div>}
+          {lead.birthDate && <div><span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}</div>}
+          {lead.birthDate && <div><span className="text-slate-500">Возраст:</span> {calcAge(lead.birthDate)}</div>}
+          {lead.startDate && <div><span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}</div>}
+          {lead.area && <div><span className="text-slate-500">Район:</span> {lead.area}</div>}
+          {lead.group && <div><span className="text-slate-500">Группа:</span> {lead.group}</div>}
           <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
           {lead.contact && <div><span className="text-slate-500">Контакт:</span> {lead.contact}</div>}
           {lead.notes && <div><span className="text-slate-500">Заметки:</span> {lead.notes}</div>}
@@ -1030,7 +1062,21 @@ export default function App() {
     setDB(next); saveDB(next); setQuickOpen(false); push("Клиент создан", "success");
   };
   const addQuickLead = () => {
-    const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() };
+    const l: Lead = {
+      id: uid(),
+      name: "Новый лид",
+      parentName: "",
+      firstName: "Новый",
+      lastName: "Лид",
+      birthDate: new Date("2017-01-01").toISOString(),
+      startDate: todayISO(),
+      area: db.settings.areas[0],
+      group: db.settings.groups[0],
+      source: "Instagram",
+      stage: "Очередь",
+      createdAt: todayISO(),
+      updatedAt: todayISO(),
+    };
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
   };
