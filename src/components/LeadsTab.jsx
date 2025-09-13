@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
+import Modal from "./Modal";
 import { todayISO, saveDB, uid, fmtDate } from "../App";
 import type { DB, Lead, LeadStage, StaffMember } from "../App";
 
@@ -104,39 +105,37 @@ function LeadModal(
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-4 space-y-3">
-        <div className="font-semibold text-slate-800">{lead.name}</div>
-        <div className="grid gap-1 text-sm">
-          <div><span className="text-slate-500">Родитель:</span> {lead.parentName || "—"}</div>
-          <div><span className="text-slate-500">Имя ребёнка:</span> {lead.firstName}</div>
-          <div><span className="text-slate-500">Фамилия:</span> {lead.lastName}</div>
-          <div><span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}</div>
-          <div><span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}</div>
-          <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
-          <div><span className="text-slate-500">Контакт:</span> {lead.contact || "—"}</div>
-          <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>
-          <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
-        </div>
-        <div className="flex justify-end gap-2">
-          {!edit && <button onClick={() => setEdit(true)} className="px-3 py-2 rounded-md border border-slate-300">Редактировать</button>}
-          <button onClick={remove} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600">Удалить</button>
-          <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
-        </div>
-        {edit && (
-          <form onSubmit={handleSubmit(save)} className="space-y-2 pt-2 border-t border-slate-200">
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("name")} placeholder="Имя" />
-            {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("parentName")} placeholder="Родитель" />
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("contact")} placeholder="Контакт" />
-            {errors.contact && <span className="text-xs text-rose-600">{errors.contact.message}</span>}
-            <div className="flex justify-end gap-2">
-              <button type="submit" disabled={!isValid} className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400">Сохранить</button>
-              <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
-            </div>
-          </form>
-        )}
+    <Modal size="lg" onClose={onClose}>
+      <div className="font-semibold text-slate-800">{lead.name}</div>
+      <div className="grid gap-1 text-sm">
+        <div><span className="text-slate-500">Родитель:</span> {lead.parentName || "—"}</div>
+        <div><span className="text-slate-500">Имя ребёнка:</span> {lead.firstName}</div>
+        <div><span className="text-slate-500">Фамилия:</span> {lead.lastName}</div>
+        <div><span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}</div>
+        <div><span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}</div>
+        <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
+        <div><span className="text-slate-500">Контакт:</span> {lead.contact || "—"}</div>
+        <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>
+        <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
       </div>
-    </div>
+      <div className="flex justify-end gap-2">
+        {!edit && <button onClick={() => setEdit(true)} className="px-3 py-2 rounded-md border border-slate-300">Редактировать</button>}
+        <button onClick={remove} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600">Удалить</button>
+        <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
+      </div>
+      {edit && (
+        <form onSubmit={handleSubmit(save)} className="space-y-2 pt-2 border-t border-slate-200">
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("name")} placeholder="Имя" />
+          {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("parentName")} placeholder="Родитель" />
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("contact")} placeholder="Контакт" />
+          {errors.contact && <span className="text-xs text-rose-600">{errors.contact.message}</span>}
+          <div className="flex justify-end gap-2">
+            <button type="submit" disabled={!isValid} className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400">Сохранить</button>
+            <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+          </div>
+        </form>
+      )}
+    </Modal>
   );
 }
