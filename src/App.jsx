@@ -1,0 +1,985 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+// === ЛЁГКИЙ КАРКАС CRM (SPA в одном файле) ===
+// Эта версия: вкладки, роли, seed-данные в LocalStorage, минимальные таблицы, поиск/фильтры,
+// тосты, хлебные крошки, переключатель валют. Tailwind подключается через CDN-скрипт в <head>.
+// Далее можно по шагам добавить: Service Worker, Manifest, офлайн-синхронизацию, push-уведомления, экспорт CSV и т.д.
+
+// Ключи LocalStorage
+const LS_KEYS = {
+  db: "judo_crm_db_v1",
+  ui: "judo_crm_ui_v1",
+};
+
+// Типы
+type Role = "Администратор" | "Менеджер" | "Тренер";
+
+type Area = "Махмутлар" | "Центр" | "Джикджилли";
+
+type Group = "4–6" | "6–9" | "9–14" | "взрослые" | "индивидуальные" | "доп. группа";
+
+type Gender = "м" | "ж";
+
+type ContactChannel = "Telegram" | "WhatsApp" | "Instagram";
+
+type PaymentMethod = "наличные" | "перевод";
+
+type PaymentStatus = "ожидание" | "действует" | "задолженность";
+
+type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты" | "Оплаченный абонемент" | "Отмена";
+
+type Currency = "EUR" | "TRY" | "RUB";
+
+interface Client {
+  id: string;
+  firstName: string;
+  lastName?: string;
+  phone?: string;
+  channel: ContactChannel;
+  birthDate: string; // ISO
+  parentName?: string;
+  gender: Gender;
+  area: Area;
+  group: Group;
+  coachId?: string;
+  startDate: string; // ISO
+  payMethod: PaymentMethod;
+  payStatus: PaymentStatus;
+  // Автополя (рассчитываются на лету)
+}
+
+interface AttendanceEntry {
+  id: string;
+  clientId: string;
+  date: string; // ISO
+  came: boolean;
+  sourceArea?: Area; // для отработок
+}
+
+interface ScheduleSlot {
+  id: string;
+  area: Area;
+  group: Group;
+  coachId: string;
+  weekday: number; // 1..7
+  time: string; // HH:MM
+  location: string;
+}
+
+interface Lead {
+  id: string;
+  name: string;
+  contact?: string;
+  source: ContactChannel;
+  stage: LeadStage;
+  notes?: string;
+  managerId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface TaskItem {
+  id: string;
+  title: string;
+  due: string; // ISO
+  assigneeId?: string;
+  status: "open" | "done";
+  type?: "оплата ученика" | "оплата аренды" | "день рождения" | "другое";
+}
+
+interface StaffMember {
+  id: string;
+  role: Role;
+  name: string;
+  areas: Area[];
+  groups: Group[];
+}
+
+interface Settings {
+  areas: Area[];
+  groups: Group[];
+  limits: Record<string, number>; // key: `${area}|${group}` => лимит мест
+  rentByAreaEUR: Partial<Record<Area, number>>; // аренда в евро для простоты
+  currencyRates: { EUR: number; TRY: number; RUB: number }; // к базовой валюте EUR (1.0)
+  coachPayFormula: string; // просто строка, которая описывает формулу (демо)
+}
+
+interface DB {
+  clients: Client[];
+  attendance: AttendanceEntry[];
+  schedule: ScheduleSlot[];
+  leads: Lead[];
+  tasks: TaskItem[];
+  staff: StaffMember[];
+  settings: Settings;
+  changelog: { id: string; who: string; what: string; when: string }[];
+}
+
+interface UIState {
+  role: Role;
+  activeTab: TabKey;
+  breadcrumbs: string[];
+  currency: Currency;
+  search: string;
+}
+
+type TabKey =
+  | "dashboard"
+  | "clients"
+  | "attendance"
+  | "schedule"
+  | "leads"
+  | "tasks"
+  | "settings";
+
+// Утилиты
+const rnd = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const todayISO = () => new Date().toISOString();
+const fmtDate = (iso: string) => new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
+const fmtMoney = (v: number, c: Currency) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(v);
+
+// Инициализация Tailwind CDN в <head>
+function useTailwindCdn() {
+  useEffect(() => {
+    const id = "tw-cdn-script";
+    if (!document.getElementById(id)) {
+      const s = document.createElement("script");
+      s.id = id;
+      s.src = "https://cdn.tailwindcss.com";
+      document.head.appendChild(s);
+    }
+  }, []);
+}
+
+// Seed-данные
+function makeSeedDB(): DB {
+  const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
+  const groups: Group[] = ["4–6", "6–9", "9–14", "взрослые", "индивидуальные", "доп. группа"];
+  const staff: StaffMember[] = [
+    { id: uid(), role: "Администратор", name: "Админ", areas, groups },
+    { id: uid(), role: "Менеджер", name: "Марина", areas, groups },
+    { id: uid(), role: "Менеджер", name: "Илья", areas, groups },
+    { id: uid(), role: "Тренер", name: "Алексей", areas: ["Центр", "Джикджилли"], groups: ["4–6", "6–9", "9–14", "взрослые"] },
+    { id: uid(), role: "Тренер", name: "Сергей", areas: ["Махмутлар"], groups: ["4–6", "6–9", "9–14"] },
+  ];
+  const coachIds = staff.filter(s => s.role === "Тренер").map(s => s.id);
+
+  const firstNames = ["Иван", "Анна", "Михаил", "Елена", "Павел", "Дарья", "Никита", "София", "Матвей", "Алиса", "Кирилл", "Артём", "Полина", "Виктор", "Ольга", "Денис", "Роман", "Ксения", "Леонид", "Мария", "Егор", "Ева", "Владислав", "Ирина", "Глеб", "Вероника", "Савелий", "Лиза", "Тимур", "Арина"];
+  const lastNames = ["Иванов", "Петров", "Сидоров", "Кузнецов", "Смирнов", "Попов", "Ершов", "Фролов", "Соколов", "Орлов"];
+
+  const nClients = rnd(18, 30);
+  const clients: Client[] = Array.from({ length: nClients }).map(() => {
+    const fn = firstNames[rnd(0, firstNames.length - 1)];
+    const ln = lastNames[rnd(0, lastNames.length - 1)];
+    const gender: Gender = Math.random() < 0.5 ? "м" : "ж";
+    const area = areas[rnd(0, areas.length - 1)];
+    const group = groups[rnd(0, groups.length - 1)];
+    const coachId = coachIds[rnd(0, coachIds.length - 1)];
+    const ageYears = rnd(5, 14);
+    const birthDate = new Date();
+    birthDate.setFullYear(birthDate.getFullYear() - ageYears);
+    const start = new Date();
+    start.setMonth(start.getMonth() - rnd(0, 8));
+    const payStatus = ["ожидание", "действует", "задолженность"][rnd(0, 2)];
+    const channel = ["Telegram", "WhatsApp", "Instagram"][rnd(0, 2)];
+    const payMethod = Math.random() < 0.6 ? "перевод" : "наличные";
+    return {
+      id: uid(),
+      firstName: fn,
+      lastName: ln,
+      phone: "+90" + rnd(500000000, 599999999),
+      channel,
+      birthDate: birthDate.toISOString(),
+      parentName: Math.random() < 0.5 ? "Родитель " + ln : undefined,
+      gender,
+      area,
+      group,
+      coachId,
+      startDate: start.toISOString(),
+      payMethod,
+      payStatus,
+    };
+  });
+
+  const schedule: ScheduleSlot[] = [];
+  for (const area of areas) {
+    const slots = rnd(3, 5);
+    for (let i = 0; i < slots; i++) {
+      schedule.push({
+        id: uid(),
+        area,
+        group: groups[rnd(0, groups.length - 1)],
+        coachId: coachIds[rnd(0, coachIds.length - 1)],
+        weekday: rnd(1, 7),
+        time: `${String(rnd(16, 21)).padStart(2, "0")}:${Math.random() < 0.5 ? "00" : "30"}`,
+        location: `${area} Dojo #${rnd(1, 3)}`,
+      });
+    }
+  }
+
+  const leadsSources: ContactChannel[] = ["Instagram", "WhatsApp", "Telegram"];
+  const leadStages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
+  const leads: Lead[] = Array.from({ length: rnd(8, 12) }).map(() => {
+    const name = firstNames[rnd(0, firstNames.length - 1)] + " (лид)";
+    const stage = leadStages[rnd(0, leadStages.length - 1)];
+    const now = new Date();
+    const created = new Date(now.getTime() - rnd(1, 20) * 86400000);
+    return {
+      id: uid(),
+      name,
+      source: leadsSources[rnd(0, leadsSources.length - 1)],
+      contact: Math.random() < 0.7 ? "+90" + rnd(500000000, 599999999) : undefined,
+      stage,
+      notes: Math.random() < 0.5 ? "Интерес к пробному занятию" : undefined,
+      managerId: staff.find(s => s.role === "Менеджер")?.id,
+      createdAt: created.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+  });
+
+  const attendance: AttendanceEntry[] = [];
+  for (const c of clients) {
+    const entries = rnd(3, 8);
+    for (let i = 0; i < entries; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - rnd(1, 25));
+      attendance.push({ id: uid(), clientId: c.id, date: d.toISOString(), came: Math.random() < 0.8 });
+    }
+  }
+
+  const tasks: TaskItem[] = [
+    { id: uid(), title: "Оплата аренды — Центр", due: new Date(Date.now() + 5 * 86400000).toISOString(), assigneeId: staff.find(s => s.role === "Менеджер")?.id, status: "open", type: "оплата аренды" },
+    { id: uid(), title: "Поздравить с ДР — Иван", due: new Date(Date.now() + 2 * 86400000).toISOString(), assigneeId: staff.find(s => s.role === "Менеджер")?.id, status: "open", type: "день рождения" },
+  ];
+
+  const settings: Settings = {
+    areas,
+    groups,
+    limits: Object.fromEntries(
+      areas.flatMap(a => groups.map(g => [`${a}|${g}`, 20]))
+    ),
+    rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
+    currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
+    coachPayFormula: "фикс 100€ + 5€ за ученика",
+  };
+
+  return {
+    clients,
+    attendance,
+    schedule,
+    leads,
+    tasks,
+    staff,
+    settings,
+    changelog: [
+      { id: uid(), who: "Система", what: "Инициализация БД (seed)", when: todayISO() },
+    ],
+  };
+}
+
+function loadDB(): DB {
+  const raw = localStorage.getItem(LS_KEYS.db);
+  if (raw) {
+    try { return JSON.parse(raw) as DB; } catch {}
+  }
+  const db = makeSeedDB();
+  localStorage.setItem(LS_KEYS.db, JSON.stringify(db));
+  return db;
+}
+
+function saveDB(db: DB) { localStorage.setItem(LS_KEYS.db, JSON.stringify(db)); }
+
+function loadUI(): UIState {
+  const raw = localStorage.getItem(LS_KEYS.ui);
+  if (raw) {
+    try { return JSON.parse(raw) as UIState; } catch {}
+  }
+  const ui: UIState = {
+    role: "Администратор",
+    activeTab: "dashboard",
+    breadcrumbs: ["Дашборд"],
+    currency: "EUR",
+    search: "",
+  };
+  localStorage.setItem(LS_KEYS.ui, JSON.stringify(ui));
+  return ui;
+}
+
+function saveUI(ui: UIState) { localStorage.setItem(LS_KEYS.ui, JSON.stringify(ui)); }
+
+// Тосты
+type Toast = { id: string; text: string; type?: "success" | "error" | "info" };
+function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const push = (text: string, type: Toast["type"] = "info") => {
+    const t = { id: uid(), text, type };
+    setToasts(prev => [...prev, t]);
+    setTimeout(() => setToasts(prev => prev.filter(x => x.id !== t.id)), 3500);
+  };
+  return { toasts, push };
+}
+
+// Ролевая проверка
+function can(role: Role, feature: "all" | "manage_clients" | "attendance" | "schedule" | "leads" | "tasks" | "settings") {
+  if (role === "Администратор") return true;
+  if (role === "Менеджер") {
+    return ["manage_clients", "leads", "tasks", "attendance", "schedule"].includes(feature);
+  }
+  if (role === "Тренер") {
+    return ["attendance", "schedule"].includes(feature);
+  }
+  return false;
+}
+
+// Хлебные крошки
+function Breadcrumbs({ items }: { items: string[] }) {
+  return (
+    <nav className="text-sm text-slate-500 mb-2" aria-label="Breadcrumb">
+      <ol className="flex flex-wrap items-center gap-1">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-center">
+            <span className={i === items.length - 1 ? "text-slate-900" : "hover:underline"}>{it}</span>
+            {i < items.length - 1 && <span className="mx-2">/</span>}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+// Верхняя панель
+function Topbar({ ui, setUI, roleList, onQuickAdd }: { ui: UIState; setUI: (u: UIState) => void; roleList: Role[]; onQuickAdd: () => void }) {
+  return (
+    <div className="w-full flex flex-wrap items-center justify-between gap-2 p-3 bg-white/70 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
+      <div className="flex items-center gap-3">
+        <div className="font-semibold text-slate-800 text-lg">Judo CRM</div>
+        <div className="hidden sm:block text-xs text-slate-500">спокойные синие/голубые — KPI зелёные</div>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          placeholder="Поиск…"
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200"
+          value={ui.search}
+          onChange={e => { const u = { ...ui, search: e.target.value }; setUI(u); saveUI(u); }}
+        />
+        <select
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm"
+          value={ui.currency}
+          onChange={e => { const u = { ...ui, currency: e.target.value as Currency }; setUI(u); saveUI(u); }}
+        >
+          <option value="EUR">€</option>
+          <option value="TRY">TRY</option>
+          <option value="RUB">RUB</option>
+        </select>
+        <button onClick={onQuickAdd} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Быстро добавить</button>
+        <select
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm"
+          value={ui.role}
+          onChange={e => { const u = { ...ui, role: e.target.value as Role }; setUI(u); saveUI(u); }}
+          title="Войти как"
+        >
+          {roleList.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// Навигация вкладок
+const TABS: { key: TabKey; title: string; need?: (role: Role) => boolean }[] = [
+  { key: "dashboard", title: "Дашборд" },
+  { key: "clients", title: "Клиенты", need: r => can(r, "manage_clients") },
+  { key: "attendance", title: "Посещаемость", need: r => can(r, "attendance") },
+  { key: "schedule", title: "Расписание", need: r => can(r, "schedule") },
+  { key: "leads", title: "Лиды", need: r => can(r, "leads") },
+  { key: "tasks", title: "Задачи", need: r => can(r, "tasks") },
+  { key: "settings", title: "Настройки", need: r => can(r, "settings") },
+];
+
+function Tabs({ ui, setUI, role }: { ui: UIState; setUI: (u: UIState) => void; role: Role }) {
+  const visible = TABS.filter(t => !t.need || t.need(role));
+  return (
+    <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">
+      <div className="flex gap-1 p-2">
+        {visible.map(t => (
+          <button
+            key={t.key}
+            onClick={() => { const u = { ...ui, activeTab: t.key, breadcrumbs: [t.title] }; setUI(u); saveUI(u); }}
+            className={`px-3 py-2 rounded-md text-sm ${ui.activeTab === t.key ? "bg-white text-sky-700 border border-sky-200" : "text-slate-700 hover:bg-white/80"}`}
+          >
+            {t.title}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Баннер-инструкция (оффлайн — добавим позже PWA)
+function OfflineTip() {
+  return (
+    <div className="m-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-slate-700">
+      <div className="font-medium mb-1">Как сохранить и работать офлайн</div>
+      <ul className="list-disc pl-5 text-sm space-y-1">
+        <li>В браузере откройте эту страницу, оставьте её открытой один раз (кешируется автоматически).</li>
+        <li>Добавить на главный экран: в мобильном браузере «Поделиться» → «На экран домой».</li>
+        <li>Отметки посещаемости и данные сохраняются локально. Позже можно синхронизировать (функция будет добавлена).</li>
+      </ul>
+    </div>
+  );
+}
+
+// Карточка-метрика
+function MetricCard({ title, value, accent }: { title: string; value: string; accent?: "green" | "sky" | "slate" }) {
+  const cls = accent === "green" ? "bg-emerald-50 border-emerald-200" : accent === "sky" ? "bg-sky-50 border-sky-200" : "bg-slate-50 border-slate-200";
+  return (
+    <div className={`p-4 rounded-2xl border ${cls} min-w-[180px]`}>
+      <div className="text-xs text-slate-500">{title}</div>
+      <div className="text-xl font-semibold text-slate-800 mt-1">{value}</div>
+    </div>
+  );
+}
+
+// Фильтр-чип
+function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className={`px-3 py-1 rounded-full border text-xs ${active ? "bg-sky-600 text-white border-sky-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"}`}>{children}</button>
+  );
+}
+
+// Таблица-обёртка
+function TableWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="w-full overflow-auto rounded-xl border border-slate-200 bg-white">
+      <table className="w-full text-sm">
+        {children}
+      </table>
+    </div>
+  );
+}
+
+// Вкладка: Дашборд (минимум для каркаса)
+function Dashboard({ db, ui }: { db: DB; ui: UIState }) {
+  const currency: Currency = ui.currency;
+  const totalClients = db.clients.length;
+  const activeClients = db.clients.filter(c => c.payStatus === "действует").length;
+  const leadsCount = db.leads.length;
+
+  // Грубая выручка по активным: считаем 55€ на ученика (дзюдо) как пример
+  const revenueEUR = activeClients * 55;
+  const rate = (cur: Currency) => (cur === "EUR" ? 1 : cur === "TRY" ? db.settings.currencyRates.TRY : db.settings.currencyRates.RUB);
+  const revenue = revenueEUR * rate(currency);
+
+  // Заполняемость: активные / суммарный лимит
+  const totalLimit = Object.values(db.settings.limits).reduce((a, b) => a + b, 0);
+  const fillPct = totalLimit ? Math.round((activeClients / totalLimit) * 100) : 0;
+
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Дашборд"]} />
+      <OfflineTip />
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <MetricCard title="Ученики всего" value={String(totalClients)} accent="sky" />
+        <MetricCard title="Активные (действует)" value={String(activeClients)} accent="green" />
+        <MetricCard title="Выручка (прибл.)" value={fmtMoney(revenue, currency)} accent="sky" />
+        <MetricCard title="Заполняемость" value={`${fillPct}%`} accent={fillPct >= 80 ? "green" : "slate"} />
+      </div>
+      <div className="grid lg:grid-cols-2 gap-3">
+        <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+          <div className="font-semibold mb-2">Лиды по этапам</div>
+          <div className="flex flex-wrap gap-2">
+            {(["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"] as LeadStage[]).map(s => (
+              <div key={s} className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div className="text-slate-500">{s}</div>
+                <div className="text-lg font-semibold text-slate-800">{db.leads.filter(l => l.stage === s).length}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+          <div className="font-semibold mb-2">Предстоящие задачи</div>
+          <ul className="space-y-2">
+            {db.tasks
+              .slice()
+              .sort((a, b) => +new Date(a.due) - +new Date(b.due))
+              .slice(0, 6)
+              .map(t => (
+                <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate">{t.title}</span>
+                  <span className="text-slate-500">{fmtDate(t.due)}</span>
+                </li>
+              ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Вкладка: Клиенты (минимальный CRUD + фильтр)
+function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UIState }) {
+  const [area, setArea] = useState<Area | "all">("all");
+  const [group, setGroup] = useState<Group | "all">("all");
+  const [pay, setPay] = useState<PaymentStatus | "all">("all");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [form, setForm] = useState<Partial<Client>>({
+    firstName: "",
+    gender: "м",
+    area: db.settings.areas[0],
+    group: db.settings.groups[0],
+    channel: "Telegram",
+    startDate: new Date().toISOString(),
+    payMethod: "перевод",
+    payStatus: "ожидание",
+    birthDate: new Date("2017-01-01").toISOString(),
+  });
+
+  const list = useMemo(() => {
+    return db.clients.filter(c =>
+      (area === "all" || c.area === area) &&
+      (group === "all" || c.group === group) &&
+      (pay === "all" || c.payStatus === pay) &&
+      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(ui.search.toLowerCase()))
+    );
+  }, [db.clients, area, group, pay, ui.search]);
+
+  const addClient = () => {
+    const c: Client = {
+      id: uid(),
+      firstName: String(form.firstName || ""),
+      lastName: form.lastName || "",
+      phone: form.phone || "",
+      channel: form.channel as ContactChannel,
+      birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
+      parentName: form.parentName || "",
+      gender: (form.gender as Gender) || "м",
+      area: (form.area as Area) || db.settings.areas[0],
+      group: (form.group as Group) || db.settings.groups[0],
+      coachId: db.staff.find(s => s.role === "Тренер")?.id,
+      startDate: form.startDate || todayISO(),
+      payMethod: (form.payMethod as PaymentMethod) || "перевод",
+      payStatus: (form.payStatus as PaymentStatus) || "ожидание",
+    };
+    const next = { ...db, clients: [c, ...db.clients], changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }] };
+    setDB(next); saveDB(next); setModalOpen(false);
+  };
+
+  const removeClient = (id: string) => {
+    if (!confirm("Удалить клиента?")) return;
+    const next = { ...db, clients: db.clients.filter(c => c.id !== id), changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }] };
+    setDB(next); saveDB(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Клиенты"]} />
+      <div className="flex flex-wrap gap-2 items-center">
+        <Chip active={area === "all"} onClick={() => setArea("all")}>Все районы</Chip>
+        {db.settings.areas.map(a => <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>)}
+        <div className="flex-1" />
+        <button onClick={() => setModalOpen(true)} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
+          <option value="all">Все группы</option>
+          {db.settings.groups.map(g => <option key={g} value={g}>{g}</option>)}
+        </select>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={pay} onChange={e => setPay(e.target.value as any)}>
+          <option value="all">Все статусы оплаты</option>
+          <option value="ожидание">ожидание</option>
+          <option value="действует">действует</option>
+          <option value="задолженность">задолженность</option>
+        </select>
+        <div className="text-xs text-slate-500">Найдено: {list.length}</div>
+      </div>
+
+      <TableWrap>
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            <th className="text-left p-2">Имя</th>
+            <th className="text-left p-2">Пол</th>
+            <th className="text-left p-2">Район</th>
+            <th className="text-left p-2">Группа</th>
+            <th className="text-left p-2">Телефон</th>
+            <th className="text-left p-2">Статус оплаты</th>
+            <th className="text-right p-2">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map(c => (
+            <tr key={c.id} className="border-t border-slate-100">
+              <td className="p-2 whitespace-nowrap">{c.firstName} {c.lastName}</td>
+              <td className="p-2">{c.gender}</td>
+              <td className="p-2">{c.area}</td>
+              <td className="p-2">{c.group}</td>
+              <td className="p-2">{c.phone || "—"}</td>
+              <td className="p-2">
+                <span className={`px-2 py-1 rounded-full text-xs ${c.payStatus === "действует" ? "bg-emerald-100 text-emerald-700" : c.payStatus === "задолженность" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{c.payStatus}</span>
+              </td>
+              <td className="p-2 text-right">
+                <button onClick={() => removeClient(c.id)} className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </TableWrap>
+
+      {modalOpen && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold text-slate-800">Новый клиент</div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName as any} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName as any} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Телефон" value={form.phone as any} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel as any} onChange={e => setForm({ ...form, channel: e.target.value as ContactChannel })}>
+                <option>Telegram</option><option>WhatsApp</option><option>Instagram</option>
+              </select>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender as any} onChange={e => setForm({ ...form, gender: e.target.value as Gender })}>
+                <option value="м">м</option><option value="ж">ж</option>
+              </select>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area as any} onChange={e => setForm({ ...form, area: e.target.value as Area })}>
+                {db.settings.areas.map(a => <option key={a}>{a}</option>)}
+              </select>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group as any} onChange={e => setForm({ ...form, group: e.target.value as Group })}>
+                {db.settings.groups.map(g => <option key={g}>{g}</option>)}
+              </select>
+              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10)} onChange={e => setForm({ ...form, birthDate: new Date(e.target.value).toISOString() })} />
+              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10)} onChange={e => setForm({ ...form, startDate: new Date(e.target.value).toISOString() })} />
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod as any} onChange={e => setForm({ ...form, payMethod: e.target.value as PaymentMethod })}>
+                <option>перевод</option><option>наличные</option>
+              </select>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus as any} onChange={e => setForm({ ...form, payStatus: e.target.value as PaymentStatus })}>
+                <option>ожидание</option><option>действует</option><option>задолженность</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setModalOpen(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button onClick={addClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Вкладка: Посещаемость (минимум: отметка пришёл/не пришёл за сегодня)
+function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const [area, setArea] = useState<Area | "all">("all");
+  const [group, setGroup] = useState<Group | "all">("all");
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const list = useMemo(() => {
+    return db.clients.filter(c => (area === "all" || c.area === area) && (group === "all" || c.group === group));
+  }, [db.clients, area, group]);
+
+  const getMark = (clientId: string) => db.attendance.find(a => a.clientId === clientId && a.date.slice(0,10) === todayStr);
+
+  const toggle = (clientId: string) => {
+    const mark = getMark(clientId);
+    if (mark) {
+      // переключить
+      const updated = { ...mark, came: !mark.came };
+      const next = { ...db, attendance: db.attendance.map(a => a.id === mark.id ? updated : a) };
+      setDB(next); saveDB(next);
+    } else {
+      const entry: AttendanceEntry = { id: uid(), clientId, date: new Date().toISOString(), came: true };
+      const next = { ...db, attendance: [entry, ...db.attendance] };
+      setDB(next); saveDB(next);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Посещаемость"]} />
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={area} onChange={e => setArea(e.target.value as any)}>
+          <option value="all">Все районы</option>
+          {db.settings.areas.map(a => <option key={a}>{a}</option>)}
+        </select>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
+          <option value="all">Все группы</option>
+          {db.settings.groups.map(g => <option key={g}>{g}</option>)}
+        </select>
+        <div className="text-xs text-slate-500">Сегодня: {fmtDate(today.toISOString())}</div>
+      </div>
+
+      <TableWrap>
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            <th className="text-left p-2">Ученик</th>
+            <th className="text-left p-2">Район</th>
+            <th className="text-left p-2">Группа</th>
+            <th className="text-left p-2">Отметка</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map(c => {
+            const m = getMark(c.id);
+            return (
+              <tr key={c.id} className="border-t border-slate-100">
+                <td className="p-2">{c.firstName} {c.lastName}</td>
+                <td className="p-2">{c.area}</td>
+                <td className="p-2">{c.group}</td>
+                <td className="p-2">
+                  <button onClick={() => toggle(c.id)} className={`px-3 py-1 rounded-md text-xs border ${m?.came ? "bg-emerald-100 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-700 border-slate-200"}`}>
+                    {m?.came ? "пришёл" : "не отмечен"}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </TableWrap>
+    </div>
+  );
+}
+
+// Вкладка: Расписание (чтение демо)
+function ScheduleTab({ db }: { db: DB }) {
+  const byArea = useMemo(() => {
+    const m: Record<string, ScheduleSlot[]> = {};
+    for (const s of db.schedule) {
+      m[s.area] ??= []; m[s.area].push(s);
+    }
+    return m;
+  }, [db.schedule]);
+
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Расписание"]} />
+      <div className="grid lg:grid-cols-3 gap-3">
+        {Object.entries(byArea).map(([area, list]) => (
+          <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
+            <div className="font-semibold">{area}</div>
+            <ul className="space-y-1 text-sm">
+              {list.sort((a,b)=> a.weekday - b.weekday || a.time.localeCompare(b.time)).map(s => (
+                <li key={s.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group} · тренер {db.staff.find(st => st.id===s.coachId)?.name || "—"}</span>
+                  <span className="text-slate-500">{s.location}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Вкладка: Лиды (простая воронка без drag&drop на каркасе)
+function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
+  const move = (id: string, dir: 1 | -1) => {
+    const l = db.leads.find(x => x.id === id); if (!l) return;
+    const idx = stages.indexOf(l.stage);
+    const nextStage = stages[Math.min(stages.length - 1, Math.max(0, idx + dir))];
+    const next = { ...db, leads: db.leads.map(x => x.id === id ? { ...x, stage: nextStage, updatedAt: todayISO() } : x) };
+    setDB(next); saveDB(next);
+  };
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Лиды"]} />
+      <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {stages.map(s => (
+          <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white">
+            <div className="text-xs text-slate-500 mb-2">{s}</div>
+            <div className="space-y-2">
+              {db.leads.filter(l => l.stage === s).map(l => (
+                <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50">
+                  <div className="text-sm font-medium">{l.name}</div>
+                  <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
+                  <div className="flex gap-1 mt-2">
+                    <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300">◀</button>
+                    <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300">▶</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Вкладка: Задачи (минимум: список, отметка done)
+function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const toggle = (id: string) => {
+    const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };
+    setDB(next); saveDB(next);
+  };
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Задачи"]} />
+      <div className="rounded-2xl border border-slate-200 bg-white divide-y">
+        {db.tasks
+          .slice()
+          .sort((a,b)=> +new Date(a.due) - +new Date(b.due))
+          .map(t => (
+          <div key={t.id} className="p-3 flex items-center justify-between gap-2 text-sm">
+            <div className="flex items-center gap-3">
+              <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
+              <div>
+                <div className="font-medium">{t.title}</div>
+                <div className="text-xs text-slate-500">К сроку: {fmtDate(t.due)}{t.type ? ` · ${t.type}`: ""}</div>
+              </div>
+            </div>
+            <div className="text-xs text-slate-500">{db.staff.find(s => s.id===t.assigneeId)?.name || "—"}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Вкладка: Настройки (минимум: курсы валют, лимиты)
+function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const [rates, setRates] = useState(db.settings.currencyRates);
+  const saveRates = () => {
+    const next = { ...db, settings: { ...db.settings, currencyRates: { ...rates } } };
+    setDB(next); saveDB(next);
+  };
+  return (
+    <div className="space-y-3">
+      <Breadcrumbs items={["Настройки"]} />
+      <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-3">
+        <div className="font-semibold">Курсы валют</div>
+        <div className="grid sm:grid-cols-3 gap-2">
+          <label className="text-sm">EUR к EUR
+            <input type="number" step="0.01" className="mt-1 w-full px-3 py-2 rounded-md border border-slate-300" value={rates.EUR} onChange={e => setRates({ ...rates, EUR: Number(e.target.value) })} />
+          </label>
+          <label className="text-sm">TRY к EUR
+            <input type="number" step="0.01" className="mt-1 w-full px-3 py-2 rounded-md border border-slate-300" value={rates.TRY} onChange={e => setRates({ ...rates, TRY: Number(e.target.value) })} />
+          </label>
+          <label className="text-sm">RUB к EUR
+            <input type="number" step="0.01" className="mt-1 w-full px-3 py-2 rounded-md border border-slate-300" value={rates.RUB} onChange={e => setRates({ ...rates, RUB: Number(e.target.value) })} />
+          </label>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={saveRates} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+        </div>
+      </div>
+
+      <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-3">
+        <div className="font-semibold">Лимиты мест</div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {Object.keys(db.settings.limits).map(k => (
+            <div key={k} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
+              <div className="truncate">{k}</div>
+              <input type="number" min={0} className="w-24 px-2 py-1 rounded-md border border-slate-300" value={db.settings.limits[k]} onChange={e => {
+                const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [k]: Number(e.target.value) } } };
+                setDB(next); saveDB(next);
+              }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Контейнер тостов
+function Toasts({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      {toasts.map(t => (
+        <div key={t.id} className={`px-4 py-3 rounded-xl shadow border text-sm ${t.type === "success" ? "bg-emerald-50 border-emerald-200 text-emerald-800" : t.type === "error" ? "bg-rose-50 border-rose-200 text-rose-800" : "bg-slate-50 border-slate-200 text-slate-800"}`}>{t.text}</div>
+      ))}
+    </div>
+  );
+}
+
+// Быстрое добавление (демо)
+function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+        <div className="font-semibold">Быстро добавить</div>
+        <div className="grid gap-2">
+          <button onClick={onAddClient} className="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">+ Клиента</button>
+          <button onClick={onAddLead} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Лида</button>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  useTailwindCdn();
+  const [db, setDB] = useState<DB>(() => loadDB());
+  const [ui, setUI] = useState<UIState>(() => loadUI());
+  const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
+  const { toasts, push } = useToasts();
+  const [quickOpen, setQuickOpen] = useState(false);
+
+  const onQuickAdd = () => setQuickOpen(true);
+  const addQuickClient = () => {
+    const c: Client = {
+      id: uid(), firstName: "Новый", lastName: "Клиент", channel: "Telegram", birthDate: new Date("2017-01-01").toISOString(), gender: "м",
+      area: db.settings.areas[0], group: db.settings.groups[0], startDate: todayISO(), payMethod: "перевод", payStatus: "ожидание"
+    } as Client;
+    const next = { ...db, clients: [c, ...db.clients] };
+    setDB(next); saveDB(next); setQuickOpen(false); push("Клиент создан", "success");
+  };
+  const addQuickLead = () => {
+    const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() } as Lead;
+    const next = { ...db, leads: [l, ...db.leads] };
+    setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
+  };
+
+  // Командная палитра (Ctrl/Cmd+K)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault(); setQuickOpen(v => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const canSee = (tab: TabKey) => {
+    const r = ui.role;
+    if (tab === "dashboard") return true;
+    if (tab === "clients") return can(r, "manage_clients");
+    if (tab === "attendance") return can(r, "attendance");
+    if (tab === "schedule") return can(r, "schedule");
+    if (tab === "leads") return can(r, "leads");
+    if (tab === "tasks") return can(r, "tasks");
+    if (tab === "settings") return can(r, "settings");
+    return false;
+  };
+
+  const activeTab = canSee(ui.activeTab) ? ui.activeTab : "dashboard";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900">
+      <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
+      <Tabs ui={ui} setUI={setUI} role={ui.role} />
+
+      <main className="max-w-7xl mx-auto p-3 space-y-3">
+        {activeTab === "dashboard" && <Dashboard db={db} ui={ui} />}
+        {activeTab === "clients" && can(ui.role, "manage_clients") && <ClientsTab db={db} setDB={setDB} ui={ui} />}
+        {activeTab === "attendance" && can(ui.role, "attendance") && <AttendanceTab db={db} setDB={setDB} />}
+        {activeTab === "schedule" && can(ui.role, "schedule") && <ScheduleTab db={db} />}
+        {activeTab === "leads" && can(ui.role, "leads") && <LeadsTab db={db} setDB={setDB} />}
+        {activeTab === "tasks" && can(ui.role, "tasks") && <TasksTab db={db} setDB={setDB} />}
+        {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
+      </main>
+
+      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} />
+      <Toasts toasts={toasts} />
+
+      <footer className="text-xs text-slate-500 text-center py-6">Каркас CRM · Следующие шаги: SW/Manifest/PWA, офлайн-синхронизация, push, CSV/печать</footer>
+    </div>
+  );
+}
