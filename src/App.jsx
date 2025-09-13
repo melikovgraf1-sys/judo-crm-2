@@ -15,9 +15,10 @@ const LS_KEYS = {
 // Типы
 type Role = "Администратор" | "Менеджер" | "Тренер";
 
-type Area = "Махмутлар" | "Центр" | "Джикджилли";
+// Районы и группы теперь динамические строки, чтобы админ мог добавлять свои варианты
+type Area = string;
 
-type Group = "4–6" | "6–9" | "9–14" | "взрослые" | "индивидуальные" | "доп. группа";
+type Group = string;
 
 type Gender = "м" | "ж";
 
@@ -148,13 +149,13 @@ const parseDateInput = (value: string) => {
 // Seed-данные
 function makeSeedDB(): DB {
   const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
-  const groups: Group[] = ["4–6", "6–9", "9–14", "взрослые", "индивидуальные", "доп. группа"];
+  const groups: Group[] = ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"];
   const staff: StaffMember[] = [
     { id: uid(), role: "Администратор", name: "Админ", areas, groups },
     { id: uid(), role: "Менеджер", name: "Марина", areas, groups },
     { id: uid(), role: "Менеджер", name: "Илья", areas, groups },
     { id: uid(), role: "Тренер", name: "Алексей", areas: ["Центр", "Джикджилли"], groups: ["4–6", "6–9", "9–14", "взрослые"] },
-    { id: uid(), role: "Тренер", name: "Сергей", areas: ["Махмутлар"], groups: ["4–6", "6–9", "9–14"] },
+    { id: uid(), role: "Тренер", name: "Сергей", areas: ["Махмутлар"], groups: ["4–6", "6–9", "7–14", "9–14"] },
   ];
   const coachIds = staff.filter(s => s.role === "Тренер").map(s => s.id);
 
@@ -195,21 +196,38 @@ function makeSeedDB(): DB {
     };
   });
 
-  const schedule: ScheduleSlot[] = [];
-  for (const area of areas) {
-    const slots = rnd(3, 5);
-    for (let i = 0; i < slots; i++) {
-      schedule.push({
-        id: uid(),
-        area,
-        group: groups[rnd(0, groups.length - 1)],
-        coachId: coachIds[rnd(0, coachIds.length - 1)],
-        weekday: rnd(1, 7),
-        time: `${String(rnd(16, 21)).padStart(2, "0")}:${Math.random() < 0.5 ? "00" : "30"}`,
-        location: `${area} Dojo #${rnd(1, 3)}`,
-      });
-    }
-  }
+  const coachAlexey = staff.find(s => s.name === "Алексей")?.id || "";
+  const coachSergey = staff.find(s => s.name === "Сергей")?.id || "";
+
+  const schedule: ScheduleSlot[] = [
+    // Центр — вторник и четверг
+    { id: uid(), area: "Центр", group: "6–9", coachId: coachAlexey, weekday: 2, time: "17:30", location: "" },
+    { id: uid(), area: "Центр", group: "4–6", coachId: coachAlexey, weekday: 2, time: "18:30", location: "" },
+    { id: uid(), area: "Центр", group: "9–14", coachId: coachAlexey, weekday: 2, time: "19:30", location: "" },
+    { id: uid(), area: "Центр", group: "6–9", coachId: coachAlexey, weekday: 4, time: "17:30", location: "" },
+    { id: uid(), area: "Центр", group: "4–6", coachId: coachAlexey, weekday: 4, time: "18:30", location: "" },
+    { id: uid(), area: "Центр", group: "9–14", coachId: coachAlexey, weekday: 4, time: "19:30", location: "" },
+
+    // Джикджилли — понедельник и пятница
+    { id: uid(), area: "Джикджилли", group: "взрослые", coachId: coachAlexey, weekday: 1, time: "09:30", location: "" },
+    { id: uid(), area: "Джикджилли", group: "доп. группа", coachId: coachAlexey, weekday: 1, time: "16:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "6–9", coachId: coachAlexey, weekday: 1, time: "17:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "4–6", coachId: coachAlexey, weekday: 1, time: "18:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "9–14", coachId: coachAlexey, weekday: 1, time: "19:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "доп. группа", coachId: coachAlexey, weekday: 1, time: "20:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "взрослые", coachId: coachAlexey, weekday: 5, time: "09:30", location: "" },
+    { id: uid(), area: "Джикджилли", group: "доп. группа", coachId: coachAlexey, weekday: 5, time: "16:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "6–9", coachId: coachAlexey, weekday: 5, time: "17:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "4–6", coachId: coachAlexey, weekday: 5, time: "18:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "9–14", coachId: coachAlexey, weekday: 5, time: "19:00", location: "" },
+    { id: uid(), area: "Джикджилли", group: "доп. группа", coachId: coachAlexey, weekday: 5, time: "20:00", location: "" },
+
+    // Махмутлар — среда и суббота
+    { id: uid(), area: "Махмутлар", group: "7–14", coachId: coachSergey, weekday: 3, time: "17:00", location: "" },
+    { id: uid(), area: "Махмутлар", group: "4–6", coachId: coachSergey, weekday: 3, time: "18:00", location: "" },
+    { id: uid(), area: "Махмутлар", group: "4–6", coachId: coachSergey, weekday: 6, time: "11:00", location: "" },
+    { id: uid(), area: "Махмутлар", group: "7–14", coachId: coachSergey, weekday: 6, time: "12:00", location: "" },
+  ];
 
   const leadsSources: ContactChannel[] = ["Instagram", "WhatsApp", "Telegram"];
   const leadStages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
@@ -733,30 +751,112 @@ function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
 }
 
 // Вкладка: Расписание (чтение демо)
-function ScheduleTab({ db }: { db: DB }) {
+function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const byArea = useMemo(() => {
     const m: Record<string, ScheduleSlot[]> = {};
+    for (const a of db.settings.areas) m[a] = [];
     for (const s of db.schedule) {
       m[s.area] ??= []; m[s.area].push(s);
     }
     return m;
-  }, [db.schedule]);
+  }, [db.schedule, db.settings.areas]);
+
+  // Добавление / редактирование районов
+  const addArea = () => {
+    const name = prompt("Название района");
+    if (!name) return;
+    if (db.settings.areas.includes(name)) return;
+    const next = { ...db, settings: { ...db.settings, areas: [...db.settings.areas, name] } };
+    setDB(next); saveDB(next);
+  };
+  const renameArea = (oldName: string) => {
+    const name = prompt("Новое название района", oldName);
+    if (!name || name === oldName) return;
+    const next = {
+      ...db,
+      settings: { ...db.settings, areas: db.settings.areas.map(a => a === oldName ? name : a) },
+      schedule: db.schedule.map(s => s.area === oldName ? { ...s, area: name } : s),
+    };
+    setDB(next); saveDB(next);
+  };
+  const deleteArea = (name: string) => {
+    if (!confirm(`Удалить район ${name}?`)) return;
+    const next = {
+      ...db,
+      settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name) },
+      schedule: db.schedule.filter(s => s.area !== name),
+    };
+    setDB(next); saveDB(next);
+  };
+
+  // Операции с группами в расписании
+  const addSlot = (area: string) => {
+    const weekday = parseInt(prompt("День недели (1-Пн … 7-Вс)", "1") || "", 10);
+    const time = prompt("Время (HH:MM)", "10:00") || "";
+    const group = prompt("Группа", "4–6") || "";
+    if (!weekday || !time || !group) return;
+    const slot: ScheduleSlot = { id: uid(), area, weekday, time, group, coachId: "", location: "" };
+    const next = {
+      ...db,
+      schedule: [...db.schedule, slot],
+      settings: db.settings.groups.includes(group)
+        ? db.settings
+        : { ...db.settings, groups: [...db.settings.groups, group] },
+    };
+    setDB(next); saveDB(next);
+  };
+  const editSlot = (id: string) => {
+    const s = db.schedule.find(x => x.id === id);
+    if (!s) return;
+    const weekday = parseInt(prompt("День недели (1-Пн … 7-Вс)", String(s.weekday)) || "", 10);
+    const time = prompt("Время (HH:MM)", s.time) || "";
+    const group = prompt("Группа", s.group) || "";
+    if (!weekday || !time || !group) return;
+    const next = {
+      ...db,
+      schedule: db.schedule.map(x => x.id === id ? { ...x, weekday, time, group } : x),
+      settings: db.settings.groups.includes(group)
+        ? db.settings
+        : { ...db.settings, groups: [...db.settings.groups, group] },
+    };
+    setDB(next); saveDB(next);
+  };
+  const deleteSlot = (id: string) => {
+    if (!confirm("Удалить группу?")) return;
+    const next = { ...db, schedule: db.schedule.filter(x => x.id !== id) };
+    setDB(next); saveDB(next);
+  };
 
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Расписание"]} />
+      <div>
+        <button onClick={addArea} className="mb-3 px-3 py-1 text-sm rounded-md border border-slate-300">+ район</button>
+      </div>
       <div className="grid lg:grid-cols-3 gap-3">
         {Object.entries(byArea).map(([area, list]) => (
           <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
-            <div className="font-semibold">{area}</div>
+            <div className="flex justify-between items-center font-semibold">
+              <span>{area}</span>
+              <span className="flex gap-1 text-xs">
+                <button onClick={() => renameArea(area)} className="px-2 py-1 rounded-md border border-slate-300">✎</button>
+                <button onClick={() => deleteArea(area)} className="px-2 py-1 rounded-md border border-slate-300">✕</button>
+              </span>
+            </div>
             <ul className="space-y-1 text-sm">
-              {list.sort((a,b)=> a.weekday - b.weekday || a.time.localeCompare(b.time)).map(s => (
-                <li key={s.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group} · тренер {db.staff.find(st => st.id===s.coachId)?.name || "—"}</span>
-                  <span className="text-slate-500">{s.location}</span>
-                </li>
-              ))}
+              {list
+                .sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time))
+                .map(s => (
+                  <li key={s.id} className="truncate flex justify-between">
+                    <span>{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][s.weekday - 1]} {s.time} · {s.group}</span>
+                    <span className="flex gap-1 text-xs">
+                      <button onClick={() => editSlot(s.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✎</button>
+                      <button onClick={() => deleteSlot(s.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✕</button>
+                    </span>
+                  </li>
+                ))}
             </ul>
+            <button onClick={() => addSlot(area)} className="mt-2 px-2 py-1 text-xs rounded-md border border-slate-300">+ группа</button>
           </div>
         ))}
       </div>
@@ -963,7 +1063,7 @@ export default function App() {
         {activeTab === "dashboard" && <Dashboard db={db} ui={ui} />}
         {activeTab === "clients" && can(ui.role, "manage_clients") && <ClientsTab db={db} setDB={setDB} ui={ui} />}
         {activeTab === "attendance" && can(ui.role, "attendance") && <AttendanceTab db={db} setDB={setDB} />}
-        {activeTab === "schedule" && can(ui.role, "schedule") && <ScheduleTab db={db} />}
+        {activeTab === "schedule" && can(ui.role, "schedule") && <ScheduleTab db={db} setDB={setDB} />}
         {activeTab === "leads" && can(ui.role, "leads") && <LeadsTab db={db} setDB={setDB} />}
         {activeTab === "tasks" && can(ui.role, "tasks") && <TasksTab db={db} setDB={setDB} />}
         {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
