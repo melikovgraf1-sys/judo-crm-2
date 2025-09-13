@@ -1,4 +1,3 @@
-// @flow
 import React, { useState, useEffect } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { todayISO, saveDB, uid, fmtDate } from "../App";
@@ -96,8 +95,8 @@ function LeadModal(
           <div><span className="text-slate-500">Родитель:</span> {lead.parentName || "—"}</div>
           <div><span className="text-slate-500">Имя ребёнка:</span> {lead.firstName}</div>
           <div><span className="text-slate-500">Фамилия:</span> {lead.lastName}</div>
-          <div><span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}</div>
-          <div><span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}</div>
+            <div><span className="text-slate-500">Дата рождения:</span> {lead.birthDate ? fmtDate(lead.birthDate) : "—"}</div>
+            <div><span className="text-slate-500">Старт:</span> {lead.startDate ? fmtDate(lead.startDate) : "—"}</div>
           <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
           <div><span className="text-slate-500">Контакт:</span> {lead.contact || "—"}</div>
           <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>

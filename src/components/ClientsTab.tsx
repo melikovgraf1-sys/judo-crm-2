@@ -1,9 +1,8 @@
-// @flow
 import React, { useState, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import TableWrap from "./TableWrap";
 import { uid, todayISO, parseDateInput, fmtMoney, calcAgeYears, calcExperience, saveDB } from "../App";
-import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
+import type { DB, UIState, Client, Area, Group, PaymentStatus, ContactChannel, PaymentMethod, Gender } from "../App";
 
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
@@ -16,17 +15,17 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
   const [group, setGroup] = useState<Group | "all">("all");
   const [pay, setPay] = useState<PaymentStatus | "all">("all");
   const [modalOpen, setModalOpen] = useState(false);
-  const blankForm = () => ({
+  const blankForm = (): Partial<Client> => ({
     firstName: "",
     lastName: "",
     phone: "",
-    gender: "м",
-    area: db.settings.areas[0],
-    group: db.settings.groups[0],
-    channel: "Telegram",
+    gender: "м" as Gender,
+    area: db.settings.areas[0] as Area,
+    group: db.settings.groups[0] as Group,
+    channel: "Telegram" as ContactChannel,
     startDate: new Date().toISOString(),
-    payMethod: "перевод",
-    payStatus: "ожидание",
+    payMethod: "перевод" as PaymentMethod,
+    payStatus: "ожидание" as PaymentStatus,
     birthDate: new Date("2017-01-01").toISOString(),
     payDate: new Date().toISOString(),
     payAmount: 0,
@@ -73,16 +72,16 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         firstName: String(form.firstName || ""),
         lastName: form.lastName || "",
         phone: form.phone || "",
-        channel: form.channel,
+        channel: form.channel as ContactChannel,
         birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
         parentName: form.parentName || "",
-        gender: form.gender || "м",
-        area: form.area || db.settings.areas[0],
-        group: form.group || db.settings.groups[0],
+        gender: (form.gender ?? "м") as Gender,
+        area: (form.area ?? db.settings.areas[0]) as Area,
+        group: (form.group ?? db.settings.groups[0]) as Group,
         coachId: db.staff.find(s => s.role === "Тренер")?.id,
         startDate: form.startDate || todayISO(),
-        payMethod: form.payMethod || "перевод",
-        payStatus: form.payStatus || "ожидание",
+        payMethod: (form.payMethod ?? "перевод") as PaymentMethod,
+        payStatus: (form.payStatus ?? "ожидание") as PaymentStatus,
         payDate: form.payDate || todayISO(),
         payAmount: form.payAmount || 0,
       };
@@ -114,11 +113,11 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value as Group | "all")}>
           <option value="all">Все группы</option>
           {db.settings.groups.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={pay} onChange={e => setPay(e.target.value)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={pay} onChange={e => setPay(e.target.value as PaymentStatus | "all")}>
           <option value="all">Все статусы оплаты</option>
           <option value="ожидание">ожидание</option>
           <option value="действует">действует</option>
@@ -204,30 +203,30 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
                 <label className="text-xs text-slate-500">Телефон</label>
                 <input className="px-3 py-2 rounded-md border border-slate-300" value={form.phone || ""} onChange={e => setForm({ ...form, phone: e.target.value })} />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">Канал</label>
-                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })}>
-                  <option>Telegram</option><option>WhatsApp</option><option>Instagram</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">Пол</label>
-                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
-                  <option value="м">м</option><option value="ж">ж</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">Район</label>
-                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })}>
-                  {db.settings.areas.map(a => <option key={a}>{a}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">Группа</label>
-                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group} onChange={e => setForm({ ...form, group: e.target.value })}>
-                  {db.settings.groups.map(g => <option key={g}>{g}</option>)}
-                </select>
-              </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Канал</label>
+                  <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value as ContactChannel })}>
+                    <option>Telegram</option><option>WhatsApp</option><option>Instagram</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Пол</label>
+                  <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value as Gender })}>
+                    <option value="м">м</option><option value="ж">ж</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Район</label>
+                  <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area} onChange={e => setForm({ ...form, area: e.target.value as Area })}>
+                    {db.settings.areas.map(a => <option key={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Группа</label>
+                  <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group} onChange={e => setForm({ ...form, group: e.target.value as Group })}>
+                    {db.settings.groups.map(g => <option key={g}>{g}</option>)}
+                  </select>
+                </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-slate-500">Дата рождения</label>
                 <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })} />
@@ -236,18 +235,18 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
                 <label className="text-xs text-slate-500">Дата начала</label>
                 <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })} />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">Способ оплаты</label>
-                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod} onChange={e => setForm({ ...form, payMethod: e.target.value })}>
-                  <option>перевод</option><option>наличные</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-500">Статус оплаты</label>
-                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus} onChange={e => setForm({ ...form, payStatus: e.target.value })}>
-                  <option>ожидание</option><option>действует</option><option>задолженность</option>
-                </select>
-              </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Способ оплаты</label>
+                  <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod} onChange={e => setForm({ ...form, payMethod: e.target.value as PaymentMethod })}>
+                    <option>перевод</option><option>наличные</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Статус оплаты</label>
+                  <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus} onChange={e => setForm({ ...form, payStatus: e.target.value as PaymentStatus })}>
+                    <option>ожидание</option><option>действует</option><option>задолженность</option>
+                  </select>
+                </div>
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => { setModalOpen(false); setEditing(null); }} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>

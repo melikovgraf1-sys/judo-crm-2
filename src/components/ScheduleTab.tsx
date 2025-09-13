@@ -1,4 +1,3 @@
-// @flow
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { uid, saveDB } from "../App";

@@ -1,4 +1,3 @@
-// @flow
 import React, { useState } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtDate, uid, saveDB, todayISO } from "../App";
@@ -7,22 +6,22 @@ import type { DB, TaskItem } from "../App";
 export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = (id: string) => {
-    const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };
+    const next: DB = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: (t.status === "open" ? "done" : "open") as "open" | "done" } : t) };
     setDB(next); saveDB(next);
   };
   const save = () => {
     if (!edit) return;
-    const next = { ...db, tasks: db.tasks.map(t => t.id === edit.id ? edit : t) };
+    const next: DB = { ...db, tasks: db.tasks.map(t => t.id === edit.id ? edit : t) };
     setDB(next); saveDB(next); setEdit(null);
   };
   const add = () => {
     const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
-    const next = { ...db, tasks: [t, ...db.tasks] };
+    const next: DB = { ...db, tasks: [t, ...db.tasks] };
     setDB(next); saveDB(next);
   };
   const remove = (id: string) => {
     if (!confirm("Удалить задачу?")) return;
-    const next = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
+    const next: DB = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
     setDB(next); saveDB(next);
   };
   return (

@@ -1,18 +1,18 @@
-// @flow
 import React from "react";
 import { saveUI, can } from "../App";
+import type { UIState, Role, TabKey } from "../App";
 
-const TABS = [
+const TABS: { key: TabKey; title: string; need?: (r: Role) => boolean }[] = [
   { key: "dashboard", title: "Дашборд" },
-  { key: "clients", title: "Клиенты", need: r => can(r, "manage_clients") },
-  { key: "attendance", title: "Посещаемость", need: r => can(r, "attendance") },
-  { key: "schedule", title: "Расписание", need: r => can(r, "schedule") },
-  { key: "leads", title: "Лиды", need: r => can(r, "leads") },
-  { key: "tasks", title: "Задачи", need: r => can(r, "tasks") },
-  { key: "settings", title: "Настройки", need: r => can(r, "settings") },
+  { key: "clients", title: "Клиенты", need: (r: Role) => can(r, "manage_clients") },
+  { key: "attendance", title: "Посещаемость", need: (r: Role) => can(r, "attendance") },
+  { key: "schedule", title: "Расписание", need: (r: Role) => can(r, "schedule") },
+  { key: "leads", title: "Лиды", need: (r: Role) => can(r, "leads") },
+  { key: "tasks", title: "Задачи", need: (r: Role) => can(r, "tasks") },
+  { key: "settings", title: "Настройки", need: (r: Role) => can(r, "settings") },
 ];
 
-export default function Tabs({ ui, setUI, role }) {
+export default function Tabs({ ui, setUI, role }: { ui: UIState; setUI: (u: UIState) => void; role: Role }) {
   const visible = TABS.filter(t => !t.need || t.need(role));
   return (
     <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">

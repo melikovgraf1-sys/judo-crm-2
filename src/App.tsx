@@ -1,4 +1,3 @@
-// @flow
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Topbar from "./components/Topbar";
 import Tabs from "./components/Tabs";
@@ -213,17 +212,17 @@ export function makeSeedDB(): DB {
     const fn = firstNames[rnd(0, firstNames.length - 1)];
     const ln = lastNames[rnd(0, lastNames.length - 1)];
     const gender: Gender = Math.random() < 0.5 ? "м" : "ж";
-    const area = areas[rnd(0, areas.length - 1)];
-    const group = groups[rnd(0, groups.length - 1)];
+    const area: Area = areas[rnd(0, areas.length - 1)];
+    const group: Group = groups[rnd(0, groups.length - 1)];
     const coachId = coachIds[rnd(0, coachIds.length - 1)];
     const ageYears = rnd(5, 14);
     const birthDate = new Date();
     birthDate.setFullYear(birthDate.getFullYear() - ageYears);
     const start = new Date();
     start.setMonth(start.getMonth() - rnd(0, 8));
-    const payStatus = ["ожидание", "действует", "задолженность"][rnd(0, 2)];
-    const channel = ["Telegram", "WhatsApp", "Instagram"][rnd(0, 2)];
-    const payMethod = Math.random() < 0.6 ? "перевод" : "наличные";
+    const payStatus: PaymentStatus = ["ожидание", "действует", "задолженность"][rnd(0, 2)] as PaymentStatus;
+    const channel: ContactChannel = ["Telegram", "WhatsApp", "Instagram"][rnd(0, 2)] as ContactChannel;
+    const payMethod: PaymentMethod = Math.random() < 0.6 ? "перевод" : "наличные";
     const payDate = new Date();
     payDate.setDate(payDate.getDate() - rnd(0, 30));
     const payAmount = rnd(20, 60) * 10; // базовая валюта EUR
@@ -355,9 +354,9 @@ export function makeSeedDB(): DB {
 
 export function loadDB(): DB {
   const raw = localStorage.getItem(LS_KEYS.db);
-  if (raw) {
-    try { return (JSON.parse(raw): DB); } catch {}
-  }
+    if (raw) {
+      try { return JSON.parse(raw) as DB; } catch {}
+    }
   const db = makeSeedDB();
   localStorage.setItem(LS_KEYS.db, JSON.stringify(db));
   return db;
@@ -367,9 +366,9 @@ export function saveDB(db: DB) { localStorage.setItem(LS_KEYS.db, JSON.stringify
 
 export function loadUI(): UIState {
   const raw = localStorage.getItem(LS_KEYS.ui);
-  if (raw) {
-    try { return (JSON.parse(raw): UIState); } catch {}
-  }
+    if (raw) {
+      try { return JSON.parse(raw) as UIState; } catch {}
+    }
   const ui: UIState = {
     role: "Администратор",
     activeTab: "dashboard",

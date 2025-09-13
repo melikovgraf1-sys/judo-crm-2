@@ -1,4 +1,3 @@
-// @flow
 import React from "react";
 
 export default function QuickAddModal({ open, onClose, onAddClient, onAddLead, onAddTask }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void; onAddTask: () => void }) {
