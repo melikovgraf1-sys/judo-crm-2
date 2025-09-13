@@ -1,7 +1,8 @@
 // @flow
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Topbar from "./components/Topbar";
-import Tabs from "./components/Tabs";
+import Tabs, { TAB_TITLES } from "./components/Tabs";
 import Dashboard from "./components/Dashboard";
 import ClientsTab from "./components/ClientsTab";
 import AttendanceTab from "./components/AttendanceTab";
@@ -459,33 +460,88 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const canSee = (tab: TabKey) => {
-    const r = ui.role;
-    if (tab === "dashboard") return true;
-    if (tab === "clients") return can(r, "manage_clients");
-    if (tab === "attendance") return can(r, "attendance");
-    if (tab === "schedule") return can(r, "schedule");
-    if (tab === "leads") return can(r, "leads");
-    if (tab === "tasks") return can(r, "tasks");
-    if (tab === "settings") return can(r, "settings");
-    return false;
-  };
-
-  const activeTab = canSee(ui.activeTab) ? ui.activeTab : "dashboard";
+  const location = useLocation();
+  useEffect(() => {
+    let key = location.pathname.replace(/^\/+/, "");
+    if (key === "") key = "dashboard";
+    if (!TAB_TITLES[key]) key = "dashboard";
+    if (ui.activeTab !== key) {
+      const next = { ...ui, activeTab: key, breadcrumbs: [TAB_TITLES[key]] };
+      setUI(next); saveUI(next);
+    }
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900">
       <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
-      <Tabs ui={ui} setUI={setUI} role={ui.role} />
+      <Tabs role={ui.role} />
 
       <main className="max-w-7xl mx-auto p-3 space-y-3">
-        {activeTab === "dashboard" && <Dashboard db={db} ui={ui} />}
-        {activeTab === "clients" && can(ui.role, "manage_clients") && <ClientsTab db={db} setDB={setDB} ui={ui} />}
-        {activeTab === "attendance" && can(ui.role, "attendance") && <AttendanceTab db={db} setDB={setDB} />}
-        {activeTab === "schedule" && can(ui.role, "schedule") && <ScheduleTab db={db} setDB={setDB} />}
-        {activeTab === "leads" && can(ui.role, "leads") && <LeadsTab db={db} setDB={setDB} />}
-        {activeTab === "tasks" && can(ui.role, "tasks") && <TasksTab db={db} setDB={setDB} />}
-        {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard db={db} ui={ui} />} />
+          <Route
+            path="/clients"
+            element={
+              can(ui.role, "manage_clients") ? (
+                <ClientsTab db={db} setDB={setDB} ui={ui} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+          <Route
+            path="/attendance"
+            element={
+              can(ui.role, "attendance") ? (
+                <AttendanceTab db={db} setDB={setDB} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+          <Route
+            path="/schedule"
+            element={
+              can(ui.role, "schedule") ? (
+                <ScheduleTab db={db} setDB={setDB} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+          <Route
+            path="/leads"
+            element={
+              can(ui.role, "leads") ? (
+                <LeadsTab db={db} setDB={setDB} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+          <Route
+            path="/tasks"
+            element={
+              can(ui.role, "tasks") ? (
+                <TasksTab db={db} setDB={setDB} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              can(ui.role, "settings") ? (
+                <SettingsTab db={db} setDB={setDB} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
       </main>
 
       <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} onAddTask={addQuickTask} />
