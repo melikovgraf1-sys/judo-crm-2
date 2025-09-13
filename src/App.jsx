@@ -566,8 +566,10 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
   const [group, setGroup] = useState<Group | "all">("all");
   const [pay, setPay] = useState<PaymentStatus | "all">("all");
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState<Partial<Client>>({
+  const blankForm = () => ({
     firstName: "",
+    lastName: "",
+    phone: "",
     gender: "м",
     area: db.settings.areas[0],
     group: db.settings.groups[0],
@@ -578,7 +580,10 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     birthDate: new Date("2017-01-01").toISOString(),
     payDate: new Date().toISOString(),
     payAmount: 0,
+    parentName: "",
   });
+  const [form, setForm] = useState<Partial<Client>>(blankForm());
+  const [editing, setEditing] = useState<Client | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
 
   const list = useMemo(() => {
@@ -590,27 +595,56 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     );
   }, [db.clients, area, group, pay, ui.search]);
 
-  const addClient = () => {
-    const c: Client = {
-      id: uid(),
-      firstName: String(form.firstName || ""),
-      lastName: form.lastName || "",
-      phone: form.phone || "",
-      channel: form.channel,
-      birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
-      parentName: form.parentName || "",
-      gender: form.gender || "м",
-      area: form.area || db.settings.areas[0],
-      group: form.group || db.settings.groups[0],
-      coachId: db.staff.find(s => s.role === "Тренер")?.id,
-      startDate: form.startDate || todayISO(),
-      payMethod: form.payMethod || "перевод",
-      payStatus: form.payStatus || "ожидание",
-      payDate: form.payDate || todayISO(),
-      payAmount: form.payAmount || 0,
-    };
-    const next = { ...db, clients: [c, ...db.clients], changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }] };
-    setDB(next); saveDB(next); setModalOpen(false);
+  const openAddModal = () => {
+    setEditing(null);
+    setForm(blankForm());
+    setModalOpen(true);
+  };
+
+  const startEdit = (c: Client) => {
+    setEditing(c);
+    setForm(c);
+    setSelected(null);
+    setModalOpen(true);
+  };
+
+  const saveClient = () => {
+    if (editing) {
+      const updated: Client = { ...editing, ...form };
+      const next = {
+        ...db,
+        clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
+      };
+      setDB(next); saveDB(next);
+    } else {
+      const c: Client = {
+        id: uid(),
+        firstName: String(form.firstName || ""),
+        lastName: form.lastName || "",
+        phone: form.phone || "",
+        channel: form.channel,
+        birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
+        parentName: form.parentName || "",
+        gender: form.gender || "м",
+        area: form.area || db.settings.areas[0],
+        group: form.group || db.settings.groups[0],
+        coachId: db.staff.find(s => s.role === "Тренер")?.id,
+        startDate: form.startDate || todayISO(),
+        payMethod: form.payMethod || "перевод",
+        payStatus: form.payStatus || "ожидание",
+        payDate: form.payDate || todayISO(),
+        payAmount: form.payAmount || 0,
+      };
+      const next = {
+        ...db,
+        clients: [c, ...db.clients],
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
+      };
+      setDB(next); saveDB(next);
+    }
+    setModalOpen(false);
+    setEditing(null);
   };
 
   const removeClient = (id: string) => {
@@ -626,7 +660,7 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <Chip active={area === "all"} onClick={() => setArea("all")}>Все районы</Chip>
         {db.settings.areas.map(a => <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>)}
         <div className="flex-1" />
-        <button onClick={() => setModalOpen(true)} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
+        <button onClick={openAddModal} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
@@ -698,13 +732,10 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
               <div><span className="text-slate-500">Дата оплаты:</span> {selected.payDate?.slice(0,10) || "—"}</div>
               <div><span className="text-slate-500">Сумма оплаты:</span> {selected.payAmount != null ? fmtMoney(selected.payAmount, ui.currency) : "—"}</div>
             </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setSelected(null)}
-                className="px-3 py-2 rounded-md border border-slate-300"
-              >
-                Закрыть
-              </button>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => startEdit(selected)} className="px-3 py-2 rounded-md border border-slate-300">Редактировать</button>
+              <button onClick={() => { removeClient(selected.id); setSelected(null); }} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600">Удалить</button>
+              <button onClick={() => setSelected(null)} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
             </div>
           </div>
         </div>
@@ -713,7 +744,7 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
       {modalOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white p-4 space-y-3">
-            <div className="font-semibold text-slate-800">Новый клиент</div>
+            <div className="font-semibold text-slate-800">{editing ? "Редактирование клиента" : "Новый клиент"}</div>
             <div className="grid sm:grid-cols-2 gap-2">
               <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
               <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName || ""} onChange={e => setForm({ ...form, lastName: e.target.value })} />
@@ -740,8 +771,8 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
               </select>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setModalOpen(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
-              <button onClick={addClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+              <button onClick={() => { setModalOpen(false); setEditing(null); }} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button onClick={saveClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
             </div>
           </div>
         </div>
