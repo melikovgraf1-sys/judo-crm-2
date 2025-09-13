@@ -948,10 +948,18 @@ function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   };
 
   // Операции с группами в расписании
+  const pickGroup = (init: string) => {
+    const list = db.settings.groups.map((g, i) => `${i + 1}. ${g}`).join("\n");
+    const raw = prompt(`Группа:\n${list}\nВведите номер или название новой`, init);
+    if (!raw) return "";
+    const idx = parseInt(raw, 10);
+    if (!isNaN(idx) && idx >= 1 && idx <= db.settings.groups.length) return db.settings.groups[idx - 1];
+    return raw;
+  };
   const addSlot = (area: string) => {
     const weekday = parseInt(prompt("День недели (1-Пн … 7-Вс)", "1") || "", 10);
     const time = prompt("Время (HH:MM)", "10:00") || "";
-    const group = prompt("Группа", "4–6") || "";
+    const group = pickGroup(db.settings.groups[0] || "");
     if (!weekday || !time || !group) return;
     const slot: ScheduleSlot = { id: uid(), area, weekday, time, group, coachId: "", location: "" };
     const next = {
@@ -968,7 +976,7 @@ function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
     if (!s) return;
     const weekday = parseInt(prompt("День недели (1-Пн … 7-Вс)", String(s.weekday)) || "", 10);
     const time = prompt("Время (HH:MM)", s.time) || "";
-    const group = prompt("Группа", s.group) || "";
+    const group = pickGroup(s.group);
     if (!weekday || !time || !group) return;
     const next = {
       ...db,
