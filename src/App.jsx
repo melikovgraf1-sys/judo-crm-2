@@ -773,29 +773,62 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
           <div className="w-full max-w-xl rounded-2xl bg-white p-4 space-y-3">
             <div className="font-semibold text-slate-800">{editing ? "Редактирование клиента" : "Новый клиент"}</div>
             <div className="grid sm:grid-cols-2 gap-2">
-              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
-              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName || ""} onChange={e => setForm({ ...form, lastName: e.target.value })} />
-              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Телефон" value={form.phone || ""} onChange={e => setForm({ ...form, phone: e.target.value })} />
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })}>
-                <option>Telegram</option><option>WhatsApp</option><option>Instagram</option>
-              </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
-                <option value="м">м</option><option value="ж">ж</option>
-              </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })}>
-                {db.settings.areas.map(a => <option key={a}>{a}</option>)}
-              </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group} onChange={e => setForm({ ...form, group: e.target.value })}>
-                {db.settings.groups.map(g => <option key={g}>{g}</option>)}
-              </select>
-              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })} />
-              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })} />
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod} onChange={e => setForm({ ...form, payMethod: e.target.value })}>
-                <option>перевод</option><option>наличные</option>
-              </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus} onChange={e => setForm({ ...form, payStatus: e.target.value })}>
-                <option>ожидание</option><option>действует</option><option>задолженность</option>
-              </select>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Имя</label>
+                <input className="px-3 py-2 rounded-md border border-slate-300" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Фамилия</label>
+                <input className="px-3 py-2 rounded-md border border-slate-300" value={form.lastName || ""} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Телефон</label>
+                <input className="px-3 py-2 rounded-md border border-slate-300" value={form.phone || ""} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Канал</label>
+                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })}>
+                  <option>Telegram</option><option>WhatsApp</option><option>Instagram</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Пол</label>
+                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
+                  <option value="м">м</option><option value="ж">ж</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Район</label>
+                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })}>
+                  {db.settings.areas.map(a => <option key={a}>{a}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Группа</label>
+                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group} onChange={e => setForm({ ...form, group: e.target.value })}>
+                  {db.settings.groups.map(g => <option key={g}>{g}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Дата рождения</label>
+                <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Дата начала</label>
+                <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Способ оплаты</label>
+                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod} onChange={e => setForm({ ...form, payMethod: e.target.value })}>
+                  <option>перевод</option><option>наличные</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Статус оплаты</label>
+                <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus} onChange={e => setForm({ ...form, payStatus: e.target.value })}>
+                  <option>ожидание</option><option>действует</option><option>задолженность</option>
+                </select>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => { setModalOpen(false); setEditing(null); }} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
