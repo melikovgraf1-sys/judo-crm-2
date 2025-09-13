@@ -46,6 +46,8 @@ interface Client {
   startDate: string; // ISO
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
+  payDate?: string; // ISO
+  payAmount?: number;
   // Автополя (рассчитываются на лету)
 }
 
@@ -145,6 +147,25 @@ const parseDateInput = (value: string) => {
   return isNaN(d.getTime()) ? "" : d.toISOString();
 };
 
+const calcAgeYears = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+};
+
+const calcExperience = (iso: string) => {
+  const start = new Date(iso);
+  const now = new Date();
+  const months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
+  if (months < 12) return `${months} мес.`;
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return `${years} г.${rest ? ` ${rest} мес.` : ""}`;
+};
+
 // Seed-данные
 function makeSeedDB(): DB {
   const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
@@ -177,6 +198,9 @@ function makeSeedDB(): DB {
     const payStatus = ["ожидание", "действует", "задолженность"][rnd(0, 2)];
     const channel = ["Telegram", "WhatsApp", "Instagram"][rnd(0, 2)];
     const payMethod = Math.random() < 0.6 ? "перевод" : "наличные";
+    const payDate = new Date();
+    payDate.setDate(payDate.getDate() - rnd(0, 30));
+    const payAmount = rnd(20, 60) * 10; // базовая валюта EUR
     return {
       id: uid(),
       firstName: fn,
@@ -192,6 +216,8 @@ function makeSeedDB(): DB {
       startDate: start.toISOString(),
       payMethod,
       payStatus,
+      payDate: payDate.toISOString(),
+      payAmount,
     };
   });
 
@@ -526,7 +552,10 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     payMethod: "перевод",
     payStatus: "ожидание",
     birthDate: new Date("2017-01-01").toISOString(),
+    payDate: new Date().toISOString(),
+    payAmount: 0,
   });
+  const [selected, setSelected] = useState<Client | null>(null);
 
   const list = useMemo(() => {
     return db.clients.filter(c =>
@@ -553,6 +582,8 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
       startDate: form.startDate || todayISO(),
       payMethod: form.payMethod || "перевод",
       payStatus: form.payStatus || "ожидание",
+      payDate: form.payDate || todayISO(),
+      payAmount: form.payAmount || 0,
     };
     const next = { ...db, clients: [c, ...db.clients], changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }] };
     setDB(next); saveDB(next); setModalOpen(false);
@@ -603,7 +634,12 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <tbody>
           {list.map(c => (
             <tr key={c.id} className="border-t border-slate-100">
-              <td className="p-2 whitespace-nowrap">{c.firstName} {c.lastName}</td>
+              <td
+                className="p-2 whitespace-nowrap text-sky-700 hover:underline cursor-pointer"
+                onClick={() => setSelected(c)}
+              >
+                {c.firstName} {c.lastName}
+              </td>
               <td className="p-2">{c.gender}</td>
               <td className="p-2">{c.area}</td>
               <td className="p-2">{c.group}</td>
@@ -618,6 +654,37 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
           ))}
         </tbody>
       </TableWrap>
+
+      {selected && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold text-slate-800">
+              {selected.firstName} {selected.lastName}
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div><span className="text-slate-500">Телефон:</span> {selected.phone || "—"}</div>
+              <div><span className="text-slate-500">Канал:</span> {selected.channel}</div>
+              <div><span className="text-slate-500">Родитель:</span> {selected.parentName || "—"}</div>
+              <div><span className="text-slate-500">Дата рождения:</span> {selected.birthDate?.slice(0,10)}</div>
+              <div><span className="text-slate-500">Возраст:</span> {selected.birthDate ? `${calcAgeYears(selected.birthDate)} лет` : "—"}</div>
+              <div><span className="text-slate-500">Район:</span> {selected.area}</div>
+              <div><span className="text-slate-500">Группа:</span> {selected.group}</div>
+              <div><span className="text-slate-500">Опыт:</span> {calcExperience(selected.startDate)}</div>
+              <div><span className="text-slate-500">Статус оплаты:</span> {selected.payStatus}</div>
+              <div><span className="text-slate-500">Дата оплаты:</span> {selected.payDate?.slice(0,10) || "—"}</div>
+              <div><span className="text-slate-500">Сумма оплаты:</span> {selected.payAmount != null ? fmtMoney(selected.payAmount, ui.currency) : "—"}</div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setSelected(null)}
+                className="px-3 py-2 rounded-md border border-slate-300"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
