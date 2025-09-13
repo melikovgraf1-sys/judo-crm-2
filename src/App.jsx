@@ -1235,7 +1235,11 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
                 if (!val) setEdit({ ...edit, assigneeType: undefined, assigneeId: undefined });
                 else {
                   const [type, id] = val.split(":");
-                  setEdit({ ...edit, assigneeType: type as "client" | "staff", assigneeId: id });
+                  setEdit({
+                    ...edit,
+                    assigneeType: type === "client" ? "client" : "staff",
+                    assigneeId: id,
+                  });
                 }
               }}>
                 <option value="">Ответственный</option>
@@ -1250,20 +1254,20 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
                   ))}
                 </optgroup>
               </select>
-              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.topic || ""} onChange={e => setEdit({ ...edit, topic: e.target.value as TaskItem["topic"] })}>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.topic || ""} onChange={e => setEdit({ ...edit, topic: e.target.value })}>
                 <option value="">Тема</option>
                 <option value="оплата">Оплата</option>
                 <option value="аренда">Аренда</option>
                 <option value="день рождения">День рождения</option>
                 <option value="другое">Другое</option>
               </select>
-              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.area || ""} onChange={e => setEdit({ ...edit, area: e.target.value as Area })}>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.area || ""} onChange={e => setEdit({ ...edit, area: e.target.value })}>
                 <option value="">Район</option>
                 {db.settings.areas.map(a => (
                   <option key={a} value={a}>{a}</option>
                 ))}
               </select>
-              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.group || ""} onChange={e => setEdit({ ...edit, group: e.target.value as Group })}>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.group || ""} onChange={e => setEdit({ ...edit, group: e.target.value })}>
                 <option value="">Группа</option>
                 {db.settings.groups.map(g => (
                   <option key={g} value={g}>{g}</option>
