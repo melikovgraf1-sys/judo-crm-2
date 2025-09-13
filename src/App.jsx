@@ -139,6 +139,11 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 const todayISO = () => new Date().toISOString();
 const fmtDate = (iso: string) => new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
 const fmtMoney = (v: number, c: Currency) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(v);
+const parseDateInput = (value: string) => {
+  if (!value) return "";
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? "" : d.toISOString();
+};
 
 // Seed-данные
 function makeSeedDB(): DB {
@@ -634,8 +639,8 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
               <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group} onChange={e => setForm({ ...form, group: e.target.value })}>
                 {db.settings.groups.map(g => <option key={g}>{g}</option>)}
               </select>
-              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10)} onChange={e => setForm({ ...form, birthDate: new Date(e.target.value).toISOString() })} />
-              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10)} onChange={e => setForm({ ...form, startDate: new Date(e.target.value).toISOString() })} />
+              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })} />
+              <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10) || ""} onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })} />
               <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod} onChange={e => setForm({ ...form, payMethod: e.target.value })}>
                 <option>перевод</option><option>наличные</option>
               </select>
