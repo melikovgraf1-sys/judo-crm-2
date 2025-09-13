@@ -83,9 +83,12 @@ interface TaskItem {
   id: string;
   title: string;
   due: string; // ISO
+  assigneeType?: "client" | "staff";
   assigneeId?: string;
   status: "open" | "done";
-  type?: "оплата ученика" | "оплата аренды" | "день рождения" | "другое";
+  topic?: "оплата" | "аренда" | "день рождения" | "другое";
+  area?: Area;
+  group?: Group;
 }
 
 interface StaffMember {
@@ -242,8 +245,8 @@ function makeSeedDB(): DB {
   }
 
   const tasks: TaskItem[] = [
-    { id: uid(), title: "Оплата аренды — Центр", due: new Date(Date.now() + 5 * 86400000).toISOString(), assigneeId: staff.find(s => s.role === "Менеджер")?.id, status: "open", type: "оплата аренды" },
-    { id: uid(), title: "Поздравить с ДР — Иван", due: new Date(Date.now() + 2 * 86400000).toISOString(), assigneeId: staff.find(s => s.role === "Менеджер")?.id, status: "open", type: "день рождения" },
+    { id: uid(), title: "Оплата аренды — Центр", due: new Date(Date.now() + 5 * 86400000).toISOString(), assigneeType: "staff", assigneeId: staff.find(s => s.role === "Администратор")?.id, status: "open", topic: "аренда", area: "Центр" },
+    { id: uid(), title: "Поздравить с ДР — Иван", due: new Date(Date.now() + 2 * 86400000).toISOString(), assigneeType: "staff", assigneeId: staff.find(s => s.role === "Администратор")?.id, status: "open", topic: "день рождения" },
   ];
 
   const settings: Settings = {
@@ -802,9 +805,20 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
 
 // Вкладка: Задачи (минимум: список, отметка done)
 function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = (id: string) => {
     const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };
     setDB(next); saveDB(next);
+  };
+  const save = () => {
+    if (!edit) return;
+    const next = { ...db, tasks: db.tasks.map(t => t.id === edit.id ? edit : t) };
+    setDB(next); saveDB(next); setEdit(null);
+  };
+  const remove = (id: string) => {
+    if (!confirm("Удалить задачу?")) return;
+    const next = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
+    setDB(next); saveDB(next); setEdit(null);
   };
   return (
     <div className="space-y-3">
@@ -818,14 +832,81 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="flex items-center gap-3">
               <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
               <div>
-                <div className="font-medium">{t.title}</div>
-                <div className="text-xs text-slate-500">К сроку: {fmtDate(t.due)}{t.type ? ` · ${t.type}`: ""}</div>
+                <button onClick={() => setEdit({ ...t })} className="font-medium text-left hover:underline">{t.title}</button>
+                <div className="text-xs text-slate-500">
+                  К сроку: {fmtDate(t.due)}
+                  {t.topic ? ` · ${t.topic}` : ""}
+                  {t.area ? ` · ${t.area}` : ""}
+                  {t.group ? ` · ${t.group}` : ""}
+                </div>
               </div>
             </div>
-            <div className="text-xs text-slate-500">{db.staff.find(s => s.id===t.assigneeId)?.name || "—"}</div>
+            <div className="text-xs text-slate-500">
+              {t.assigneeType === "client"
+                ? (() => { const c = db.clients.find(c => c.id === t.assigneeId); return c ? `${c.firstName} ${c.lastName ?? ""}`.trim() : "—"; })()
+                : db.staff.find(s => s.id === t.assigneeId)?.name || "—"}
+            </div>
           </div>
         ))}
       </div>
+
+      {edit && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold">Редактировать задачу</div>
+            <div className="space-y-2">
+              <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
+              <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: parseDateInput(e.target.value) })} />
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.assigneeId ? `${edit.assigneeType}:${edit.assigneeId}` : ""} onChange={e => {
+                const val = e.target.value;
+                if (!val) setEdit({ ...edit, assigneeType: undefined, assigneeId: undefined });
+                else {
+                  const [type, id] = val.split(":");
+                  setEdit({ ...edit, assigneeType: type as "client" | "staff", assigneeId: id });
+                }
+              }}>
+                <option value="">Ответственный</option>
+                <optgroup label="Администраторы">
+                  {db.staff.filter(s => s.role === "Администратор").map(s => (
+                    <option key={s.id} value={`staff:${s.id}`}>{s.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Клиенты">
+                  {db.clients.map(c => (
+                    <option key={c.id} value={`client:${c.id}`}>{c.firstName} {c.lastName || ""}</option>
+                  ))}
+                </optgroup>
+              </select>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.topic || ""} onChange={e => setEdit({ ...edit, topic: e.target.value as TaskItem["topic"] })}>
+                <option value="">Тема</option>
+                <option value="оплата">Оплата</option>
+                <option value="аренда">Аренда</option>
+                <option value="день рождения">День рождения</option>
+                <option value="другое">Другое</option>
+              </select>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.area || ""} onChange={e => setEdit({ ...edit, area: e.target.value as Area })}>
+                <option value="">Район</option>
+                {db.settings.areas.map(a => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+              <select className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.group || ""} onChange={e => setEdit({ ...edit, group: e.target.value as Group })}>
+                <option value="">Группа</option>
+                {db.settings.groups.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-between">
+              <button onClick={() => remove(edit.id)} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
+              <div className="flex gap-2">
+                <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+                <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700">Сохранить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -888,7 +969,7 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 }
 
 // Быстрое добавление (демо)
-function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void }) {
+function QuickAddModal({ open, onClose, onAddClient, onAddLead, onAddTask }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void; onAddTask: () => void }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
@@ -897,6 +978,7 @@ function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolea
         <div className="grid gap-2">
           <button onClick={onAddClient} className="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">+ Клиента</button>
           <button onClick={onAddLead} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Лида</button>
+          <button onClick={onAddTask} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Задачу</button>
         </div>
         <div className="flex justify-end">
           <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
@@ -927,6 +1009,22 @@ export default function App() {
     const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() };
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
+  };
+  const addQuickTask = () => {
+    const admin = db.staff.find(s => s.role === "Администратор");
+    const t: TaskItem = {
+      id: uid(),
+      title: "Новая задача",
+      due: todayISO(),
+      status: "open",
+      assigneeType: admin ? "staff" : undefined,
+      assigneeId: admin?.id,
+      topic: "другое",
+      area: db.settings.areas[0],
+      group: db.settings.groups[0],
+    };
+    const next = { ...db, tasks: [t, ...db.tasks] };
+    setDB(next); saveDB(next); setQuickOpen(false); push("Задача создана", "success");
   };
 
   // Командная палитра (Ctrl/Cmd+K)
@@ -969,7 +1067,7 @@ export default function App() {
         {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
       </main>
 
-      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} />
+      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} onAddTask={addQuickTask} />
       <Toasts toasts={toasts} />
 
       <footer className="text-xs text-slate-500 text-center py-6">Каркас CRM · Следующие шаги: SW/Manifest/PWA, офлайн-синхронизация, push, CSV/печать</footer>
