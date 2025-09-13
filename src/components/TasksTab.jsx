@@ -1,6 +1,7 @@
 // @flow
 import React, { useState } from "react";
 import Breadcrumbs from "./Breadcrumbs";
+import Modal from "./Modal";
 import { fmtDate, uid, saveDB, todayISO } from "../App";
 import type { DB, TaskItem } from "../App";
 
@@ -45,17 +46,15 @@ export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
         ))}
       </ul>
       {edit && (
-        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
-            <div className="font-semibold text-slate-800">Редактирование задачи</div>
-            <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
-            <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: e.target.value })} />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
-              <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
-            </div>
+        <Modal size="md" onClose={() => setEdit(null)}>
+          <div className="font-semibold text-slate-800">Редактирование задачи</div>
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
+          <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: e.target.value })} />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+            <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
