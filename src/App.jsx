@@ -46,6 +46,8 @@ interface Client {
   startDate: string; // ISO
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
+  payDate?: string; // ISO
+  payAmount?: number;
   // Автополя (рассчитываются на лету)
 }
 
@@ -156,6 +158,25 @@ const parseDateInput = (value: string) => {
   return isNaN(d.getTime()) ? "" : d.toISOString();
 };
 
+const calcAgeYears = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+};
+
+const calcExperience = (iso: string) => {
+  const start = new Date(iso);
+  const now = new Date();
+  const months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
+  if (months < 12) return `${months} мес.`;
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return `${years} г.${rest ? ` ${rest} мес.` : ""}`;
+};
+
 // Seed-данные
 function makeSeedDB(): DB {
   const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
@@ -188,6 +209,9 @@ function makeSeedDB(): DB {
     const payStatus = ["ожидание", "действует", "задолженность"][rnd(0, 2)];
     const channel = ["Telegram", "WhatsApp", "Instagram"][rnd(0, 2)];
     const payMethod = Math.random() < 0.6 ? "перевод" : "наличные";
+    const payDate = new Date();
+    payDate.setDate(payDate.getDate() - rnd(0, 30));
+    const payAmount = rnd(20, 60) * 10; // базовая валюта EUR
     return {
       id: uid(),
       firstName: fn,
@@ -203,6 +227,8 @@ function makeSeedDB(): DB {
       startDate: start.toISOString(),
       payMethod,
       payStatus,
+      payDate: payDate.toISOString(),
+      payAmount,
     };
   });
 
@@ -540,8 +566,10 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
   const [group, setGroup] = useState<Group | "all">("all");
   const [pay, setPay] = useState<PaymentStatus | "all">("all");
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState<Partial<Client>>({
+  const blankForm = () => ({
     firstName: "",
+    lastName: "",
+    phone: "",
     gender: "м",
     area: db.settings.areas[0],
     group: db.settings.groups[0],
@@ -550,7 +578,13 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     payMethod: "перевод",
     payStatus: "ожидание",
     birthDate: new Date("2017-01-01").toISOString(),
+    payDate: new Date().toISOString(),
+    payAmount: 0,
+    parentName: "",
   });
+  const [form, setForm] = useState<Partial<Client>>(blankForm());
+  const [editing, setEditing] = useState<Client | null>(null);
+  const [selected, setSelected] = useState<Client | null>(null);
 
   const list = useMemo(() => {
     return db.clients.filter(c =>
@@ -561,25 +595,56 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     );
   }, [db.clients, area, group, pay, ui.search]);
 
-  const addClient = () => {
-    const c: Client = {
-      id: uid(),
-      firstName: String(form.firstName || ""),
-      lastName: form.lastName || "",
-      phone: form.phone || "",
-      channel: form.channel,
-      birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
-      parentName: form.parentName || "",
-      gender: form.gender || "м",
-      area: form.area || db.settings.areas[0],
-      group: form.group || db.settings.groups[0],
-      coachId: db.staff.find(s => s.role === "Тренер")?.id,
-      startDate: form.startDate || todayISO(),
-      payMethod: form.payMethod || "перевод",
-      payStatus: form.payStatus || "ожидание",
-    };
-    const next = { ...db, clients: [c, ...db.clients], changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }] };
-    setDB(next); saveDB(next); setModalOpen(false);
+  const openAddModal = () => {
+    setEditing(null);
+    setForm(blankForm());
+    setModalOpen(true);
+  };
+
+  const startEdit = (c: Client) => {
+    setEditing(c);
+    setForm(c);
+    setSelected(null);
+    setModalOpen(true);
+  };
+
+  const saveClient = () => {
+    if (editing) {
+      const updated: Client = { ...editing, ...form };
+      const next = {
+        ...db,
+        clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
+      };
+      setDB(next); saveDB(next);
+    } else {
+      const c: Client = {
+        id: uid(),
+        firstName: String(form.firstName || ""),
+        lastName: form.lastName || "",
+        phone: form.phone || "",
+        channel: form.channel,
+        birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
+        parentName: form.parentName || "",
+        gender: form.gender || "м",
+        area: form.area || db.settings.areas[0],
+        group: form.group || db.settings.groups[0],
+        coachId: db.staff.find(s => s.role === "Тренер")?.id,
+        startDate: form.startDate || todayISO(),
+        payMethod: form.payMethod || "перевод",
+        payStatus: form.payStatus || "ожидание",
+        payDate: form.payDate || todayISO(),
+        payAmount: form.payAmount || 0,
+      };
+      const next = {
+        ...db,
+        clients: [c, ...db.clients],
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
+      };
+      setDB(next); saveDB(next);
+    }
+    setModalOpen(false);
+    setEditing(null);
   };
 
   const removeClient = (id: string) => {
@@ -595,7 +660,7 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <Chip active={area === "all"} onClick={() => setArea("all")}>Все районы</Chip>
         {db.settings.areas.map(a => <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>)}
         <div className="flex-1" />
-        <button onClick={() => setModalOpen(true)} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
+        <button onClick={openAddModal} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
@@ -627,7 +692,12 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <tbody>
           {list.map(c => (
             <tr key={c.id} className="border-t border-slate-100">
-              <td className="p-2 whitespace-nowrap">{c.firstName} {c.lastName}</td>
+              <td
+                className="p-2 whitespace-nowrap text-sky-700 hover:underline cursor-pointer"
+                onClick={() => setSelected(c)}
+              >
+                {c.firstName} {c.lastName}
+              </td>
               <td className="p-2">{c.gender}</td>
               <td className="p-2">{c.area}</td>
               <td className="p-2">{c.group}</td>
@@ -643,10 +713,38 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         </tbody>
       </TableWrap>
 
+      {selected && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold text-slate-800">
+              {selected.firstName} {selected.lastName}
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div><span className="text-slate-500">Телефон:</span> {selected.phone || "—"}</div>
+              <div><span className="text-slate-500">Канал:</span> {selected.channel}</div>
+              <div><span className="text-slate-500">Родитель:</span> {selected.parentName || "—"}</div>
+              <div><span className="text-slate-500">Дата рождения:</span> {selected.birthDate?.slice(0,10)}</div>
+              <div><span className="text-slate-500">Возраст:</span> {selected.birthDate ? `${calcAgeYears(selected.birthDate)} лет` : "—"}</div>
+              <div><span className="text-slate-500">Район:</span> {selected.area}</div>
+              <div><span className="text-slate-500">Группа:</span> {selected.group}</div>
+              <div><span className="text-slate-500">Опыт:</span> {calcExperience(selected.startDate)}</div>
+              <div><span className="text-slate-500">Статус оплаты:</span> {selected.payStatus}</div>
+              <div><span className="text-slate-500">Дата оплаты:</span> {selected.payDate?.slice(0,10) || "—"}</div>
+              <div><span className="text-slate-500">Сумма оплаты:</span> {selected.payAmount != null ? fmtMoney(selected.payAmount, ui.currency) : "—"}</div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => startEdit(selected)} className="px-3 py-2 rounded-md border border-slate-300">Редактировать</button>
+              <button onClick={() => { removeClient(selected.id); setSelected(null); }} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600">Удалить</button>
+              <button onClick={() => setSelected(null)} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white p-4 space-y-3">
-            <div className="font-semibold text-slate-800">Новый клиент</div>
+            <div className="font-semibold text-slate-800">{editing ? "Редактирование клиента" : "Новый клиент"}</div>
             <div className="grid sm:grid-cols-2 gap-2">
               <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
               <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName || ""} onChange={e => setForm({ ...form, lastName: e.target.value })} />
@@ -673,8 +771,8 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
               </select>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setModalOpen(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
-              <button onClick={addClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+              <button onClick={() => { setModalOpen(false); setEditing(null); }} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button onClick={saveClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
             </div>
           </div>
         </div>
@@ -774,12 +872,13 @@ function ScheduleTab({ db }: { db: DB }) {
           <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
             <div className="font-semibold">{area}</div>
             <ul className="space-y-1 text-sm">
-              {list.sort((a,b)=> a.weekday - b.weekday || a.time.localeCompare(b.time)).map(s => (
-                <li key={s.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group} · тренер {db.staff.find(st => st.id===s.coachId)?.name || "—"}</span>
-                  <span className="text-slate-500">{s.location}</span>
-                </li>
-              ))}
+              {list
+                .sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time))
+                .map(s => (
+                  <li key={s.id} className="truncate">
+                    {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][s.weekday - 1]} {s.time} · {s.group}
+                  </li>
+                ))}
             </ul>
           </div>
         ))}
@@ -1076,9 +1175,20 @@ function LeadModal(
 
 // Вкладка: Задачи (минимум: список, отметка done)
 function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = (id: string) => {
     const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };
     setDB(next); saveDB(next);
+  };
+  const save = () => {
+    if (!edit) return;
+    const next = { ...db, tasks: db.tasks.map(t => t.id === edit.id ? edit : t) };
+    setDB(next); saveDB(next); setEdit(null);
+  };
+  const remove = (id: string) => {
+    if (!confirm("Удалить задачу?")) return;
+    const next = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
+    setDB(next); saveDB(next); setEdit(null);
   };
   return (
     <div className="space-y-3">
@@ -1092,7 +1202,7 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="flex items-center gap-3">
               <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
               <div>
-                <div className="font-medium">{t.title}</div>
+                <button onClick={() => setEdit({ ...t })} className="font-medium text-left hover:underline">{t.title}</button>
                 <div className="text-xs text-slate-500">К сроку: {fmtDate(t.due)}{t.type ? ` · ${t.type}`: ""}</div>
               </div>
             </div>
@@ -1100,6 +1210,25 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
           </div>
         ))}
       </div>
+
+      {edit && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold">Редактировать задачу</div>
+            <div className="space-y-2">
+              <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
+              <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: parseDateInput(e.target.value) })} />
+            </div>
+            <div className="flex justify-between">
+              <button onClick={() => remove(edit.id)} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
+              <div className="flex gap-2">
+                <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+                <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700">Сохранить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1134,14 +1263,28 @@ function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
 
       <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-3">
         <div className="font-semibold">Лимиты мест</div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {Object.keys(db.settings.limits).map(k => (
-            <div key={k} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
-              <div className="truncate">{k}</div>
-              <input type="number" min={0} className="w-24 px-2 py-1 rounded-md border border-slate-300" value={db.settings.limits[k]} onChange={e => {
-                const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [k]: Number(e.target.value) } } };
-                setDB(next); saveDB(next);
-              }} />
+        <div className="grid md:grid-cols-3 gap-4">
+          {["Центр", "Джикджилли", "Махмутлар"].map(area => (
+            <div key={area} className="space-y-2">
+              <div className="font-medium">{area}</div>
+              {db.settings.groups.map(group => {
+                const key = `${area}|${group}`;
+                return (
+                  <div key={key} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
+                    <div className="truncate">{group}</div>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-24 px-2 py-1 rounded-md border border-slate-300"
+                      value={db.settings.limits[key]}
+                      onChange={e => {
+                        const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
+                        setDB(next); saveDB(next);
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -1162,7 +1305,7 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 }
 
 // Быстрое добавление (демо)
-function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void }) {
+function QuickAddModal({ open, onClose, onAddClient, onAddLead, onAddTask }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void; onAddTask: () => void }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
@@ -1171,6 +1314,7 @@ function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolea
         <div className="grid gap-2">
           <button onClick={onAddClient} className="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">+ Клиента</button>
           <button onClick={onAddLead} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Лида</button>
+          <button onClick={onAddTask} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Задачу</button>
         </div>
         <div className="flex justify-end">
           <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
@@ -1216,6 +1360,11 @@ export default function App() {
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
   };
+  const addQuickTask = () => {
+    const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
+    const next = { ...db, tasks: [t, ...db.tasks] };
+    setDB(next); saveDB(next); setQuickOpen(false); push("Задача создана", "success");
+  };
 
   // Командная палитра (Ctrl/Cmd+K)
   useEffect(() => {
@@ -1257,7 +1406,7 @@ export default function App() {
         {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
       </main>
 
-      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} />
+      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} onAddTask={addQuickTask} />
       <Toasts toasts={toasts} />
 
       <footer className="text-xs text-slate-500 text-center py-6">Каркас CRM · Следующие шаги: SW/Manifest/PWA, офлайн-синхронизация, push, CSV/печать</footer>
