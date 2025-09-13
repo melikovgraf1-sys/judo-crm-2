@@ -149,6 +149,7 @@ export interface UIState {
   breadcrumbs: string[];
   currency: Currency;
   search: string;
+  theme: "light" | "dark";
 }
 
 export type TabKey =
@@ -374,6 +375,7 @@ const defaultUI: UIState = {
   breadcrumbs: ["Дашборд"],
   currency: "EUR",
   search: "",
+  theme: "light",
 };
 
 // Ролевая проверка
@@ -395,6 +397,16 @@ export default function App() {
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
   const [quickOpen, setQuickOpen] = useState(false);
+
+  // Apply theme to root element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (ui.theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }, [ui.theme]);
 
   const onQuickAdd = () => setQuickOpen(true);
   const addQuickClient = () => {
@@ -481,7 +493,7 @@ export default function App() {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900">
+    <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100">
       <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
       <Tabs role={ui.role} />
 

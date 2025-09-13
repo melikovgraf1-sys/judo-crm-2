@@ -3,10 +3,10 @@ import React from "react";
 
 export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
   return (
-    <div className="w-full flex flex-wrap items-center justify-between gap-2 p-3 bg-white/70 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
+    <div className="w-full flex flex-wrap items-center justify-between gap-2 p-3 bg-white/70 dark:bg-slate-800/70 backdrop-blur border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30">
       <div className="flex items-center gap-3">
-        <div className="font-semibold text-slate-800 text-lg">Judo CRM</div>
-        <div className="hidden sm:block text-xs text-slate-500">спокойные синие/голубые — KPI зелёные</div>
+        <div className="font-semibold text-slate-800 dark:text-slate-100 text-lg">Judo CRM</div>
+        <div className="hidden sm:block text-xs text-slate-500 dark:text-slate-400">спокойные синие/голубые — KPI зелёные</div>
       </div>
       <div className="flex items-center gap-2">
         <input
@@ -24,6 +24,13 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
           <option value="TRY">TRY</option>
           <option value="RUB">RUB</option>
         </select>
+        <button
+          onClick={() => { const u = { ...ui, theme: ui.theme === "light" ? "dark" : "light" }; setUI(u); }}
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm"
+          title="Переключить тему"
+        >
+          {ui.theme === "light" ? "🌙" : "☀️"}
+        </button>
         <button onClick={onQuickAdd} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Быстро добавить</button>
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm"
