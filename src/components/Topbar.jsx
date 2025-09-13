@@ -1,6 +1,5 @@
 // @flow
 import React from "react";
-import { saveUI } from "../App";
 
 export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
   return (
@@ -14,12 +13,12 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
           placeholder="Поиск…"
           className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200"
           value={ui.search}
-          onChange={e => { const u = { ...ui, search: e.target.value }; setUI(u); saveUI(u); }}
+          onChange={e => { const u = { ...ui, search: e.target.value }; setUI(u); }}
         />
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm"
           value={ui.currency}
-          onChange={e => { const u = { ...ui, currency: e.target.value }; setUI(u); saveUI(u); }}
+          onChange={e => { const u = { ...ui, currency: e.target.value }; setUI(u); }}
         >
           <option value="EUR">€</option>
           <option value="TRY">TRY</option>
@@ -29,7 +28,7 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm"
           value={ui.role}
-          onChange={e => { const u = { ...ui, role: e.target.value }; setUI(u); saveUI(u); }}
+          onChange={e => { const u = { ...ui, role: e.target.value }; setUI(u); }}
           title="Войти как"
         >
           {roleList.map(r => <option key={r} value={r}>{r}</option>)}

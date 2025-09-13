@@ -12,6 +12,7 @@ import TasksTab from "./components/TasksTab";
 import SettingsTab from "./components/SettingsTab";
 import QuickAddModal from "./components/QuickAddModal";
 import Toasts, { useToasts } from "./components/Toasts";
+import usePersistentState from "./hooks/usePersistentState";
 
 // === ЛЁГКИЙ КАРКАС CRM (SPA в одном файле) ===
 // Эта версия: вкладки, роли, seed-данные в LocalStorage, минимальные таблицы, поиск/фильтры,
@@ -366,23 +367,13 @@ export function loadDB(): DB {
 
 export function saveDB(db: DB) { localStorage.setItem(LS_KEYS.db, JSON.stringify(db)); }
 
-export function loadUI(): UIState {
-  const raw = localStorage.getItem(LS_KEYS.ui);
-  if (raw) {
-    try { return (JSON.parse(raw): UIState); } catch {}
-  }
-  const ui: UIState = {
-    role: "Администратор",
-    activeTab: "dashboard",
-    breadcrumbs: ["Дашборд"],
-    currency: "EUR",
-    search: "",
-  };
-  localStorage.setItem(LS_KEYS.ui, JSON.stringify(ui));
-  return ui;
-}
-
-export function saveUI(ui: UIState) { localStorage.setItem(LS_KEYS.ui, JSON.stringify(ui)); }
+const defaultUI: UIState = {
+  role: "Администратор",
+  activeTab: "dashboard",
+  breadcrumbs: ["Дашборд"],
+  currency: "EUR",
+  search: "",
+};
 
 // Ролевая проверка
 export function can(role: Role, feature: "all" | "manage_clients" | "attendance" | "schedule" | "leads" | "tasks" | "settings") {
@@ -399,7 +390,7 @@ export function can(role: Role, feature: "all" | "manage_clients" | "attendance"
 export default function App() {
 
   const [db, setDB] = useState<DB>(() => loadDB());
-  const [ui, setUI] = useState<UIState>(() => loadUI());
+  const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
   const [quickOpen, setQuickOpen] = useState(false);
@@ -467,7 +458,7 @@ export default function App() {
     if (!TAB_TITLES[key]) key = "dashboard";
     if (ui.activeTab !== key) {
       const next = { ...ui, activeTab: key, breadcrumbs: [TAB_TITLES[key]] };
-      setUI(next); saveUI(next);
+      setUI(next);
     }
   }, [location.pathname]);
 
