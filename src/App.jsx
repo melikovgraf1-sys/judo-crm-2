@@ -46,6 +46,8 @@ interface Client {
   startDate: string; // ISO
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
+  payDate?: string; // ISO
+  payAmount?: number;
   // Автополя (рассчитываются на лету)
 }
 
@@ -70,6 +72,13 @@ interface ScheduleSlot {
 interface Lead {
   id: string;
   name: string;
+  parentName?: string;
+  firstName?: string;
+  lastName?: string;
+  birthDate?: string; // ISO
+  startDate?: string; // ISO
+  area?: Area;
+  group?: Group;
   contact?: string;
   source: ContactChannel;
   stage: LeadStage;
@@ -142,10 +151,33 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 const todayISO = () => new Date().toISOString();
 const fmtDate = (iso: string) => new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
 const fmtMoney = (v: number, c: Currency) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(v);
+const calcAge = (iso: string) => {
+  const d = new Date(iso);
+  return Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+};
 const parseDateInput = (value: string) => {
   if (!value) return "";
   const d = new Date(value);
   return isNaN(d.getTime()) ? "" : d.toISOString();
+};
+
+const calcAgeYears = (iso: string) => {
+  const d = new Date(iso);
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+};
+
+const calcExperience = (iso: string) => {
+  const start = new Date(iso);
+  const now = new Date();
+  const months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
+  if (months < 12) return `${months} мес.`;
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  return `${years} г.${rest ? ` ${rest} мес.` : ""}`;
 };
 
 // Seed-данные
@@ -180,6 +212,9 @@ function makeSeedDB(): DB {
     const payStatus = ["ожидание", "действует", "задолженность"][rnd(0, 2)];
     const channel = ["Telegram", "WhatsApp", "Instagram"][rnd(0, 2)];
     const payMethod = Math.random() < 0.6 ? "перевод" : "наличные";
+    const payDate = new Date();
+    payDate.setDate(payDate.getDate() - rnd(0, 30));
+    const payAmount = rnd(20, 60) * 10; // базовая валюта EUR
     return {
       id: uid(),
       firstName: fn,
@@ -195,6 +230,8 @@ function makeSeedDB(): DB {
       startDate: start.toISOString(),
       payMethod,
       payStatus,
+      payDate: payDate.toISOString(),
+      payAmount,
     };
   });
 
@@ -217,13 +254,26 @@ function makeSeedDB(): DB {
   const leadsSources: ContactChannel[] = ["Instagram", "WhatsApp", "Telegram"];
   const leadStages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const leads: Lead[] = Array.from({ length: rnd(8, 12) }).map(() => {
-    const name = firstNames[rnd(0, firstNames.length - 1)] + " (лид)";
+    const fn = firstNames[rnd(0, firstNames.length - 1)];
+    const ln = lastNames[rnd(0, lastNames.length - 1)];
+    const name = fn + " (лид)";
     const stage = leadStages[rnd(0, leadStages.length - 1)];
     const now = new Date();
     const created = new Date(now.getTime() - rnd(1, 20) * 86400000);
+    const birth = new Date();
+    birth.setFullYear(birth.getFullYear() - rnd(5, 14));
+    const start = new Date();
+    start.setDate(start.getDate() + rnd(1, 30));
     return {
       id: uid(),
       name,
+      parentName: Math.random() < 0.5 ? "Родитель " + ln : undefined,
+      firstName: fn,
+      lastName: ln,
+      birthDate: birth.toISOString(),
+      startDate: start.toISOString(),
+      area: areas[rnd(0, areas.length - 1)],
+      group: groups[rnd(0, groups.length - 1)],
       source: leadsSources[rnd(0, leadsSources.length - 1)],
       contact: Math.random() < 0.7 ? "+90" + rnd(500000000, 599999999) : undefined,
       stage,
@@ -519,8 +569,10 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
   const [group, setGroup] = useState<Group | "all">("all");
   const [pay, setPay] = useState<PaymentStatus | "all">("all");
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState<Partial<Client>>({
+  const blankForm = () => ({
     firstName: "",
+    lastName: "",
+    phone: "",
     gender: "м",
     area: db.settings.areas[0],
     group: db.settings.groups[0],
@@ -529,7 +581,13 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     payMethod: "перевод",
     payStatus: "ожидание",
     birthDate: new Date("2017-01-01").toISOString(),
+    payDate: new Date().toISOString(),
+    payAmount: 0,
+    parentName: "",
   });
+  const [form, setForm] = useState<Partial<Client>>(blankForm());
+  const [editing, setEditing] = useState<Client | null>(null);
+  const [selected, setSelected] = useState<Client | null>(null);
 
   const list = useMemo(() => {
     return db.clients.filter(c =>
@@ -540,25 +598,56 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     );
   }, [db.clients, area, group, pay, ui.search]);
 
-  const addClient = () => {
-    const c: Client = {
-      id: uid(),
-      firstName: String(form.firstName || ""),
-      lastName: form.lastName || "",
-      phone: form.phone || "",
-      channel: form.channel,
-      birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
-      parentName: form.parentName || "",
-      gender: form.gender || "м",
-      area: form.area || db.settings.areas[0],
-      group: form.group || db.settings.groups[0],
-      coachId: db.staff.find(s => s.role === "Тренер")?.id,
-      startDate: form.startDate || todayISO(),
-      payMethod: form.payMethod || "перевод",
-      payStatus: form.payStatus || "ожидание",
-    };
-    const next = { ...db, clients: [c, ...db.clients], changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }] };
-    setDB(next); saveDB(next); setModalOpen(false);
+  const openAddModal = () => {
+    setEditing(null);
+    setForm(blankForm());
+    setModalOpen(true);
+  };
+
+  const startEdit = (c: Client) => {
+    setEditing(c);
+    setForm(c);
+    setSelected(null);
+    setModalOpen(true);
+  };
+
+  const saveClient = () => {
+    if (editing) {
+      const updated: Client = { ...editing, ...form };
+      const next = {
+        ...db,
+        clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
+      };
+      setDB(next); saveDB(next);
+    } else {
+      const c: Client = {
+        id: uid(),
+        firstName: String(form.firstName || ""),
+        lastName: form.lastName || "",
+        phone: form.phone || "",
+        channel: form.channel,
+        birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
+        parentName: form.parentName || "",
+        gender: form.gender || "м",
+        area: form.area || db.settings.areas[0],
+        group: form.group || db.settings.groups[0],
+        coachId: db.staff.find(s => s.role === "Тренер")?.id,
+        startDate: form.startDate || todayISO(),
+        payMethod: form.payMethod || "перевод",
+        payStatus: form.payStatus || "ожидание",
+        payDate: form.payDate || todayISO(),
+        payAmount: form.payAmount || 0,
+      };
+      const next = {
+        ...db,
+        clients: [c, ...db.clients],
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
+      };
+      setDB(next); saveDB(next);
+    }
+    setModalOpen(false);
+    setEditing(null);
   };
 
   const removeClient = (id: string) => {
@@ -574,7 +663,7 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <Chip active={area === "all"} onClick={() => setArea("all")}>Все районы</Chip>
         {db.settings.areas.map(a => <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>)}
         <div className="flex-1" />
-        <button onClick={() => setModalOpen(true)} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
+        <button onClick={openAddModal} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Добавить клиента</button>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
@@ -606,7 +695,12 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <tbody>
           {list.map(c => (
             <tr key={c.id} className="border-t border-slate-100">
-              <td className="p-2 whitespace-nowrap">{c.firstName} {c.lastName}</td>
+              <td
+                className="p-2 whitespace-nowrap text-sky-700 hover:underline cursor-pointer"
+                onClick={() => setSelected(c)}
+              >
+                {c.firstName} {c.lastName}
+              </td>
               <td className="p-2">{c.gender}</td>
               <td className="p-2">{c.area}</td>
               <td className="p-2">{c.group}</td>
@@ -622,10 +716,38 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         </tbody>
       </TableWrap>
 
+      {selected && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold text-slate-800">
+              {selected.firstName} {selected.lastName}
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div><span className="text-slate-500">Телефон:</span> {selected.phone || "—"}</div>
+              <div><span className="text-slate-500">Канал:</span> {selected.channel}</div>
+              <div><span className="text-slate-500">Родитель:</span> {selected.parentName || "—"}</div>
+              <div><span className="text-slate-500">Дата рождения:</span> {selected.birthDate?.slice(0,10)}</div>
+              <div><span className="text-slate-500">Возраст:</span> {selected.birthDate ? `${calcAgeYears(selected.birthDate)} лет` : "—"}</div>
+              <div><span className="text-slate-500">Район:</span> {selected.area}</div>
+              <div><span className="text-slate-500">Группа:</span> {selected.group}</div>
+              <div><span className="text-slate-500">Опыт:</span> {calcExperience(selected.startDate)}</div>
+              <div><span className="text-slate-500">Статус оплаты:</span> {selected.payStatus}</div>
+              <div><span className="text-slate-500">Дата оплаты:</span> {selected.payDate?.slice(0,10) || "—"}</div>
+              <div><span className="text-slate-500">Сумма оплаты:</span> {selected.payAmount != null ? fmtMoney(selected.payAmount, ui.currency) : "—"}</div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => startEdit(selected)} className="px-3 py-2 rounded-md border border-slate-300">Редактировать</button>
+              <button onClick={() => { removeClient(selected.id); setSelected(null); }} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600">Удалить</button>
+              <button onClick={() => setSelected(null)} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
           <div className="w-full max-w-xl rounded-2xl bg-white p-4 space-y-3">
-            <div className="font-semibold text-slate-800">Новый клиент</div>
+            <div className="font-semibold text-slate-800">{editing ? "Редактирование клиента" : "Новый клиент"}</div>
             <div className="grid sm:grid-cols-2 gap-2">
               <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
               <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName || ""} onChange={e => setForm({ ...form, lastName: e.target.value })} />
@@ -652,8 +774,8 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
               </select>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setModalOpen(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
-              <button onClick={addClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+              <button onClick={() => { setModalOpen(false); setEditing(null); }} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button onClick={saveClient} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
             </div>
           </div>
         </div>
@@ -753,12 +875,13 @@ function ScheduleTab({ db }: { db: DB }) {
           <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
             <div className="font-semibold">{area}</div>
             <ul className="space-y-1 text-sm">
-              {list.sort((a,b)=> a.weekday - b.weekday || a.time.localeCompare(b.time)).map(s => (
-                <li key={s.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group} · тренер {db.staff.find(st => st.id===s.coachId)?.name || "—"}</span>
-                  <span className="text-slate-500">{s.location}</span>
-                </li>
-              ))}
+              {list
+                .sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time))
+                .map(s => (
+                  <li key={s.id} className="truncate">
+                    {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][s.weekday - 1]} {s.time} · {s.group}
+                  </li>
+                ))}
             </ul>
           </div>
         ))}
@@ -770,6 +893,7 @@ function ScheduleTab({ db }: { db: DB }) {
 // Вкладка: Лиды (простая воронка без drag&drop на каркасе)
 function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
+  const [open, setOpen] = useState<Lead | null>(null);
   const move = (id: string, dir: 1 | -1) => {
     const l = db.leads.find(x => x.id === id); if (!l) return;
     const idx = stages.indexOf(l.stage);
@@ -787,7 +911,7 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="space-y-2">
               {db.leads.filter(l => l.stage === s).map(l => (
                 <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50">
-                  <div className="text-sm font-medium">{l.name}</div>
+                  <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
                   <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
                   <div className="flex gap-1 mt-2">
                     <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300">◀</button>
@@ -798,6 +922,255 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             </div>
           </div>
         ))}
+      </div>
+      {open && (
+        <LeadModal
+          lead={open}
+          onClose={() => setOpen(null)}
+          staff={db.staff}
+          db={db}
+          setDB={setDB}
+        />
+      )}
+    </div>
+  );
+}
+
+function LeadModal(
+  {
+    lead,
+    onClose,
+    staff,
+    db,
+    setDB,
+  }: {
+    lead: Lead;
+    onClose: () => void;
+    staff: StaffMember[];
+    db: DB;
+    setDB: (db: DB) => void;
+  },
+) {
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState<Partial<Lead>>(lead);
+  useEffect(() => setForm(lead), [lead]);
+
+  const save = () => {
+    const nextLead: Lead = { ...lead, ...form, updatedAt: todayISO() };
+    const next = {
+      ...db,
+      leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
+    };
+    setDB(next); saveDB(next); setEdit(false); onClose();
+  };
+
+  const remove = () => {
+    if (!confirm("Удалить лид?")) return;
+    const next = {
+      ...db,
+      leads: db.leads.filter(l => l.id !== lead.id),
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.name}`, when: todayISO() }],
+    };
+    setDB(next); saveDB(next); onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+        {edit ? (
+          <>
+            <div className="font-semibold text-lg">Редактирование лида</div>
+            <div className="grid sm:grid-cols-2 gap-2 text-sm">
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Имя лида"
+                value={form.name || ""}
+                onChange={e => setForm({ ...form, name: e.target.value })}
+              />
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Имя родителя"
+                value={form.parentName || ""}
+                onChange={e => setForm({ ...form, parentName: e.target.value })}
+              />
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Имя"
+                value={form.firstName || ""}
+                onChange={e => setForm({ ...form, firstName: e.target.value })}
+              />
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Фамилия"
+                value={form.lastName || ""}
+                onChange={e => setForm({ ...form, lastName: e.target.value })}
+              />
+              <input
+                type="date"
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.birthDate ? form.birthDate.slice(0,10) : ""}
+                onChange={e => setForm({ ...form, birthDate: parseDateInput(e.target.value) })}
+              />
+              <input
+                type="date"
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.startDate ? form.startDate.slice(0,10) : ""}
+                onChange={e => setForm({ ...form, startDate: parseDateInput(e.target.value) })}
+              />
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.area || ""}
+                onChange={e => setForm({ ...form, area: (e.target.value: any) })}
+              >
+                <option value="">—</option>
+                {db.settings.areas.map(a => (
+                  <option key={a}>{a}</option>
+                ))}
+              </select>
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.group || ""}
+                onChange={e => setForm({ ...form, group: (e.target.value: any) })}
+              >
+                <option value="">—</option>
+                {db.settings.groups.map(g => (
+                  <option key={g}>{g}</option>
+                ))}
+              </select>
+              <input
+                className="px-3 py-2 rounded-md border border-slate-300"
+                placeholder="Контакт"
+                value={form.contact || ""}
+                onChange={e => setForm({ ...form, contact: e.target.value })}
+              />
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300"
+                value={form.source}
+                onChange={e => setForm({ ...form, source: (e.target.value: any) })}
+              >
+                <option>Telegram</option>
+                <option>WhatsApp</option>
+                <option>Instagram</option>
+              </select>
+              <textarea
+                className="px-3 py-2 rounded-md border border-slate-300 sm:col-span-2"
+                placeholder="Заметки"
+                value={form.notes || ""}
+                onChange={e => setForm({ ...form, notes: e.target.value })}
+              />
+              <select
+                className="px-3 py-2 rounded-md border border-slate-300 sm:col-span-2"
+                value={form.managerId || ""}
+                onChange={e => setForm({ ...form, managerId: e.target.value })}
+              >
+                <option value="">Ответственный</option>
+                {staff.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+              <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="font-semibold text-lg">{lead.name}</div>
+            <div className="text-sm space-y-1">
+              {lead.parentName && (
+                <div>
+                  <span className="text-slate-500">Имя родителя:</span> {lead.parentName}
+                </div>
+              )}
+              {lead.firstName && (
+                <div>
+                  <span className="text-slate-500">Имя:</span> {lead.firstName}
+                </div>
+              )}
+              {lead.lastName && (
+                <div>
+                  <span className="text-slate-500">Фамилия:</span> {lead.lastName}
+                </div>
+              )}
+              {lead.birthDate && (
+                <div>
+                  <span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}
+                </div>
+              )}
+              {lead.birthDate && (
+                <div>
+                  <span className="text-slate-500">Возраст:</span> {calcAge(lead.birthDate)}
+                </div>
+              )}
+              {lead.startDate && (
+                <div>
+                  <span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}
+                </div>
+              )}
+              {lead.area && (
+                <div>
+                  <span className="text-slate-500">Район:</span> {lead.area}
+                </div>
+              )}
+              {lead.group && (
+                <div>
+                  <span className="text-slate-500">Группа:</span> {lead.group}
+                </div>
+              )}
+              <div>
+                <span className="text-slate-500">Источник:</span> {lead.source}
+              </div>
+              {lead.contact && (
+                <div>
+                  <span className="text-slate-500">Контакт:</span> {lead.contact}
+                </div>
+              )}
+              {lead.notes && (
+                <div>
+                  <span className="text-slate-500">Заметки:</span> {lead.notes}
+                </div>
+              )}
+              <div>
+                <span className="text-slate-500">Ответственный:</span> {staff.find(s => s.id===lead.managerId)?.name || "—"}
+              </div>
+              <div>
+                <span className="text-slate-500">Этап:</span> {lead.stage}
+              </div>
+              <div>
+                <span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}
+              </div>
+              <div>
+                <span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}
+              </div>
+            </div>
+            <div className="flex justify-between gap-2">
+              <button
+                onClick={remove}
+                className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50"
+              >
+                Удалить
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEdit(true)}
+                  className="px-3 py-2 rounded-md border border-slate-300"
+                >
+                  Редактировать
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-3 py-2 rounded-md border border-slate-300"
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -945,14 +1318,28 @@ function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
 
       <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-3">
         <div className="font-semibold">Лимиты мест</div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {Object.keys(db.settings.limits).map(k => (
-            <div key={k} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
-              <div className="truncate">{k}</div>
-              <input type="number" min={0} className="w-24 px-2 py-1 rounded-md border border-slate-300" value={db.settings.limits[k]} onChange={e => {
-                const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [k]: Number(e.target.value) } } };
-                setDB(next); saveDB(next);
-              }} />
+        <div className="grid md:grid-cols-3 gap-4">
+          {["Центр", "Джикджилли", "Махмутлар"].map(area => (
+            <div key={area} className="space-y-2">
+              <div className="font-medium">{area}</div>
+              {db.settings.groups.map(group => {
+                const key = `${area}|${group}`;
+                return (
+                  <div key={key} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
+                    <div className="truncate">{group}</div>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-24 px-2 py-1 rounded-md border border-slate-300"
+                      value={db.settings.limits[key]}
+                      onChange={e => {
+                        const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
+                        setDB(next); saveDB(next);
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -1010,7 +1397,21 @@ export default function App() {
     setDB(next); saveDB(next); setQuickOpen(false); push("Клиент создан", "success");
   };
   const addQuickLead = () => {
-    const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() };
+    const l: Lead = {
+      id: uid(),
+      name: "Новый лид",
+      parentName: "",
+      firstName: "Новый",
+      lastName: "Лид",
+      birthDate: new Date("2017-01-01").toISOString(),
+      startDate: todayISO(),
+      area: db.settings.areas[0],
+      group: db.settings.groups[0],
+      source: "Instagram",
+      stage: "Очередь",
+      createdAt: todayISO(),
+      updatedAt: todayISO(),
+    };
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
   };
