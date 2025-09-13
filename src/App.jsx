@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 // === ЛЁГКИЙ КАРКАС CRM (SPA в одном файле) ===
 // Эта версия: вкладки, роли, seed-данные в LocalStorage, минимальные таблицы, поиск/фильтры,
-// тосты, хлебные крошки, переключатель валют. Tailwind подключается через CDN-скрипт в <head>.
+// тосты, хлебные крошки, переключатель валют. Tailwind подключается локально.
 // Далее можно по шагам добавить: Service Worker, Manifest, офлайн-синхронизацию, push-уведомления, экспорт CSV и т.д.
 
 // Ключи LocalStorage
@@ -139,19 +139,6 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 const todayISO = () => new Date().toISOString();
 const fmtDate = (iso: string) => new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
 const fmtMoney = (v: number, c: Currency) => new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(v);
-
-// Инициализация Tailwind CDN в <head>
-function useTailwindCdn() {
-  useEffect(() => {
-    const id = "tw-cdn-script";
-    if (!document.getElementById(id)) {
-      const s = document.createElement("script");
-      s.id = id;
-      s.src = "https://cdn.tailwindcss.com";
-      document.head.appendChild(s);
-    }
-  }, []);
-}
 
 // Seed-данные
 function makeSeedDB(): DB {
@@ -915,7 +902,7 @@ function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolea
 }
 
 export default function App() {
-  useTailwindCdn();
+
   const [db, setDB] = useState<DB>(() => loadDB());
   const [ui, setUI] = useState<UIState>(() => loadUI());
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
