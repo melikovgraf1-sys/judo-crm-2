@@ -750,12 +750,13 @@ function ScheduleTab({ db }: { db: DB }) {
           <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
             <div className="font-semibold">{area}</div>
             <ul className="space-y-1 text-sm">
-              {list.sort((a,b)=> a.weekday - b.weekday || a.time.localeCompare(b.time)).map(s => (
-                <li key={s.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group} · тренер {db.staff.find(st => st.id===s.coachId)?.name || "—"}</span>
-                  <span className="text-slate-500">{s.location}</span>
-                </li>
-              ))}
+              {list
+                .sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time))
+                .map(s => (
+                  <li key={s.id} className="truncate">
+                    {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][s.weekday - 1]} {s.time} · {s.group}
+                  </li>
+                ))}
             </ul>
           </div>
         ))}
