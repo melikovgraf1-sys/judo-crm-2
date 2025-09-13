@@ -925,9 +925,20 @@ function LeadModal({ lead, onClose, staff }: { lead: Lead; onClose: () => void; 
 
 // Вкладка: Задачи (минимум: список, отметка done)
 function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = (id: string) => {
     const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };
     setDB(next); saveDB(next);
+  };
+  const save = () => {
+    if (!edit) return;
+    const next = { ...db, tasks: db.tasks.map(t => t.id === edit.id ? edit : t) };
+    setDB(next); saveDB(next); setEdit(null);
+  };
+  const remove = (id: string) => {
+    if (!confirm("Удалить задачу?")) return;
+    const next = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
+    setDB(next); saveDB(next); setEdit(null);
   };
   return (
     <div className="space-y-3">
@@ -941,7 +952,7 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="flex items-center gap-3">
               <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
               <div>
-                <div className="font-medium">{t.title}</div>
+                <button onClick={() => setEdit({ ...t })} className="font-medium text-left hover:underline">{t.title}</button>
                 <div className="text-xs text-slate-500">К сроку: {fmtDate(t.due)}{t.type ? ` · ${t.type}`: ""}</div>
               </div>
             </div>
@@ -949,6 +960,25 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
           </div>
         ))}
       </div>
+
+      {edit && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold">Редактировать задачу</div>
+            <div className="space-y-2">
+              <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
+              <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: parseDateInput(e.target.value) })} />
+            </div>
+            <div className="flex justify-between">
+              <button onClick={() => remove(edit.id)} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
+              <div className="flex gap-2">
+                <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+                <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700">Сохранить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
