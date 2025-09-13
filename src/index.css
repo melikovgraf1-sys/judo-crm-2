@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Минимальные стили, можно расширять по необходимости */
 body {
   margin: 0;
