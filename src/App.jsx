@@ -802,9 +802,20 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
 
 // Вкладка: Задачи (минимум: список, отметка done)
 function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+  const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = (id: string) => {
     const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };
     setDB(next); saveDB(next);
+  };
+  const save = () => {
+    if (!edit) return;
+    const next = { ...db, tasks: db.tasks.map(t => t.id === edit.id ? edit : t) };
+    setDB(next); saveDB(next); setEdit(null);
+  };
+  const remove = (id: string) => {
+    if (!confirm("Удалить задачу?")) return;
+    const next = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
+    setDB(next); saveDB(next); setEdit(null);
   };
   return (
     <div className="space-y-3">
@@ -818,7 +829,7 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="flex items-center gap-3">
               <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
               <div>
-                <div className="font-medium">{t.title}</div>
+                <button onClick={() => setEdit({ ...t })} className="font-medium text-left hover:underline">{t.title}</button>
                 <div className="text-xs text-slate-500">К сроку: {fmtDate(t.due)}{t.type ? ` · ${t.type}`: ""}</div>
               </div>
             </div>
@@ -826,6 +837,25 @@ function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
           </div>
         ))}
       </div>
+
+      {edit && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold">Редактировать задачу</div>
+            <div className="space-y-2">
+              <input className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
+              <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: parseDateInput(e.target.value) })} />
+            </div>
+            <div className="flex justify-between">
+              <button onClick={() => remove(edit.id)} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
+              <div className="flex gap-2">
+                <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+                <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700">Сохранить</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -888,7 +918,7 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 }
 
 // Быстрое добавление (демо)
-function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void }) {
+function QuickAddModal({ open, onClose, onAddClient, onAddLead, onAddTask }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void; onAddTask: () => void }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
@@ -897,6 +927,7 @@ function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolea
         <div className="grid gap-2">
           <button onClick={onAddClient} className="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">+ Клиента</button>
           <button onClick={onAddLead} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Лида</button>
+          <button onClick={onAddTask} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Задачу</button>
         </div>
         <div className="flex justify-end">
           <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
@@ -927,6 +958,11 @@ export default function App() {
     const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() };
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
+  };
+  const addQuickTask = () => {
+    const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
+    const next = { ...db, tasks: [t, ...db.tasks] };
+    setDB(next); saveDB(next); setQuickOpen(false); push("Задача создана", "success");
   };
 
   // Командная палитра (Ctrl/Cmd+K)
@@ -969,7 +1005,7 @@ export default function App() {
         {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
       </main>
 
-      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} />
+      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} onAddTask={addQuickTask} />
       <Toasts toasts={toasts} />
 
       <footer className="text-xs text-slate-500 text-center py-6">Каркас CRM · Следующие шаги: SW/Manifest/PWA, офлайн-синхронизация, push, CSV/печать</footer>
