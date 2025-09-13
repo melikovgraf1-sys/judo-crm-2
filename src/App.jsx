@@ -1,3 +1,4 @@
+// @flow
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 // === ЛЁГКИЙ КАРКАС CRM (SPA в одном файле) ===
@@ -281,7 +282,7 @@ function makeSeedDB(): DB {
 function loadDB(): DB {
   const raw = localStorage.getItem(LS_KEYS.db);
   if (raw) {
-    try { return JSON.parse(raw) as DB; } catch {}
+    try { return (JSON.parse(raw): DB); } catch {}
   }
   const db = makeSeedDB();
   localStorage.setItem(LS_KEYS.db, JSON.stringify(db));
@@ -293,7 +294,7 @@ function saveDB(db: DB) { localStorage.setItem(LS_KEYS.db, JSON.stringify(db)); 
 function loadUI(): UIState {
   const raw = localStorage.getItem(LS_KEYS.ui);
   if (raw) {
-    try { return JSON.parse(raw) as UIState; } catch {}
+    try { return (JSON.parse(raw): UIState); } catch {}
   }
   const ui: UIState = {
     role: "Администратор",
@@ -366,7 +367,7 @@ function Topbar({ ui, setUI, roleList, onQuickAdd }: { ui: UIState; setUI: (u: U
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm"
           value={ui.currency}
-          onChange={e => { const u = { ...ui, currency: e.target.value as Currency }; setUI(u); saveUI(u); }}
+          onChange={e => { const u = { ...ui, currency: e.target.value }; setUI(u); saveUI(u); }}
         >
           <option value="EUR">€</option>
           <option value="TRY">TRY</option>
@@ -376,7 +377,7 @@ function Topbar({ ui, setUI, roleList, onQuickAdd }: { ui: UIState; setUI: (u: U
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm"
           value={ui.role}
-          onChange={e => { const u = { ...ui, role: e.target.value as Role }; setUI(u); saveUI(u); }}
+          onChange={e => { const u = { ...ui, role: e.target.value }; setUI(u); saveUI(u); }}
           title="Войти как"
         >
           {roleList.map(r => <option key={r} value={r}>{r}</option>)}
@@ -489,7 +490,7 @@ function Dashboard({ db, ui }: { db: DB; ui: UIState }) {
         <div className="p-4 rounded-2xl border border-slate-200 bg-white">
           <div className="font-semibold mb-2">Лиды по этапам</div>
           <div className="flex flex-wrap gap-2">
-            {(["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"] as LeadStage[]).map(s => (
+            {["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"].map(s => (
               <div key={s} className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
                 <div className="text-slate-500">{s}</div>
                 <div className="text-lg font-semibold text-slate-800">{db.leads.filter(l => l.stage === s).length}</div>
@@ -550,16 +551,16 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
       firstName: String(form.firstName || ""),
       lastName: form.lastName || "",
       phone: form.phone || "",
-      channel: form.channel as ContactChannel,
+      channel: form.channel,
       birthDate: form.birthDate || new Date("2017-01-01").toISOString(),
       parentName: form.parentName || "",
-      gender: (form.gender as Gender) || "м",
-      area: (form.area as Area) || db.settings.areas[0],
-      group: (form.group as Group) || db.settings.groups[0],
+      gender: form.gender || "м",
+      area: form.area || db.settings.areas[0],
+      group: form.group || db.settings.groups[0],
       coachId: db.staff.find(s => s.role === "Тренер")?.id,
       startDate: form.startDate || todayISO(),
-      payMethod: (form.payMethod as PaymentMethod) || "перевод",
-      payStatus: (form.payStatus as PaymentStatus) || "ожидание",
+      payMethod: form.payMethod || "перевод",
+      payStatus: form.payStatus || "ожидание",
     };
     const next = { ...db, clients: [c, ...db.clients], changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }] };
     setDB(next); saveDB(next); setModalOpen(false);
@@ -582,11 +583,11 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value)}>
           <option value="all">Все группы</option>
           {db.settings.groups.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={pay} onChange={e => setPay(e.target.value as any)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={pay} onChange={e => setPay(e.target.value)}>
           <option value="all">Все статусы оплаты</option>
           <option value="ожидание">ожидание</option>
           <option value="действует">действует</option>
@@ -631,27 +632,27 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
           <div className="w-full max-w-xl rounded-2xl bg-white p-4 space-y-3">
             <div className="font-semibold text-slate-800">Новый клиент</div>
             <div className="grid sm:grid-cols-2 gap-2">
-              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName as any} onChange={e => setForm({ ...form, firstName: e.target.value })} />
-              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName as any} onChange={e => setForm({ ...form, lastName: e.target.value })} />
-              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Телефон" value={form.phone as any} onChange={e => setForm({ ...form, phone: e.target.value })} />
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel as any} onChange={e => setForm({ ...form, channel: e.target.value as ContactChannel })}>
+              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Имя" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Фамилия" value={form.lastName || ""} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+              <input className="px-3 py-2 rounded-md border border-slate-300" placeholder="Телефон" value={form.phone || ""} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.channel} onChange={e => setForm({ ...form, channel: e.target.value })}>
                 <option>Telegram</option><option>WhatsApp</option><option>Instagram</option>
               </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender as any} onChange={e => setForm({ ...form, gender: e.target.value as Gender })}>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
                 <option value="м">м</option><option value="ж">ж</option>
               </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area as any} onChange={e => setForm({ ...form, area: e.target.value as Area })}>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })}>
                 {db.settings.areas.map(a => <option key={a}>{a}</option>)}
               </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group as any} onChange={e => setForm({ ...form, group: e.target.value as Group })}>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.group} onChange={e => setForm({ ...form, group: e.target.value })}>
                 {db.settings.groups.map(g => <option key={g}>{g}</option>)}
               </select>
               <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.birthDate?.slice(0,10)} onChange={e => setForm({ ...form, birthDate: new Date(e.target.value).toISOString() })} />
               <input type="date" className="px-3 py-2 rounded-md border border-slate-300" value={form.startDate?.slice(0,10)} onChange={e => setForm({ ...form, startDate: new Date(e.target.value).toISOString() })} />
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod as any} onChange={e => setForm({ ...form, payMethod: e.target.value as PaymentMethod })}>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payMethod} onChange={e => setForm({ ...form, payMethod: e.target.value })}>
                 <option>перевод</option><option>наличные</option>
               </select>
-              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus as any} onChange={e => setForm({ ...form, payStatus: e.target.value as PaymentStatus })}>
+              <select className="px-3 py-2 rounded-md border border-slate-300" value={form.payStatus} onChange={e => setForm({ ...form, payStatus: e.target.value })}>
                 <option>ожидание</option><option>действует</option><option>задолженность</option>
               </select>
             </div>
@@ -697,11 +698,11 @@ function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
     <div className="space-y-3">
       <Breadcrumbs items={["Посещаемость"]} />
       <div className="flex flex-wrap items-center gap-2">
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={area} onChange={e => setArea(e.target.value as any)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={area} onChange={e => setArea(e.target.value)}>
           <option value="all">Все районы</option>
           {db.settings.areas.map(a => <option key={a}>{a}</option>)}
         </select>
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value as any)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value)}>
           <option value="all">Все группы</option>
           {db.settings.groups.map(g => <option key={g}>{g}</option>)}
         </select>
@@ -926,12 +927,12 @@ export default function App() {
     const c: Client = {
       id: uid(), firstName: "Новый", lastName: "Клиент", channel: "Telegram", birthDate: new Date("2017-01-01").toISOString(), gender: "м",
       area: db.settings.areas[0], group: db.settings.groups[0], startDate: todayISO(), payMethod: "перевод", payStatus: "ожидание"
-    } as Client;
+    };
     const next = { ...db, clients: [c, ...db.clients] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Клиент создан", "success");
   };
   const addQuickLead = () => {
-    const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() } as Lead;
+    const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() };
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
   };
