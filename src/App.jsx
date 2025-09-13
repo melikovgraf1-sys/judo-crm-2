@@ -441,6 +441,23 @@ export default function App() {
     setDB(next); saveDB(next); setQuickOpen(false); push("Задача создана", "success");
   };
 
+  // Синхронизация между вкладками
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === LS_KEYS.db) {
+        setDB(loadDB());
+      }
+      if (e.key === LS_KEYS.ui) {
+        try {
+          const raw = localStorage.getItem(LS_KEYS.ui);
+          if (raw != null) setUI((JSON.parse(raw): UIState));
+        } catch (err) {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   // Командная палитра (Ctrl/Cmd+K)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
