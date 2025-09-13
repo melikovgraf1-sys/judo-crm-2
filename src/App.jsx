@@ -819,7 +819,7 @@ function ScheduleTab({ db }: { db: DB }) {
             <ul className="space-y-1 text-sm">
               {list.sort((a,b)=> a.weekday - b.weekday || a.time.localeCompare(b.time)).map(s => (
                 <li key={s.id} className="flex items-center justify-between gap-2">
-                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group} · тренер {db.staff.find(st => st.id===s.coachId)?.name || "—"}</span>
+                  <span className="truncate">{["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][s.weekday-1]} {s.time} · {s.group}</span>
                   <span className="text-slate-500">{s.location}</span>
                 </li>
               ))}
@@ -834,6 +834,7 @@ function ScheduleTab({ db }: { db: DB }) {
 // Вкладка: Лиды (простая воронка без drag&drop на каркасе)
 function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
+  const [open, setOpen] = useState<Lead | null>(null);
   const move = (id: string, dir: 1 | -1) => {
     const l = db.leads.find(x => x.id === id); if (!l) return;
     const idx = stages.indexOf(l.stage);
@@ -851,7 +852,7 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             <div className="space-y-2">
               {db.leads.filter(l => l.stage === s).map(l => (
                 <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50">
-                  <div className="text-sm font-medium">{l.name}</div>
+                  <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
                   <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
                   <div className="flex gap-1 mt-2">
                     <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300">◀</button>
@@ -862,6 +863,29 @@ function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
             </div>
           </div>
         ))}
+      </div>
+      {open && <LeadModal lead={open} onClose={() => setOpen(null)} staff={db.staff} />}
+    </div>
+  );
+}
+
+function LeadModal({ lead, onClose, staff }: { lead: Lead; onClose: () => void; staff: StaffMember[] }) {
+  return (
+    <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+        <div className="font-semibold text-lg">{lead.name}</div>
+        <div className="text-sm space-y-1">
+          <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
+          {lead.contact && <div><span className="text-slate-500">Контакт:</span> {lead.contact}</div>}
+          {lead.notes && <div><span className="text-slate-500">Заметки:</span> {lead.notes}</div>}
+          <div><span className="text-slate-500">Ответственный:</span> {staff.find(s => s.id===lead.managerId)?.name || "—"}</div>
+          <div><span className="text-slate-500">Этап:</span> {lead.stage}</div>
+          <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>
+          <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
+        </div>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
+        </div>
       </div>
     </div>
   );
@@ -927,14 +951,28 @@ function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
 
       <div className="p-4 rounded-2xl border border-slate-200 bg-white space-y-3">
         <div className="font-semibold">Лимиты мест</div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-2">
-          {Object.keys(db.settings.limits).map(k => (
-            <div key={k} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
-              <div className="truncate">{k}</div>
-              <input type="number" min={0} className="w-24 px-2 py-1 rounded-md border border-slate-300" value={db.settings.limits[k]} onChange={e => {
-                const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [k]: Number(e.target.value) } } };
-                setDB(next); saveDB(next);
-              }} />
+        <div className="grid md:grid-cols-3 gap-4">
+          {["Центр", "Джикджилли", "Махмутлар"].map(area => (
+            <div key={area} className="space-y-2">
+              <div className="font-medium">{area}</div>
+              {db.settings.groups.map(group => {
+                const key = `${area}|${group}`;
+                return (
+                  <div key={key} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2">
+                    <div className="truncate">{group}</div>
+                    <input
+                      type="number"
+                      min={0}
+                      className="w-24 px-2 py-1 rounded-md border border-slate-300"
+                      value={db.settings.limits[key]}
+                      onChange={e => {
+                        const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
+                        setDB(next); saveDB(next);
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -955,7 +993,7 @@ function Toasts({ toasts }: { toasts: Toast[] }) {
 }
 
 // Быстрое добавление (демо)
-function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void }) {
+function QuickAddModal({ open, onClose, onAddClient, onAddLead, onAddTask }: { open: boolean; onClose: () => void; onAddClient: () => void; onAddLead: () => void; onAddTask: () => void }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
@@ -964,6 +1002,7 @@ function QuickAddModal({ open, onClose, onAddClient, onAddLead }: { open: boolea
         <div className="grid gap-2">
           <button onClick={onAddClient} className="px-3 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700">+ Клиента</button>
           <button onClick={onAddLead} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Лида</button>
+          <button onClick={onAddTask} className="px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-50">+ Задачу</button>
         </div>
         <div className="flex justify-end">
           <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
@@ -994,6 +1033,11 @@ export default function App() {
     const l: Lead = { id: uid(), name: "Новый лид", source: "Instagram", stage: "Очередь", createdAt: todayISO(), updatedAt: todayISO() };
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next); saveDB(next); setQuickOpen(false); push("Лид создан", "success");
+  };
+  const addQuickTask = () => {
+    const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
+    const next = { ...db, tasks: [t, ...db.tasks] };
+    setDB(next); saveDB(next); setQuickOpen(false); push("Задача создана", "success");
   };
 
   // Командная палитра (Ctrl/Cmd+K)
@@ -1036,7 +1080,7 @@ export default function App() {
         {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
       </main>
 
-      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} />
+      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} onAddTask={addQuickTask} />
       <Toasts toasts={toasts} />
 
       <footer className="text-xs text-slate-500 text-center py-6">Каркас CRM · Следующие шаги: SW/Manifest/PWA, офлайн-синхронизация, push, CSV/печать</footer>
