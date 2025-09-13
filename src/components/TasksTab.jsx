@@ -1,10 +1,12 @@
 // @flow
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtDate, uid, saveDB, todayISO } from "../App";
-import type { DB, TaskItem } from "../App";
+import type { TaskItem } from "../App";
+import { DBContext } from "../context/DBContext";
 
-export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function TasksTab() {
+  const { db, setDB } = useContext(DBContext);
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = (id: string) => {
     const next = { ...db, tasks: db.tasks.map(t => t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t) };

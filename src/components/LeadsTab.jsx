@@ -1,10 +1,12 @@
 // @flow
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { todayISO, saveDB, uid, fmtDate } from "../App";
-import type { DB, Lead, LeadStage, StaffMember } from "../App";
+import type { Lead, LeadStage, StaffMember } from "../App";
+import { DBContext } from "../context/DBContext";
 
-export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function LeadsTab() {
+  const { db, setDB } = useContext(DBContext);
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const [open, setOpen] = useState<Lead | null>(null);
   const move = (id: string, dir: 1 | -1) => {
@@ -41,8 +43,6 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
           lead={open}
           onClose={() => setOpen(null)}
           staff={db.staff}
-          db={db}
-          setDB={setDB}
         />
       )}
     </div>
@@ -54,16 +54,13 @@ function LeadModal(
     lead,
     onClose,
     staff,
-    db,
-    setDB,
   }: {
     lead: Lead;
     onClose: () => void;
     staff: StaffMember[];
-    db: DB;
-    setDB: (db: DB) => void;
   },
 ) {
+  const { db, setDB } = useContext(DBContext);
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState<Partial<Lead>>(lead);
   useEffect(() => setForm(lead), [lead]);

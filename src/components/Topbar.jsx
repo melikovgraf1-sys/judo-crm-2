@@ -1,8 +1,10 @@
 // @flow
-import React from "react";
+import React, { useContext } from "react";
 import { saveUI } from "../App";
+import { UIContext } from "../context/UIContext";
 
-export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
+export default function Topbar({ roleList, onQuickAdd }) {
+  const { ui, setUI } = useContext(UIContext);
   return (
     <div className="w-full flex flex-wrap items-center justify-between gap-2 p-3 bg-white/70 backdrop-blur border-b border-slate-200 sticky top-0 z-30">
       <div className="flex items-center gap-3">

@@ -1,7 +1,9 @@
 // @flow
-import React from "react";
+import React, { useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtMoney, fmtDate } from "../App";
+import { DBContext } from "../context/DBContext";
+import { UIContext } from "../context/UIContext";
 
 function OfflineTip() {
   return (
@@ -26,7 +28,9 @@ function MetricCard({ title, value, accent }) {
   );
 }
 
-export default function Dashboard({ db, ui }) {
+export default function Dashboard() {
+  const { db } = useContext(DBContext);
+  const { ui } = useContext(UIContext);
   const currency = ui.currency;
   const totalClients = db.clients.length;
   const activeClients = db.clients.filter(c => c.payStatus === "действует").length;

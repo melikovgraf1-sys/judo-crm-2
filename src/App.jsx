@@ -1,5 +1,5 @@
 // @flow
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
 import Topbar from "./components/Topbar";
 import Tabs from "./components/Tabs";
 import Dashboard from "./components/Dashboard";
@@ -11,6 +11,8 @@ import TasksTab from "./components/TasksTab";
 import SettingsTab from "./components/SettingsTab";
 import QuickAddModal from "./components/QuickAddModal";
 import Toasts, { useToasts } from "./components/Toasts";
+import { DBContext } from "./context/DBContext";
+import { UIContext } from "./context/UIContext";
 
 // === ЛЁГКИЙ КАРКАС CRM (SPA в одном файле) ===
 // Эта версия: вкладки, роли, seed-данные в LocalStorage, минимальные таблицы, поиск/фильтры,
@@ -397,8 +399,8 @@ export function can(role: Role, feature: "all" | "manage_clients" | "attendance"
 
 export default function App() {
 
-  const [db, setDB] = useState<DB>(() => loadDB());
-  const [ui, setUI] = useState<UIState>(() => loadUI());
+  const { db, setDB } = useContext(DBContext);
+  const { ui, setUI } = useContext(UIContext);
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
   const [quickOpen, setQuickOpen] = useState(false);
@@ -475,17 +477,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900">
-      <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
-      <Tabs ui={ui} setUI={setUI} role={ui.role} />
+      <Topbar roleList={roles} onQuickAdd={onQuickAdd} />
+      <Tabs />
 
       <main className="max-w-7xl mx-auto p-3 space-y-3">
-        {activeTab === "dashboard" && <Dashboard db={db} ui={ui} />}
-        {activeTab === "clients" && can(ui.role, "manage_clients") && <ClientsTab db={db} setDB={setDB} ui={ui} />}
-        {activeTab === "attendance" && can(ui.role, "attendance") && <AttendanceTab db={db} setDB={setDB} />}
-        {activeTab === "schedule" && can(ui.role, "schedule") && <ScheduleTab db={db} setDB={setDB} />}
-        {activeTab === "leads" && can(ui.role, "leads") && <LeadsTab db={db} setDB={setDB} />}
-        {activeTab === "tasks" && can(ui.role, "tasks") && <TasksTab db={db} setDB={setDB} />}
-        {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab db={db} setDB={setDB} />}
+        {activeTab === "dashboard" && <Dashboard />}
+        {activeTab === "clients" && can(ui.role, "manage_clients") && <ClientsTab />}
+        {activeTab === "attendance" && can(ui.role, "attendance") && <AttendanceTab />}
+        {activeTab === "schedule" && can(ui.role, "schedule") && <ScheduleTab />}
+        {activeTab === "leads" && can(ui.role, "leads") && <LeadsTab />}
+        {activeTab === "tasks" && can(ui.role, "tasks") && <TasksTab />}
+        {activeTab === "settings" && can(ui.role, "settings") && <SettingsTab />}
       </main>
 
       <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} onAddClient={addQuickClient} onAddLead={addQuickLead} onAddTask={addQuickTask} />

@@ -1,10 +1,11 @@
 // @flow
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { saveDB } from "../App";
-import type { DB } from "../App";
+import { DBContext } from "../context/DBContext";
 
-export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function SettingsTab() {
+  const { db, setDB } = useContext(DBContext);
   const [rates, setRates] = useState({
     eurTry: db.settings.currencyRates.TRY,
     eurRub: db.settings.currencyRates.RUB,

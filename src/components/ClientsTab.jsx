@@ -1,9 +1,11 @@
 // @flow
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import TableWrap from "./TableWrap";
 import { uid, todayISO, parseDateInput, fmtMoney, calcAgeYears, calcExperience, saveDB } from "../App";
-import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
+import type { Client, Area, Group, PaymentStatus } from "../App";
+import { DBContext } from "../context/DBContext";
+import { UIContext } from "../context/UIContext";
 
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
@@ -11,7 +13,9 @@ function Chip({ active, onClick, children }: { active?: boolean; onClick?: () =>
   );
 }
 
-export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UIState }) {
+export default function ClientsTab() {
+  const { db, setDB } = useContext(DBContext);
+  const { ui } = useContext(UIContext);
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
   const [pay, setPay] = useState<PaymentStatus | "all">("all");

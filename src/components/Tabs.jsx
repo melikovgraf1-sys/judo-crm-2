@@ -1,6 +1,7 @@
 // @flow
-import React from "react";
+import React, { useContext } from "react";
 import { saveUI, can } from "../App";
+import { UIContext } from "../context/UIContext";
 
 const TABS = [
   { key: "dashboard", title: "Дашборд" },
@@ -12,7 +13,9 @@ const TABS = [
   { key: "settings", title: "Настройки", need: r => can(r, "settings") },
 ];
 
-export default function Tabs({ ui, setUI, role }) {
+export default function Tabs() {
+  const { ui, setUI } = useContext(UIContext);
+  const role = ui.role;
   const visible = TABS.filter(t => !t.need || t.need(role));
   return (
     <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">

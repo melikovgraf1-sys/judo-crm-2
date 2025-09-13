@@ -1,11 +1,13 @@
 // @flow
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import TableWrap from "./TableWrap";
 import { fmtDate, uid, saveDB } from "../App";
-import type { DB, Area, Group, AttendanceEntry } from "../App";
+import type { Area, Group, AttendanceEntry } from "../App";
+import { DBContext } from "../context/DBContext";
 
-export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function AttendanceTab() {
+  const { db, setDB } = useContext(DBContext);
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
   const today = new Date();

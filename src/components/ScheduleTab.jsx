@@ -1,10 +1,12 @@
 // @flow
-import React, { useMemo } from "react";
+import React, { useMemo, useContext } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { uid, saveDB } from "../App";
-import type { DB, ScheduleSlot } from "../App";
+import type { ScheduleSlot } from "../App";
+import { DBContext } from "../context/DBContext";
 
-export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function ScheduleTab() {
+  const { db, setDB } = useContext(DBContext);
   const byArea = useMemo(() => {
     const m: Record<string, ScheduleSlot[]> = {};
     for (const a of db.settings.areas) m[a] = [];
