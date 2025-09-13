@@ -527,6 +527,7 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
     payStatus: "ожидание",
     birthDate: new Date("2017-01-01").toISOString(),
   });
+  const [selected, setSelected] = useState<Client | null>(null);
 
   const list = useMemo(() => {
     return db.clients.filter(c =>
@@ -603,7 +604,12 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
         <tbody>
           {list.map(c => (
             <tr key={c.id} className="border-t border-slate-100">
-              <td className="p-2 whitespace-nowrap">{c.firstName} {c.lastName}</td>
+              <td
+                className="p-2 whitespace-nowrap text-sky-700 hover:underline cursor-pointer"
+                onClick={() => setSelected(c)}
+              >
+                {c.firstName} {c.lastName}
+              </td>
               <td className="p-2">{c.gender}</td>
               <td className="p-2">{c.area}</td>
               <td className="p-2">{c.group}</td>
@@ -618,6 +624,32 @@ function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UI
           ))}
         </tbody>
       </TableWrap>
+
+      {selected && (
+        <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 space-y-3">
+            <div className="font-semibold text-slate-800">
+              {selected.firstName} {selected.lastName}
+            </div>
+            <div className="grid gap-1 text-sm">
+              <div><span className="text-slate-500">Телефон:</span> {selected.phone || "—"}</div>
+              <div><span className="text-slate-500">Канал:</span> {selected.channel}</div>
+              <div><span className="text-slate-500">Район:</span> {selected.area}</div>
+              <div><span className="text-slate-500">Группа:</span> {selected.group}</div>
+              <div><span className="text-slate-500">Старт:</span> {selected.startDate?.slice(0,10)}</div>
+              <div><span className="text-slate-500">Оплата:</span> {selected.payStatus}</div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setSelected(null)}
+                className="px-3 py-2 rounded-md border border-slate-300"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4">
