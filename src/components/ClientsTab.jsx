@@ -70,7 +70,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
   };
 
   const removeClient = (id: string) => {
-    if (!confirm("Удалить клиента?")) return;
+    if (!window.confirm("Удалить клиента?")) return;
     const next = {
       ...db,
       clients: db.clients.filter(c => c.id !== id),
