@@ -1,7 +1,19 @@
 // @flow
-import React from "react";
+import React, { useCallback, useRef } from "react";
 
 export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
+  const searchTimeout = useRef();
+
+  const handleSearch = useCallback((e) => {
+    const value = e.target.value;
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    searchTimeout.current = setTimeout(() => {
+      setUI(u => ({ ...u, search: value }));
+    }, 300);
+  }, [setUI]);
+
   return (
     <div className="w-full flex flex-wrap items-center justify-between gap-2 p-3 bg-white/70 dark:bg-slate-800/70 backdrop-blur border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30">
       <div className="flex items-center gap-3">
@@ -13,7 +25,7 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
           placeholder="Поиск…"
           className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={ui.search}
-          onChange={e => { const u = { ...ui, search: e.target.value }; setUI(u); }}
+          onChange={handleSearch}
         />
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
