@@ -129,6 +129,7 @@ export type TabKey =
   | "schedule"
   | "leads"
   | "tasks"
+  | "appeals"
   | "settings";
 
 export type Toast = { id: string; text: string; type?: "success" | "error" | "info" };
