@@ -112,7 +112,7 @@ function LeadModal(
   };
 
   const remove = () => {
-    if (!confirm("Удалить лид?")) return;
+    if (!window.confirm("Удалить лид?")) return;
     const next = {
       ...db,
       leads: db.leads.filter(l => l.id !== lead.id),

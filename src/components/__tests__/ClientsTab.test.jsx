@@ -27,7 +27,7 @@ beforeEach(() => {
   todayISO.mockReturnValue('2024-01-01T00:00:00.000Z');
   parseDateInput.mockImplementation((v) => (v ? v + 'T00:00:00.000Z' : ''));
   fmtMoney.mockImplementation((v, c) => v + ' ' + c);
-  global.confirm = jest.fn(() => true);
+  window.confirm = jest.fn(() => true);
 });
 
 const makeDB = () => ({
@@ -174,7 +174,7 @@ test('delete: removes client after confirmation', async () => {
 
   await userEvent.click(screen.getByText('Удалить'));
 
-  expect(global.confirm).toHaveBeenCalled();
+  expect(window.confirm).toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByText('Del')).not.toBeInTheDocument());
   expect(getDB().clients.find(c => c.id === 'c1')).toBeUndefined();
 });

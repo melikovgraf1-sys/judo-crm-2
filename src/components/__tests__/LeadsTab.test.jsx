@@ -22,7 +22,7 @@ import { todayISO, uid, saveDB } from '../../state/appState';
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.confirm = jest.fn(() => true);
+  window.confirm = jest.fn(() => true);
   global.prompt = jest.fn();
 });
 
@@ -153,7 +153,7 @@ test('delete: removes lead from list', async () => {
   const { getDB } = renderLeads();
   await userEvent.click(screen.getByRole('button', { name: 'Лид2' }));
   await userEvent.click(screen.getByText('Удалить'));
-  expect(global.confirm).toHaveBeenCalled();
+  expect(window.confirm).toHaveBeenCalled();
   await waitFor(() => expect(getDB().leads.find(l => l.id === 'l2')).toBeUndefined());
   expect(screen.queryByText('Лид2')).not.toBeInTheDocument();
 });
