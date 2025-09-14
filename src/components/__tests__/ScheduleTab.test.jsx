@@ -1,3 +1,4 @@
+
 // @flow
 import React from 'react';
 import { render, screen, within, cleanup } from '@testing-library/react';
@@ -105,3 +106,4 @@ describe('ScheduleTab CRUD for areas and slots', () => {
     expect(getDb().settings.areas).toHaveLength(0);
   });
 });
+
