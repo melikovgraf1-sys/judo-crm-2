@@ -1,5 +1,5 @@
 // @flow
-import React from "react";
+import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtMoney, fmtDate } from "../App";
 
@@ -33,8 +33,33 @@ function MetricCard({ title, value, accent }) {
 export default function Dashboard({ db, ui }) {
   const currency = ui.currency;
   const totalClients = db.clients.length;
-  const activeClients = db.clients.filter(c => c.payStatus === "действует").length;
-  const leadsCount = db.leads.length;
+  const activeClients = useMemo(
+    () => db.clients.filter(c => c.payStatus === "действует").length,
+    [db.clients]
+  );
+  const leadsCount = useMemo(() => db.leads.length, [db.leads]);
+
+  const leadStages = [
+    "Очередь",
+    "Задержка",
+    "Пробное",
+    "Ожидание оплаты",
+    "Оплаченный абонемент",
+    "Отмена",
+  ];
+  const leadsDistribution = useMemo(
+    () =>
+      db.leads.reduce((acc, l) => {
+        acc[l.stage] = (acc[l.stage] || 0) + 1;
+        return acc;
+      }, {}),
+    [db.leads]
+  );
+
+  const sortedTasks = useMemo(
+    () => db.tasks.slice().sort((a, b) => +new Date(a.due) - +new Date(b.due)),
+    [db.tasks]
+  );
 
   const revenueEUR = activeClients * 55;
   const rate = cur => (cur === "EUR" ? 1 : cur === "TRY" ? db.settings.currencyRates.TRY : db.settings.currencyRates.RUB);
@@ -57,10 +82,15 @@ export default function Dashboard({ db, ui }) {
         <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
           <div className="font-semibold mb-2">Лиды по этапам</div>
           <div className="flex flex-wrap gap-2">
-            {["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"].map(s => (
-              <div key={s} className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs dark:bg-slate-800 dark:border-slate-700">
+            {leadStages.map(s => (
+              <div
+                key={s}
+                className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs dark:bg-slate-800 dark:border-slate-700"
+              >
                 <div className="text-slate-500">{s}</div>
-                <div className="text-lg font-semibold text-slate-800">{db.leads.filter(l => l.stage === s).length}</div>
+                <div className="text-lg font-semibold text-slate-800">
+                  {leadsDistribution[s] || 0}
+                </div>
               </div>
             ))}
           </div>
@@ -68,9 +98,7 @@ export default function Dashboard({ db, ui }) {
         <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
           <div className="font-semibold mb-2">Предстоящие задачи</div>
           <ul className="space-y-2">
-            {db.tasks
-              .slice()
-              .sort((a, b) => +new Date(a.due) - +new Date(b.due))
+            {sortedTasks
               .slice(0, 6)
               .map(t => (
                 <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
