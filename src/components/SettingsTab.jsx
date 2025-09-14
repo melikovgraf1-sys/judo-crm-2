@@ -1,8 +1,8 @@
 // @flow
 import React, { useState, useEffect } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import { saveDB } from "../App";
-import type { DB } from "../App";
+import { saveDB } from "../state/appState";
+import type { DB } from "../types";
 
 export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const [rates, setRates] = useState({

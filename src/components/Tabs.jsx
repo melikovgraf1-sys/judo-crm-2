@@ -1,7 +1,7 @@
 // @flow
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { can } from "../App";
+import { can } from "../state/appState";
 
 const TABS = [
   { key: "dashboard", title: "Дашборд" },
