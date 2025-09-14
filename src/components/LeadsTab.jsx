@@ -1,5 +1,5 @@
 // @flow
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -11,6 +11,11 @@ import type { DB, Lead, LeadStage, StaffMember } from "../App";
 export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const [open, setOpen] = useState<Lead | null>(null);
+  const groupedLeads = useMemo((): { [LeadStage]: Lead[] } =>
+    db.leads.reduce((acc, l) => {
+      if (acc[l.stage]) acc[l.stage].push(l); else acc[l.stage] = [l];
+      return acc;
+    }, {}), [db.leads]);
   const move = (id: string, dir: 1 | -1) => {
     const l = db.leads.find(x => x.id === id); if (!l) return;
     const idx = stages.indexOf(l.stage);
@@ -26,7 +31,7 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
           <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
             <div className="text-xs text-slate-500 mb-2">{s}</div>
             <div className="space-y-2">
-              {db.leads.filter(l => l.stage === s).map(l => (
+              {(groupedLeads[s] || []).map(l => (
                 <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                   <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
                   <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
