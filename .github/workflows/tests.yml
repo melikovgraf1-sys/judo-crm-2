@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: v22.19.0.
+          cache: 'npm'
+
+      - run: npm ci                 # установка зависимостей из package-lock.json
+      - run: npm test -- --watchAll=false
+
+env:
+  DISABLE_ESLINT_PLUGIN: ${{ vars.DISABLE_ESLINT_PLUGIN }}
