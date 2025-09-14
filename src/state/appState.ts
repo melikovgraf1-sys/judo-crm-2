@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
-import { db as fs } from "../firebase";
+import { db } from "../firebase";
 import type {
   DB,
   UIState,
@@ -22,6 +22,8 @@ import type {
   StaffMember,
   TabKey,
 } from "../types";
+
+const fs = db!;
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
