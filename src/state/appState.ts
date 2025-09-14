@@ -239,18 +239,28 @@ export function makeSeedDB(): DB {
 
 export async function loadDB(): Promise<DB> {
   const ref = doc(fs, "app", "main");
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
-    return snap.data() as DB;
+  try {
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      return snap.data() as DB;
+    }
+    const db = makeSeedDB();
+    await setDoc(ref, db);
+    return db;
+  } catch (err) {
+    console.error("Failed to load DB", err);
+    throw err;
   }
-  const db = makeSeedDB();
-  await setDoc(ref, db);
-  return db;
 }
 
-export function saveDB(db: DB) {
+export async function saveDB(db: DB): Promise<void> {
   const ref = doc(fs, "app", "main");
-  return setDoc(ref, db);
+  try {
+    await setDoc(ref, db);
+  } catch (err) {
+    console.error("Failed to save DB", err);
+    throw err;
+  }
 }
 
 const defaultUI: UIState = {
@@ -346,15 +356,26 @@ export function useAppState() {
 
   useEffect(() => {
     const ref = doc(fs, "app", "main");
-    const unsub = onSnapshot(ref, snap => {
-      if (snap.exists()) {
-        setDB(snap.data() as DB);
-      } else {
-        const seed = makeSeedDB();
-        setDB(seed);
-        setDoc(ref, seed);
-      }
-    });
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(ref, async snap => {
+        try {
+          if (snap.exists()) {
+            setDB(snap.data() as DB);
+          } else {
+            const seed = makeSeedDB();
+            setDB(seed);
+            await setDoc(ref, seed);
+          }
+        } catch (err) {
+          console.error("Error processing snapshot", err);
+          push("Ошибка обновления данных", "error");
+        }
+      });
+    } catch (err) {
+      console.error("Failed to subscribe to snapshot", err);
+      push("Не удалось подписаться на обновления", "error");
+    }
     return () => unsub();
   }, []);
 
