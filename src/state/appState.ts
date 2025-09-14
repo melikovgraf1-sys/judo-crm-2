@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db as fs } from "../firebase";
 import type {
   DB,
@@ -233,17 +233,6 @@ export function makeSeedDB(): DB {
       { id: uid(), who: "Система", what: "Инициализация БД (seed)", when: todayISO() },
     ],
   };
-}
-
-export async function loadDB(): Promise<DB> {
-  const ref = doc(fs, "app", "main");
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
-    return snap.data() as DB;
-  }
-  const db = makeSeedDB();
-  await setDoc(ref, db);
-  return db;
 }
 
 export function saveDB(db: DB) {
