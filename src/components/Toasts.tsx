@@ -6,8 +6,11 @@ export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const push = (text: string, type: Toast["type"] = "info") => {
     const t: Toast = { id: uid(), text, type };
-    setToasts(prev => [...prev, t]);
-    setTimeout(() => setToasts(prev => prev.filter(x => x.id !== t.id)), 3500);
+    setToasts((prev: Toast[]) => [...prev, t]);
+    setTimeout(
+      () => setToasts((prev: Toast[]) => prev.filter((x: Toast) => x.id !== t.id)),
+      3500
+    );
   };
   return { toasts, push };
 }
