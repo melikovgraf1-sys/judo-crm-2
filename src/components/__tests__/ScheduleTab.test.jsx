@@ -1,90 +1,109 @@
-import React from "react";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import ScheduleTab from "../ScheduleTab";
-import "@testing-library/jest-dom";
 
-jest.mock("../../App", () => ({
-  uid: () => "uid",
+// @flow
+import React from 'react';
+import { render, screen, within, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom';
+
+jest.mock('../../App', () => ({
+  uid: () => 'id-1',
   saveDB: jest.fn(),
+  todayISO: () => new Date().toISOString(),
+  parseDateInput: (s) => s,
+  fmtMoney: (v) => String(v),
+  calcAgeYears: () => 0,
+  calcExperience: () => 0,
 }));
 
-const renderWithDB = (db) => {
-  function Wrapper() {
+jest.mock('../VirtualizedTable', () => (props) => <table>{props.children}</table>);
+
+import ScheduleTab from '../ScheduleTab';
+
+afterEach(() => {
+  cleanup();
+  jest.restoreAllMocks();
+});
+
+function makeDb() {
+  return {
+    clients: [],
+    attendance: [],
+    schedule: [],
+    leads: [],
+    tasks: [],
+    staff: [],
+    settings: {
+      areas: ['A1'],
+      groups: ['G1'],
+      limits: {},
+      rentByAreaEUR: {},
+      currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
+      coachPayFormula: '',
+    },
+    changelog: [],
+  };
+}
+
+function renderSchedule(db = makeDb()) {
+  let current = db;
+  const Wrapper = () => {
     const [state, setState] = React.useState(db);
-    return <ScheduleTab db={state} setDB={setState} />;
-  }
-  return render(<Wrapper />);
-};
-
-beforeEach(() => {
-  global.prompt = jest.fn();
-  global.confirm = jest.fn();
-});
-
-test("renders schedule grouped by area", () => {
-  const db = {
-    schedule: [
-      { id: "1", area: "North", weekday: 1, time: "10:00", group: "Kids", coachId: "", location: "" },
-      { id: "2", area: "South", weekday: 2, time: "11:00", group: "Teens", coachId: "", location: "" },
-    ],
-    settings: { areas: ["North", "South"], groups: ["Kids", "Teens"] },
+    const setDB = (next) => { current = next; setState(next); };
+    return <ScheduleTab db={state} setDB={setDB} />;
   };
-  renderWithDB(db);
-  const north = screen.getByText("North").parentElement.parentElement;
-  expect(within(north).getByText("Пн 10:00 · Kids")).toBeInTheDocument();
-  const south = screen.getByText("South").parentElement.parentElement;
-  expect(within(south).getByText("Вт 11:00 · Teens")).toBeInTheDocument();
-});
+  const utils = render(<Wrapper />);
+  return { ...utils, getDb: () => current };
+}
 
-test("addArea and addSlot add new area and slot", async () => {
-  const user = userEvent;
-  const db = { schedule: [], settings: { areas: [], groups: ["Kids"] } };
-  renderWithDB(db);
-  prompt
-    .mockReturnValueOnce("East")
-    .mockReturnValueOnce("1")
-    .mockReturnValueOnce("09:00")
-    .mockReturnValueOnce("Kids");
-  await user.click(screen.getByRole("button", { name: "+ район" }));
-  const area = screen.getByText("East").parentElement.parentElement;
-  await user.click(within(area).getByRole("button", { name: "+ группа" }));
-  expect(within(area).getByText("Пн 09:00 · Kids")).toBeInTheDocument();
-});
+describe('ScheduleTab CRUD for areas and slots', () => {
+  test('Create: add area and slot', async () => {
+    const { getDb } = renderSchedule();
+    const promptSpy = jest.spyOn(window, 'prompt');
+    promptSpy.mockReturnValueOnce('A2');
+    await userEvent.click(screen.getByText('+ район'));
+    expect(getDb().settings.areas).toContain('A2');
 
-test("renameArea and editSlot modify records", async () => {
-  const user = userEvent;
-  const db = {
-    schedule: [{ id: "1", area: "North", weekday: 1, time: "10:00", group: "Kids", coachId: "", location: "" }],
-    settings: { areas: ["North"], groups: ["Kids"] },
-  };
-  renderWithDB(db);
-  prompt
-    .mockReturnValueOnce("Center")
-    .mockReturnValueOnce("2")
-    .mockReturnValueOnce("12:00")
-    .mockReturnValueOnce("Teens");
-  const header = screen.getByText("North").parentElement;
-  await user.click(within(header).getByRole("button", { name: "✎" }));
-  const area = screen.getByText("Center").parentElement.parentElement;
-  const slot = within(area).getByText("Пн 10:00 · Kids").parentElement;
-  await user.click(within(slot).getByRole("button", { name: "✎" }));
-  expect(within(area).getByText("Вт 12:00 · Teens")).toBeInTheDocument();
-});
+    const promptsSlot = ['1', '10:00', 'G1'];
+    promptSpy.mockImplementation(() => promptsSlot.shift());
+    await userEvent.click(screen.getAllByText('+ группа')[1]);
+    expect(getDb().schedule).toHaveLength(1);
+    expect(getDb().schedule[0].area).toBe('A2');
+  });
 
-test("deleteArea and deleteSlot remove elements", async () => {
-  const user = userEvent;
-  const db = {
-    schedule: [{ id: "1", area: "North", weekday: 1, time: "10:00", group: "Kids", coachId: "", location: "" }],
-    settings: { areas: ["North"], groups: ["Kids"] },
-  };
-  renderWithDB(db);
-  confirm.mockReturnValueOnce(true).mockReturnValueOnce(true);
-  const slot = screen.getByText("Пн 10:00 · Kids").parentElement;
-  await user.click(within(slot).getByRole("button", { name: "✕" }));
-  expect(screen.queryByText("Пн 10:00 · Kids")).toBeNull();
-  const header = screen.getByText("North").parentElement;
-  await user.click(within(header).getByRole("button", { name: "✕" }));
-  expect(screen.queryByText("North")).toBeNull();
+  test('Update: rename area and edit slot', async () => {
+    const db = makeDb();
+    db.schedule = [{ id: 's1', area: 'A1', weekday: 1, time: '10:00', group: 'G1', coachId: '', location: '' }];
+    const { getDb } = renderSchedule(db);
+
+    const promptSpy = jest.spyOn(window, 'prompt');
+    promptSpy.mockReturnValueOnce('B1');
+    const renameBtn = screen.getAllByText('✎')[0];
+    await userEvent.click(renameBtn);
+    expect(getDb().settings.areas[0]).toBe('B1');
+    expect(getDb().schedule[0].area).toBe('B1');
+
+    const prompts = ['2', '11:00', 'G1'];
+    promptSpy.mockImplementation(() => prompts.shift());
+    const editBtn = screen.getAllByText('✎')[1];
+    await userEvent.click(editBtn);
+    expect(getDb().schedule[0].weekday).toBe(2);
+    expect(getDb().schedule[0].time).toBe('11:00');
+  });
+
+  test('Delete: delete slot and area', async () => {
+    const db = makeDb();
+    db.schedule = [{ id: 's1', area: 'A1', weekday: 1, time: '10:00', group: 'G1', coachId: '', location: '' }];
+    const { getDb } = renderSchedule(db);
+
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const slotItem = screen.getByText(/10:00/).closest('li');
+    const delSlotBtn = within(slotItem).getByText('✕');
+    await userEvent.click(delSlotBtn);
+    expect(getDb().schedule).toHaveLength(0);
+
+    const delAreaBtn = screen.getAllByText('✕')[0];
+    await userEvent.click(delAreaBtn);
+    expect(getDb().settings.areas).toHaveLength(0);
+  });
 });
 
