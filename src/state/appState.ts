@@ -268,11 +268,12 @@ export function can(
     | "schedule"
     | "leads"
     | "tasks"
+    | "appeals"
     | "settings",
 ) {
   if (role === "Администратор") return true;
   if (role === "Менеджер") {
-    return ["manage_clients", "leads", "tasks", "attendance", "schedule"].includes(
+    return ["manage_clients", "leads", "tasks", "attendance", "schedule", "appeals"].includes(
       feature,
     );
   }

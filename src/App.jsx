@@ -9,6 +9,7 @@ import ScheduleTab from "./components/ScheduleTab";
 import LeadsTab from "./components/LeadsTab";
 import TasksTab from "./components/TasksTab";
 import SettingsTab from "./components/SettingsTab";
+import AppealsTab from "./components/AppealsTab";
 import QuickAddModal from "./components/QuickAddModal";
 import Toasts from "./components/Toasts";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -85,6 +86,16 @@ export default function App() {
               element={
                 can(ui.role, "tasks") ? (
                   <TasksTab db={db} setDB={setDB} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
+              path="/appeals"
+              element={
+                can(ui.role, "appeals") ? (
+                  <AppealsTab />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
