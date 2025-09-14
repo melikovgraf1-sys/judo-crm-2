@@ -29,7 +29,7 @@ export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Задачи"]} />
-      <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ задача</button>
+      <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Задача</button>
       <ul className="space-y-2">
         {db.tasks.map(t => (
           <li key={t.id} className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-2">
