@@ -23,16 +23,16 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
       <Breadcrumbs items={["Лиды"]} />
       <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
         {stages.map(s => (
-          <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white">
+          <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
             <div className="text-xs text-slate-500 mb-2">{s}</div>
             <div className="space-y-2">
               {db.leads.filter(l => l.stage === s).map(l => (
-                <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50">
+                <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                   <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
                   <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
                   <div className="flex gap-1 mt-2">
-                    <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300">◀</button>
-                    <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300">▶</button>
+                    <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">◀</button>
+                    <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">▶</button>
                   </div>
                 </div>
               ))}
@@ -119,20 +119,20 @@ function LeadModal(
         <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
       </div>
       <div className="flex justify-end gap-2">
-        {!edit && <button onClick={() => setEdit(true)} className="px-3 py-2 rounded-md border border-slate-300">Редактировать</button>}
-        <button onClick={remove} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600">Удалить</button>
-        <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">Закрыть</button>
+        {!edit && <button onClick={() => setEdit(true)} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Редактировать</button>}
+        <button onClick={remove} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 dark:border-rose-700 dark:bg-rose-900/20">Удалить</button>
+        <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Закрыть</button>
       </div>
       {edit && (
-        <form onSubmit={handleSubmit(save)} className="space-y-2 pt-2 border-t border-slate-200">
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("name")} placeholder="Имя" />
+        <form onSubmit={handleSubmit(save)} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("name")} placeholder="Имя" />
           {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("parentName")} placeholder="Родитель" />
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300" {...register("contact")} placeholder="Контакт" />
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("parentName")} placeholder="Родитель" />
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("contact")} placeholder="Контакт" />
           {errors.contact && <span className="text-xs text-rose-600">{errors.contact.message}</span>}
           <div className="flex justify-end gap-2">
             <button type="submit" disabled={!isValid} className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400">Сохранить</button>
-            <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300">Отмена</button>
+            <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Отмена</button>
           </div>
         </form>
       )}

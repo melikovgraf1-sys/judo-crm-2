@@ -5,7 +5,7 @@ import { fmtMoney, fmtDate } from "../App";
 
 function OfflineTip() {
   return (
-    <div className="m-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-slate-700">
+    <div className="m-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
       <div className="font-medium mb-1">Как сохранить и работать офлайн</div>
       <ul className="list-disc pl-5 text-sm space-y-1">
         <li>В браузере откройте эту страницу, оставьте её открытой один раз (кешируется автоматически).</li>
@@ -17,7 +17,11 @@ function OfflineTip() {
 }
 
 function MetricCard({ title, value, accent }) {
-  const cls = accent === "green" ? "bg-emerald-50 border-emerald-200" : accent === "sky" ? "bg-sky-50 border-sky-200" : "bg-slate-50 border-slate-200";
+  const cls = accent === "green"
+    ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-700"
+    : accent === "sky"
+      ? "bg-sky-50 border-sky-200 dark:bg-sky-900/30 dark:border-sky-700"
+      : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700";
   return (
     <div className={`p-4 rounded-2xl border ${cls} min-w-[180px]`}>
       <div className="text-xs text-slate-500">{title}</div>
@@ -50,18 +54,18 @@ export default function Dashboard({ db, ui }) {
         <MetricCard title="Заполняемость" value={`${fillPct}%`} accent={fillPct >= 80 ? "green" : "slate"} />
       </div>
       <div className="grid lg:grid-cols-2 gap-3">
-        <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+        <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
           <div className="font-semibold mb-2">Лиды по этапам</div>
           <div className="flex flex-wrap gap-2">
             {["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"].map(s => (
-              <div key={s} className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+              <div key={s} className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs dark:bg-slate-800 dark:border-slate-700">
                 <div className="text-slate-500">{s}</div>
                 <div className="text-lg font-semibold text-slate-800">{db.leads.filter(l => l.stage === s).length}</div>
               </div>
             ))}
           </div>
         </div>
-        <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+        <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
           <div className="font-semibold mb-2">Предстоящие задачи</div>
           <ul className="space-y-2">
             {db.tasks

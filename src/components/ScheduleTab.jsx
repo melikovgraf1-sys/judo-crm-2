@@ -94,7 +94,7 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
       </div>
       <div className="grid lg:grid-cols-3 gap-3">
         {Object.entries(byArea).map(([area, list]) => (
-          <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
+          <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-2">
             <div className="flex justify-between items-center font-semibold">
               <span>{area}</span>
               <span className="flex gap-1 text-xs">
