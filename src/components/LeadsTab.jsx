@@ -17,12 +17,12 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
       if (acc[l.stage]) acc[l.stage].push(l); else acc[l.stage] = [l];
       return acc;
     }, {}), [db.leads]);
-  const move = (id: string, dir: 1 | -1) => {
+  const move = async (id: string, dir: 1 | -1) => {
     const l = db.leads.find(x => x.id === id); if (!l) return;
     const idx = stages.indexOf(l.stage);
     const nextStage = stages[Math.min(stages.length - 1, Math.max(0, idx + dir))];
     const next = { ...db, leads: db.leads.map(x => x.id === id ? { ...x, stage: nextStage, updatedAt: todayISO() } : x) };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
   return (
     <div className="space-y-3">
@@ -101,24 +101,24 @@ function LeadModal(
 
   useEffect(() => reset(lead), [lead, reset]);
 
-  const save = (data: any) => {
+  const save = async (data: any) => {
     const nextLead: Lead = { ...lead, ...data, updatedAt: todayISO() };
     const next = {
       ...db,
       leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
     };
-    setDB(next); saveDB(next); setEdit(false); onClose();
+    setDB(next); await saveDB(next); setEdit(false); onClose();
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!window.confirm("Удалить лид?")) return;
     const next = {
       ...db,
       leads: db.leads.filter(l => l.id !== lead.id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.id}`, when: todayISO() }],
     };
-    setDB(next); saveDB(next); onClose();
+    setDB(next); await saveDB(next); onClose();
   };
 
   return (

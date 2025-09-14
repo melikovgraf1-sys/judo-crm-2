@@ -14,14 +14,14 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
     return m;
   }, [db.schedule, db.settings.areas]);
 
-  const addArea = () => {
+  const addArea = async () => {
     const name = prompt("Название района");
     if (!name) return;
     if (db.settings.areas.includes(name)) return;
     const next = { ...db, settings: { ...db.settings, areas: [...db.settings.areas, name] } };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
-  const renameArea = (oldName: string) => {
+  const renameArea = async (oldName: string) => {
     const name = prompt("Новое название района", oldName);
     if (!name || name === oldName) return;
     const next = {
@@ -29,16 +29,16 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
       settings: { ...db.settings, areas: db.settings.areas.map(a => a === oldName ? name : a) },
       schedule: db.schedule.map(s => s.area === oldName ? { ...s, area: name } : s),
     };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
-  const deleteArea = (name: string) => {
+  const deleteArea = async (name: string) => {
     if (!window.confirm(`Удалить район ${name}?`)) return;
     const next = {
       ...db,
       settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name) },
       schedule: db.schedule.filter(s => s.area !== name),
     };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
 
   const pickGroup = (init: string) => {
@@ -49,7 +49,7 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
     if (!isNaN(idx) && idx >= 1 && idx <= db.settings.groups.length) return db.settings.groups[idx - 1];
     return raw;
   };
-  const addSlot = (area: string) => {
+  const addSlot = async (area: string) => {
     const weekday = parseInt(prompt("День недели (1-Пн … 7-Вс)", "1") || "", 10);
     const time = prompt("Время (HH:MM)", "10:00") || "";
     const group = pickGroup(db.settings.groups[0] || "");
@@ -62,9 +62,9 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
         ? db.settings
         : { ...db.settings, groups: [...db.settings.groups, group] },
     };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
-  const editSlot = (id: string) => {
+  const editSlot = async (id: string) => {
     const s = db.schedule.find(x => x.id === id);
     if (!s) return;
     const weekday = parseInt(prompt("День недели (1-Пн … 7-Вс)", String(s.weekday)) || "", 10);
@@ -78,12 +78,12 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
         ? db.settings
         : { ...db.settings, groups: [...db.settings.groups, group] },
     };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
-  const deleteSlot = (id: string) => {
+  const deleteSlot = async (id: string) => {
     if (!window.confirm("Удалить группу?")) return;
     const next = { ...db, schedule: db.schedule.filter(x => x.id !== id) };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
 
   return (
