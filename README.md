@@ -32,6 +32,39 @@ npm start         # запуск приложения в режиме разра
 npm run build     # сборка production-версии в каталог build/
 ```
 
+## Настройка Firebase
+
+1. Создайте проект в [Firebase Console](https://console.firebase.google.com/) и добавьте веб-приложение.
+2. Установите SDK и зависимости:
+
+   ```bash
+   npm install firebase
+   ```
+
+3. Скопируйте конфигурацию из настроек проекта и заполните `.env`:
+
+   ```env
+   REACT_APP_FIREBASE_API_KEY=...
+   REACT_APP_FIREBASE_AUTH_DOMAIN=...
+   REACT_APP_FIREBASE_PROJECT_ID=...
+   REACT_APP_FIREBASE_STORAGE_BUCKET=...
+   REACT_APP_FIREBASE_MESSAGING_SENDER_ID=...
+   REACT_APP_FIREBASE_APP_ID=...
+   ```
+
+4. Перезапустите `npm start`, чтобы подтянуть новые переменные окружения.
+
+### Используемые сервисы
+
+- **Firestore** — хранение данных (ученики, тренировки, результаты).
+- **Authentication** — управление пользователями и авторизация.
+
+### Устранение неполадок
+
+- Ошибка `auth/invalid-api-key` — убедитесь, что API ключ скопирован верно.
+- При ошибках доступа к Firestore проверьте правила безопасности в консоли Firebase.
+- Если изменения `.env` не применяются, остановите dev-сервер и запустите его снова.
+
 ## Контакты
 
 Вопросы и предложения: [info@judocrm.dev](mailto:info@judocrm.dev)
