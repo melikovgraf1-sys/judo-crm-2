@@ -2,8 +2,8 @@
 import React, { useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
 import Modal from "../Modal";
-import { fmtMoney, calcAgeYears, calcExperience } from "../../App";
-import type { Client, UIState } from "../../App";
+import { fmtMoney, calcAgeYears, calcExperience } from "../../state/appState";
+import type { Client, UIState } from "../../types";
 
 type Props = {
   list: Client[],
