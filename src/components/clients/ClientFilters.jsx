@@ -1,6 +1,6 @@
 // @flow
 import React from "react";
-import type { DB, Area, Group, PaymentStatus } from "../../App";
+import type { DB, Area, Group, PaymentStatus } from "../../types";
 
 type Props = {
   db: DB,
