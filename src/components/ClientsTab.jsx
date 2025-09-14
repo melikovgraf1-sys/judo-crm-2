@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
-import TableWrap from "./TableWrap";
+import VirtualizedTable from "./VirtualizedTable";
 import Modal from "./Modal";
 import { uid, todayISO, parseDateInput, fmtMoney, calcAgeYears, calcExperience, saveDB } from "../App";
 import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
@@ -151,37 +151,39 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         <div className="text-xs text-slate-500">Найдено: {list.length}</div>
       </div>
 
-      <TableWrap>
-        <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-          <tr>
-            <th className="text-left p-2">Имя</th>
-            <th className="text-left p-2">Телефон</th>
-            <th className="text-left p-2">Район</th>
-            <th className="text-left p-2">Группа</th>
-            <th className="text-left p-2">Статус оплаты</th>
-            <th className="text-left p-2">Сумма оплаты</th>
-            <th className="text-right p-2">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map(c => (
-            <tr key={c.id} className="border-t border-slate-100 dark:border-slate-700">
-              <td className="p-2 cursor-pointer" onClick={() => setSelected(c)}>{c.firstName} {c.lastName}</td>
-              <td className="p-2">{c.phone}</td>
-              <td className="p-2">{c.area}</td>
-              <td className="p-2">{c.group}</td>
-              <td className="p-2">
-                <span className={`px-2 py-1 rounded-full text-xs ${c.payStatus === "действует" ? "bg-emerald-100 text-emerald-700" : c.payStatus === "задолженность" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{c.payStatus}</span>
-              </td>
-              <td className="p-2">{c.payAmount != null ? fmtMoney(c.payAmount, ui.currency) : "—"}</td>
-              <td className="p-2 text-right">
-                <button onClick={() => startEdit(c)} className="px-2 py-1 text-xs rounded-md border border-slate-300 mr-1 dark:border-slate-700 dark:bg-slate-800">Редактировать</button>
-                <button onClick={() => removeClient(c.id)} className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30">Удалить</button>
-              </td>
+      <VirtualizedTable
+        header={(
+          <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <tr>
+              <th className="text-left p-2">Имя</th>
+              <th className="text-left p-2">Телефон</th>
+              <th className="text-left p-2">Район</th>
+              <th className="text-left p-2">Группа</th>
+              <th className="text-left p-2">Статус оплаты</th>
+              <th className="text-left p-2">Сумма оплаты</th>
+              <th className="text-right p-2">Действия</th>
             </tr>
-          ))}
-        </tbody>
-      </TableWrap>
+          </thead>
+        )}
+        items={list}
+        rowHeight={48}
+        renderRow={(c, style) => (
+          <tr key={c.id} style={style} className="border-t border-slate-100 dark:border-slate-700">
+            <td className="p-2 cursor-pointer" onClick={() => setSelected(c)}>{c.firstName} {c.lastName}</td>
+            <td className="p-2">{c.phone}</td>
+            <td className="p-2">{c.area}</td>
+            <td className="p-2">{c.group}</td>
+            <td className="p-2">
+              <span className={`px-2 py-1 rounded-full text-xs ${c.payStatus === "действует" ? "bg-emerald-100 text-emerald-700" : c.payStatus === "задолженность" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700"}`}>{c.payStatus}</span>
+            </td>
+            <td className="p-2">{c.payAmount != null ? fmtMoney(c.payAmount, ui.currency) : "—"}</td>
+            <td className="p-2 text-right">
+              <button onClick={() => startEdit(c)} className="px-2 py-1 text-xs rounded-md border border-slate-300 mr-1 dark:border-slate-700 dark:bg-slate-800">Редактировать</button>
+              <button onClick={() => removeClient(c.id)} className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30">Удалить</button>
+            </td>
+          </tr>
+        )}
+      />
 
       {selected && (
         <Modal size="md" onClose={() => setSelected(null)}>
