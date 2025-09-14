@@ -11,7 +11,7 @@ import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
 
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className={`px-3 py-1 rounded-full border text-xs ${active ? "bg-sky-600 text-white border-sky-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"}`}>{children}</button>
+    <button onClick={onClick} className={`px-3 py-1 rounded-full border text-xs ${active ? "bg-sky-600 text-white border-sky-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700"}`}>{children}</button>
   );
 }
 
@@ -136,11 +136,11 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={group} onChange={e => setGroup(e.target.value)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200" value={group} onChange={e => setGroup(e.target.value)}>
           <option value="all">Все группы</option>
           {db.settings.groups.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
-        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm" value={pay} onChange={e => setPay(e.target.value)}>
+        <select className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200" value={pay} onChange={e => setPay(e.target.value)}>
           <option value="all">Все статусы оплаты</option>
           <option value="ожидание">ожидание</option>
           <option value="действует">действует</option>
@@ -150,7 +150,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
       </div>
 
       <TableWrap>
-        <thead className="bg-slate-50 text-slate-600">
+        <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           <tr>
             <th className="text-left p-2">Имя</th>
             <th className="text-left p-2">Телефон</th>
@@ -163,7 +163,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         </thead>
         <tbody>
           {list.map(c => (
-            <tr key={c.id} className="border-t border-slate-100">
+            <tr key={c.id} className="border-t border-slate-100 dark:border-slate-700">
               <td className="p-2 cursor-pointer" onClick={() => setSelected(c)}>{c.firstName} {c.lastName}</td>
               <td className="p-2">{c.phone}</td>
               <td className="p-2">{c.area}</td>
@@ -173,8 +173,8 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
               </td>
               <td className="p-2">{c.payAmount != null ? fmtMoney(c.payAmount, ui.currency) : "—"}</td>
               <td className="p-2 text-right">
-                <button onClick={() => startEdit(c)} className="px-2 py-1 text-xs rounded-md border border-slate-300 mr-1">Редактировать</button>
-                <button onClick={() => removeClient(c.id)} className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50">Удалить</button>
+                <button onClick={() => startEdit(c)} className="px-2 py-1 text-xs rounded-md border border-slate-300 mr-1 dark:border-slate-700 dark:bg-slate-800">Редактировать</button>
+                <button onClick={() => removeClient(c.id)} className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30">Удалить</button>
               </td>
             </tr>
           ))}

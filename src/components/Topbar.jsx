@@ -11,12 +11,12 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
       <div className="flex items-center gap-2">
         <input
           placeholder="Поиск…"
-          className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200"
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={ui.search}
           onChange={e => { const u = { ...ui, search: e.target.value }; setUI(u); }}
         />
         <select
-          className="px-2 py-2 rounded-md border border-slate-300 text-sm"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={ui.currency}
           onChange={e => { const u = { ...ui, currency: e.target.value }; setUI(u); }}
         >
@@ -26,14 +26,14 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
         </select>
         <button
           onClick={() => { const u = { ...ui, theme: ui.theme === "light" ? "dark" : "light" }; setUI(u); }}
-          className="px-2 py-2 rounded-md border border-slate-300 text-sm"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           title="Переключить тему"
         >
           {ui.theme === "light" ? "🌙" : "☀️"}
         </button>
         <button onClick={onQuickAdd} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Быстро добавить</button>
         <select
-          className="px-2 py-2 rounded-md border border-slate-300 text-sm"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={ui.role}
           onChange={e => { const u = { ...ui, role: e.target.value }; setUI(u); }}
           title="Войти как"
