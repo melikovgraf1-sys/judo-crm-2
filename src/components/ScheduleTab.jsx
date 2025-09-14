@@ -32,7 +32,7 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
     setDB(next); saveDB(next);
   };
   const deleteArea = (name: string) => {
-    if (!confirm(`Удалить район ${name}?`)) return;
+    if (!window.confirm(`Удалить район ${name}?`)) return;
     const next = {
       ...db,
       settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name) },
@@ -81,7 +81,7 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
     setDB(next); saveDB(next);
   };
   const deleteSlot = (id: string) => {
-    if (!confirm("Удалить группу?")) return;
+    if (!window.confirm("Удалить группу?")) return;
     const next = { ...db, schedule: db.schedule.filter(x => x.id !== id) };
     setDB(next); saveDB(next);
   };
