@@ -36,7 +36,7 @@ export default function Tabs({ role }: TabsProps) {
           <NavLink
             key={t.key}
             to={`/${t.key}`}
-            className={({ isActive }) =>
+            className={({ isActive }: { isActive: boolean }) =>
               `px-3 py-2 rounded-md text-sm ${
                 isActive
                   ? "bg-white text-sky-700 border border-sky-200 dark:bg-slate-800 dark:text-sky-400 dark:border-slate-700"

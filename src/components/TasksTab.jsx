@@ -22,7 +22,7 @@ export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
     setDB(next); saveDB(next);
   };
   const remove = (id: string) => {
-    if (!confirm("Удалить задачу?")) return;
+    if (!window.confirm("Удалить задачу?")) return;
     const next = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
     setDB(next); saveDB(next);
   };
