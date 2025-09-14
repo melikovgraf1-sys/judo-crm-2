@@ -4,8 +4,8 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Modal from "../Modal";
-import { todayISO } from "../../App.jsx";
-import type { DB, Client } from "../../App.jsx";
+import { todayISO } from "../../App";
+import type { DB, Client } from "../../App";
 
 type Props = {
   db: DB,
