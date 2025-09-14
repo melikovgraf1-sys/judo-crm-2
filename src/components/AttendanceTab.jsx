@@ -2,8 +2,8 @@
 import React, { useState, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
-import { fmtDate, uid, saveDB } from "../App";
-import type { DB, Area, Group, AttendanceEntry } from "../App";
+import { fmtDate, uid, saveDB } from "../state/appState";
+import type { DB, Area, Group, AttendanceEntry } from "../types";
 
 export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const [area, setArea] = useState<Area | "all">("all");
