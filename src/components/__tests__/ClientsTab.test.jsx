@@ -13,7 +13,7 @@ jest.mock('../../state/appState', () => ({
   __esModule: true,
   uid: jest.fn(),
   todayISO: jest.fn(),
-  saveDB: jest.fn(),
+  saveDB: jest.fn().mockResolvedValue(undefined),
   parseDateInput: jest.fn(),
   fmtMoney: jest.fn(),
 }));

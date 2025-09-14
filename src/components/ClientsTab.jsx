@@ -36,7 +36,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
     setModalOpen(true);
   };
 
-  const saveClient = (data: any) => {
+  const saveClient = async (data: any) => {
     const prepared = {
       ...data,
       birthDate: parseDateInput(data.birthDate),
@@ -50,7 +50,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
         changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
       };
-      setDB(next); saveDB(next);
+      setDB(next); await saveDB(next);
     } else {
       const c: Client = {
         id: uid(),
@@ -63,20 +63,20 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         clients: [c, ...db.clients],
         changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
       };
-      setDB(next); saveDB(next);
+      setDB(next); await saveDB(next);
     }
     setModalOpen(false);
     setEditing(null);
   };
 
-  const removeClient = (id: string) => {
+  const removeClient = async (id: string) => {
     if (!window.confirm("Удалить клиента?")) return;
     const next = {
       ...db,
       clients: db.clients.filter(c => c.id !== id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }],
     };
-    setDB(next); saveDB(next);
+    setDB(next); await saveDB(next);
   };
 
   return (

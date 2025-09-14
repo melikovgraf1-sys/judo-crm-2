@@ -12,7 +12,7 @@ jest.mock('react-window', () => ({
 jest.mock('../../state/appState', () => ({
   todayISO: jest.fn(() => '2024-01-01T00:00:00.000Z'),
   uid: jest.fn(() => 'uid-123'),
-  saveDB: jest.fn(),
+  saveDB: jest.fn().mockResolvedValue(undefined),
   fmtDate: (iso) => iso,
 }));
 
@@ -95,7 +95,7 @@ test('create: adds new lead via modal', async () => {
     const [state, setState] = React.useState(db);
     const [open, setOpen] = React.useState(true);
     const setDB = (next) => { current = next; setState(next); };
-    const addLead = () => {
+  const addLead = async () => {
       const l = {
         id: uid(),
         name: 'Новый лид',
@@ -114,7 +114,7 @@ test('create: adds new lead via modal', async () => {
       };
       const next = { ...state, leads: [l, ...state.leads] };
       setDB(next);
-      saveDB(next);
+      await saveDB(next);
       setOpen(false);
     };
     return (

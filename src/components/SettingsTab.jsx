@@ -39,7 +39,7 @@ export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
           },
         };
         setDB(nextDB);
-        saveDB(nextDB);
+        await saveDB(nextDB);
       } catch (e) {
         console.error(e);
       }
@@ -96,9 +96,9 @@ export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
                       min={0}
                       className="w-24 px-2 py-1 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                       value={db.settings.limits[key]}
-                      onChange={e => {
+                      onChange={async e => {
                         const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
-                        setDB(next); saveDB(next);
+                        setDB(next); await saveDB(next);
                       }}
                     />
                   </div>
