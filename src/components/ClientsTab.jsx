@@ -4,8 +4,8 @@ import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { uid, todayISO, parseDateInput, saveDB } from "../App";
-import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
+import { uid, todayISO, parseDateInput, saveDB } from "../App.jsx";
+import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App.jsx";
 
 export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UIState }) {
   const [area, setArea] = useState<Area | "all">("all");
