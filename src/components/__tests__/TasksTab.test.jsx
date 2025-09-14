@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 jest.mock('../../state/appState', () => ({
   fmtDate: (iso) => new Intl.DateTimeFormat('ru-RU').format(new Date(iso)),
   uid: () => 'uid',
-  saveDB: () => {},
+  saveDB: jest.fn().mockResolvedValue(undefined),
   todayISO: () => '2025-01-01T00:00:00.000Z'
 }));
 import TasksTab from '../TasksTab';
@@ -26,7 +26,6 @@ describe('TasksTab CRUD operations', () => {
 
   beforeEach(() => {
     window.confirm = jest.fn(() => true);
-    localStorage.clear();
   });
 
   test('Read: renders initial tasks', () => {

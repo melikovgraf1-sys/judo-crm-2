@@ -25,16 +25,16 @@ export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) =
     return map;
   }, [db.attendance, todayStr]);
 
-  const toggle = (clientId: string) => {
+  const toggle = async (clientId: string) => {
     const mark = todayMarks.get(clientId);
     if (mark) {
       const updated = { ...mark, came: !mark.came };
       const next = { ...db, attendance: db.attendance.map(a => a.id === mark.id ? updated : a) };
-      setDB(next); saveDB(next);
+      setDB(next); await saveDB(next);
     } else {
       const entry: AttendanceEntry = { id: uid(), clientId, date: new Date().toISOString(), came: true };
       const next = { ...db, attendance: [entry, ...db.attendance] };
-      setDB(next); saveDB(next);
+      setDB(next); await saveDB(next);
     }
   };
 

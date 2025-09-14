@@ -7,7 +7,7 @@ import '@testing-library/jest-dom';
 
 jest.mock('../../state/appState', () => ({
   uid: () => 'id-1',
-  saveDB: jest.fn(),
+  saveDB: jest.fn().mockResolvedValue(undefined),
   todayISO: () => new Date().toISOString(),
   parseDateInput: (s) => s,
   fmtMoney: (v) => String(v),
