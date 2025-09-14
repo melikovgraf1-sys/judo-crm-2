@@ -18,7 +18,7 @@ export const TAB_TITLES = TABS.reduce((acc, t) => ({ ...acc, [t.key]: t.title })
 export default function Tabs({ role }) {
   const visible = TABS.filter(t => !t.need || t.need(role));
   return (
-    <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50">
+    <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
       <div className="flex gap-1 p-2">
         {visible.map(t => (
           <NavLink
@@ -26,7 +26,9 @@ export default function Tabs({ role }) {
             to={`/${t.key}`}
             className={({ isActive }) =>
               `px-3 py-2 rounded-md text-sm ${
-                isActive ? "bg-white text-sky-700 border border-sky-200" : "text-slate-700 hover:bg-white/80"
+                isActive
+                  ? "bg-white text-sky-700 border border-sky-200 dark:bg-slate-800 dark:text-sky-400 dark:border-slate-700"
+                  : "text-slate-700 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-slate-800/80"
               }`}
           >
             {t.title}

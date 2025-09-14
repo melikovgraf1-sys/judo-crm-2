@@ -19,7 +19,7 @@ export default function Modal({ children, onClose, size = "md", className = "" }
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4" onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
-        className={`w-full ${sizeClass} rounded-2xl bg-white p-4 space-y-3 ${className}`}
+        className={`w-full ${sizeClass} rounded-2xl bg-white dark:bg-slate-800 p-4 space-y-3 ${className}`}
       >
         {children}
       </div>
