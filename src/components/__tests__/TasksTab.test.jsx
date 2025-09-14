@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
-jest.mock('../../App', () => ({
+jest.mock('../../state/appState', () => ({
   fmtDate: (iso) => new Intl.DateTimeFormat('ru-RU').format(new Date(iso)),
   uid: () => 'uid',
   saveDB: () => {},

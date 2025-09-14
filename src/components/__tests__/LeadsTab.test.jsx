@@ -9,7 +9,7 @@ jest.mock('react-window', () => ({
   ),
 }), { virtual: true });
 
-jest.mock('../../App', () => ({
+jest.mock('../../state/appState', () => ({
   todayISO: jest.fn(() => '2024-01-01T00:00:00.000Z'),
   uid: jest.fn(() => 'uid-123'),
   saveDB: jest.fn(),
@@ -18,7 +18,7 @@ jest.mock('../../App', () => ({
 
 import LeadsTab from '../LeadsTab';
 import QuickAddModal from '../QuickAddModal';
-import { todayISO, uid, saveDB } from '../../App';
+import { todayISO, uid, saveDB } from '../../state/appState';
 
 beforeEach(() => {
   jest.clearAllMocks();

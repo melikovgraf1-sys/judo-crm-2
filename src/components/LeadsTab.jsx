@@ -6,8 +6,8 @@ import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
 import { FixedSizeList } from "react-window";
-import { todayISO, saveDB, uid, fmtDate } from "../App";
-import type { DB, Lead, LeadStage, StaffMember } from "../App";
+import { todayISO, saveDB, uid, fmtDate } from "../state/appState";
+import type { DB, Lead, LeadStage, StaffMember } from "../types";
 
 export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];

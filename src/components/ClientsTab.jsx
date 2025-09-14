@@ -7,6 +7,7 @@ import ClientForm from "./clients/ClientForm";
 import { uid, todayISO, parseDateInput, saveDB } from "../App";
 import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
 
+
 export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UIState }) {
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
