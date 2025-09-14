@@ -6,8 +6,8 @@ import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
 import Modal from "./Modal";
-import { uid, todayISO, parseDateInput, fmtMoney, calcAgeYears, calcExperience, saveDB } from "../App";
-import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../App";
+import { uid, todayISO, parseDateInput, fmtMoney, calcAgeYears, calcExperience, saveDB } from "../state/appState";
+import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../types";
 
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (

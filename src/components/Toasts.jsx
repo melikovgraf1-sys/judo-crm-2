@@ -1,8 +1,7 @@
 // @flow
 import React, { useState } from "react";
-import { uid } from "../App";
-
-export type Toast = { id: string; text: string; type?: "success" | "error" | "info" };
+import { uid } from "../state/appState";
+import type { Toast } from "../types";
 
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
