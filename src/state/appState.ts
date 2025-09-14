@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { db as fs } from "../firebase";
 import type {
   DB,
   UIState,
@@ -237,23 +237,7 @@ export function makeSeedDB(): DB {
   };
 }
 
-export async function loadDB(): Promise<DB> {
-  const ref = doc(fs, "app", "main");
-  try {
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      return snap.data() as DB;
-    }
-    const db = makeSeedDB();
-    await setDoc(ref, db);
-    return db;
-  } catch (err) {
-    console.error("Failed to load DB", err);
-    throw err;
-  }
-}
-
-export async function saveDB(db: DB): Promise<void> {
+export function saveDB(db: DB) {
   const ref = doc(fs, "app", "main");
   try {
     await setDoc(ref, db);
