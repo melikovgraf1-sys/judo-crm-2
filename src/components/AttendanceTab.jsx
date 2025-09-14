@@ -15,10 +15,18 @@ export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) =
     return db.clients.filter(c => (area === "all" || c.area === area) && (group === "all" || c.group === group));
   }, [db.clients, area, group]);
 
-  const getMark = (clientId: string) => db.attendance.find(a => a.clientId === clientId && a.date.slice(0,10) === todayStr);
+  const todayMarks = useMemo(() => {
+    const map: Map<string, AttendanceEntry> = new Map();
+    db.attendance.forEach(a => {
+      if (a.date.slice(0, 10) === todayStr) {
+        map.set(a.clientId, a);
+      }
+    });
+    return map;
+  }, [db.attendance, todayStr]);
 
   const toggle = (clientId: string) => {
-    const mark = getMark(clientId);
+    const mark = todayMarks.get(clientId);
     if (mark) {
       const updated = { ...mark, came: !mark.came };
       const next = { ...db, attendance: db.attendance.map(a => a.id === mark.id ? updated : a) };
@@ -56,7 +64,7 @@ export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) =
         </thead>
         <tbody>
           {list.map(c => {
-            const m = getMark(c.id);
+            const m = todayMarks.get(c.id);
             return (
               <tr key={c.id} className="border-t border-slate-100 dark:border-slate-700">
                 <td className="p-2">{c.firstName} {c.lastName}</td>
