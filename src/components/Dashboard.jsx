@@ -1,7 +1,7 @@
 // @flow
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import { fmtMoney, fmtDate } from "../App";
+import { fmtMoney, fmtDate } from "../state/appState";
 
 function OfflineTip() {
   return (

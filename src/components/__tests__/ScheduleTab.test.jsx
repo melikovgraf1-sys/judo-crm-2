@@ -5,7 +5,7 @@ import { render, screen, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
-jest.mock('../../App', () => ({
+jest.mock('../../state/appState', () => ({
   uid: () => 'id-1',
   saveDB: jest.fn(),
   todayISO: () => new Date().toISOString(),
