@@ -24,8 +24,8 @@ function MetricCard({ title, value, accent }) {
       : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700";
   return (
     <div className={`p-4 rounded-2xl border ${cls} min-w-[180px]`}>
-      <div className="text-xs text-slate-500">{title}</div>
-      <div className="text-xl font-semibold text-slate-800 mt-1">{value}</div>
+      <div className="text-xs text-slate-500 dark:text-slate-400">{title}</div>
+      <div className="text-xl font-semibold text-slate-800 dark:text-slate-200 mt-1">{value}</div>
     </div>
   );
 }
@@ -80,15 +80,15 @@ export default function Dashboard({ db, ui }) {
       </div>
       <div className="grid lg:grid-cols-2 gap-3">
         <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <div className="font-semibold mb-2">Лиды по этапам</div>
+          <div className="font-semibold mb-2 text-slate-800 dark:text-slate-200">Лиды по этапам</div>
           <div className="flex flex-wrap gap-2">
             {leadStages.map(s => (
               <div
                 key={s}
                 className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs dark:bg-slate-800 dark:border-slate-700"
               >
-                <div className="text-slate-500">{s}</div>
-                <div className="text-lg font-semibold text-slate-800">
+                <div className="text-slate-500 dark:text-slate-400">{s}</div>
+                <div className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                   {leadsDistribution[s] || 0}
                 </div>
               </div>
@@ -96,14 +96,14 @@ export default function Dashboard({ db, ui }) {
           </div>
         </div>
         <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <div className="font-semibold mb-2">Предстоящие задачи</div>
+          <div className="font-semibold mb-2 text-slate-800 dark:text-slate-200">Предстоящие задачи</div>
           <ul className="space-y-2">
             {sortedTasks
               .slice(0, 6)
               .map(t => (
                 <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
                   <span className="truncate">{t.title}</span>
-                  <span className="text-slate-500">{fmtDate(t.due)}</span>
+                  <span className="text-slate-500 dark:text-slate-400">{fmtDate(t.due)}</span>
                 </li>
               ))}
           </ul>
