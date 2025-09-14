@@ -5,6 +5,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
+import { FixedSizeList } from "react-window";
 import { todayISO, saveDB, uid, fmtDate } from "../App";
 import type { DB, Lead, LeadStage, StaffMember } from "../App";
 
@@ -27,23 +28,34 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
     <div className="space-y-3">
       <Breadcrumbs items={["Лиды"]} />
       <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {stages.map(s => (
-          <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-            <div className="text-xs text-slate-500 mb-2">{s}</div>
-            <div className="space-y-2">
-              {(groupedLeads[s] || []).map(l => (
-                <div key={l.id} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                  <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
-                  <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
-                  <div className="flex gap-1 mt-2">
-                    <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">◀</button>
-                    <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">▶</button>
-                  </div>
-                </div>
-              ))}
+        {stages.map(s => {
+          const leads = groupedLeads[s] || [];
+          return (
+            <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+              <div className="text-xs text-slate-500 mb-2">{s}</div>
+              <FixedSizeList
+                height={200}
+                itemCount={leads.length}
+                itemSize={90}
+                width="100%"
+              >
+                {({ index, style }) => {
+                  const l = leads[index];
+                  return (
+                    <div key={l.id} style={style} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
+                      <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
+                      <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
+                      <div className="flex gap-1 mt-2">
+                        <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">◀</button>
+                        <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">▶</button>
+                      </div>
+                    </div>
+                  );
+                }}
+              </FixedSizeList>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {open && (
         <LeadModal
