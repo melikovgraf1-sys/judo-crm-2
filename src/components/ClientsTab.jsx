@@ -59,12 +59,14 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
   const [editing, setEditing] = useState<Client | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
 
+  const search = ui.search.toLowerCase();
+
   const list = useMemo(() => {
     return db.clients.filter(c =>
       (area === "all" || c.area === area) &&
       (group === "all" || c.group === group) &&
       (pay === "all" || c.payStatus === pay) &&
-      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(ui.search.toLowerCase()))
+      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search]);
 
