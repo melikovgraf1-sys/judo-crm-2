@@ -126,9 +126,9 @@ export type TabKey =
   | "dashboard"
   | "clients"
   | "attendance"
+  | "tasks"
   | "schedule"
   | "leads"
-  | "tasks"
   | "appeals"
   | "settings";
 

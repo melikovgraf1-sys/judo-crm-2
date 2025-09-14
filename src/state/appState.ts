@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { db as fs } from "../firebase";
 import type {
   DB,
   UIState,
@@ -22,7 +24,6 @@ import type {
 } from "../types";
 
 export const LS_KEYS = {
-  db: "judo_crm_db_v1",
   ui: "judo_crm_ui_v1",
 };
 
@@ -234,20 +235,20 @@ export function makeSeedDB(): DB {
   };
 }
 
-export function loadDB(): DB {
-  const raw = localStorage.getItem(LS_KEYS.db);
-  if (raw) {
-    try {
-      return JSON.parse(raw) as DB;
-    } catch {}
+export async function loadDB(): Promise<DB> {
+  const ref = doc(fs, "app", "main");
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    return snap.data() as DB;
   }
   const db = makeSeedDB();
-  localStorage.setItem(LS_KEYS.db, JSON.stringify(db));
+  await setDoc(ref, db);
   return db;
 }
 
 export function saveDB(db: DB) {
-  localStorage.setItem(LS_KEYS.db, JSON.stringify(db));
+  const ref = doc(fs, "app", "main");
+  return setDoc(ref, db);
 }
 
 const defaultUI: UIState = {
@@ -328,7 +329,7 @@ function usePersistentState<T>(
 }
 
 export function useAppState() {
-  const [db, setDB] = useState<DB>(() => loadDB());
+  const [db, setDB] = useState<DB>(makeSeedDB());
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
@@ -342,10 +343,21 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === LS_KEYS.db) {
-        setDB(loadDB());
+    const ref = doc(fs, "app", "main");
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        setDB(snap.data() as DB);
+      } else {
+        const seed = makeSeedDB();
+        setDB(seed);
+        setDoc(ref, seed);
       }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
       if (e.key === LS_KEYS.ui) {
         try {
           const raw = localStorage.getItem(LS_KEYS.ui);
@@ -379,7 +391,7 @@ export function useAppState() {
   }, [location.pathname]);
 
   const onQuickAdd = () => setQuickOpen(true);
-  const addQuickClient = () => {
+  const addQuickClient = async () => {
     const c: Client = {
       id: uid(),
       firstName: "Новый",
@@ -395,11 +407,11 @@ export function useAppState() {
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
     setDB(next);
-    saveDB(next);
+    await saveDB(next);
     setQuickOpen(false);
     push("Клиент создан", "success");
   };
-  const addQuickLead = () => {
+  const addQuickLead = async () => {
     const l: Lead = {
       id: uid(),
       name: "Новый лид",
@@ -417,11 +429,11 @@ export function useAppState() {
     } as Lead;
     const next = { ...db, leads: [l, ...db.leads] };
     setDB(next);
-    saveDB(next);
+    await saveDB(next);
     setQuickOpen(false);
     push("Лид создан", "success");
   };
-  const addQuickTask = () => {
+  const addQuickTask = async () => {
     const admin = db.staff.find((s: StaffMember) => s.role === "Администратор");
     const t: TaskItem = {
       id: uid(),
@@ -436,7 +448,7 @@ export function useAppState() {
     } as TaskItem;
     const next = { ...db, tasks: [t, ...db.tasks] };
     setDB(next);
-    saveDB(next);
+    await saveDB(next);
     setQuickOpen(false);
     push("Задача создана", "success");
   };
