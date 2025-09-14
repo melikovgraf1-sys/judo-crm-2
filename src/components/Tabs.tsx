@@ -12,9 +12,10 @@ const TABS: TabConfig[] = [
   { key: "dashboard", title: "Дашборд" },
   { key: "clients", title: "Клиенты", need: r => can(r, "manage_clients") },
   { key: "attendance", title: "Посещаемость", need: r => can(r, "attendance") },
+  { key: "tasks", title: "Задачи", need: r => can(r, "tasks") },
   { key: "schedule", title: "Расписание", need: r => can(r, "schedule") },
   { key: "leads", title: "Лиды", need: r => can(r, "leads") },
-  { key: "tasks", title: "Задачи", need: r => can(r, "tasks") },
+  { key: "appeals", title: "Обращения", need: r => can(r, "appeals") },
   { key: "settings", title: "Настройки", need: r => can(r, "settings") },
 ];
 

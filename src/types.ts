@@ -126,9 +126,10 @@ export type TabKey =
   | "dashboard"
   | "clients"
   | "attendance"
+  | "tasks"
   | "schedule"
   | "leads"
-  | "tasks"
+  | "appeals"
   | "settings";
 
 export type Toast = { id: string; text: string; type?: "success" | "error" | "info" };

@@ -5,10 +5,11 @@ import Tabs from "./components/Tabs";
 import Dashboard from "./components/Dashboard";
 import ClientsTab from "./components/ClientsTab";
 import AttendanceTab from "./components/AttendanceTab";
+import TasksTab from "./components/TasksTab";
 import ScheduleTab from "./components/ScheduleTab";
 import LeadsTab from "./components/LeadsTab";
-import TasksTab from "./components/TasksTab";
 import SettingsTab from "./components/SettingsTab";
+import AppealsTab from "./components/AppealsTab";
 import QuickAddModal from "./components/QuickAddModal";
 import Toasts from "./components/Toasts";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -61,6 +62,16 @@ export default function App() {
               }
             />
             <Route
+              path="/tasks"
+              element={
+                can(ui.role, "tasks") ? (
+                  <TasksTab db={db} setDB={setDB} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
               path="/schedule"
               element={
                 can(ui.role, "schedule") ? (
@@ -81,10 +92,10 @@ export default function App() {
               }
             />
             <Route
-              path="/tasks"
+              path="/appeals"
               element={
-                can(ui.role, "tasks") ? (
-                  <TasksTab db={db} setDB={setDB} />
+                can(ui.role, "appeals") ? (
+                  <AppealsTab />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
