@@ -1,9 +1,14 @@
-// @flow
-import React from "react";
 import { NavLink } from "react-router-dom";
 import { can } from "../state/appState";
+import type { Role } from "../types";
 
-const TABS = [
+interface TabConfig {
+  key: string;
+  title: string;
+  need?: (role: Role) => boolean;
+}
+
+const TABS: TabConfig[] = [
   { key: "dashboard", title: "Дашборд" },
   { key: "clients", title: "Клиенты", need: r => can(r, "manage_clients") },
   { key: "attendance", title: "Посещаемость", need: r => can(r, "attendance") },
@@ -13,9 +18,16 @@ const TABS = [
   { key: "settings", title: "Настройки", need: r => can(r, "settings") },
 ];
 
-export const TAB_TITLES = TABS.reduce((acc, t) => ({ ...acc, [t.key]: t.title }), {});
+export const TAB_TITLES: Record<string, string> = TABS.reduce<Record<string, string>>(
+  (acc, t) => ({ ...acc, [t.key]: t.title }),
+  {},
+);
 
-export default function Tabs({ role }) {
+interface TabsProps {
+  role: Role;
+}
+
+export default function Tabs({ role }: TabsProps) {
   const visible = TABS.filter(t => !t.need || t.need(role));
   return (
     <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
@@ -24,7 +36,7 @@ export default function Tabs({ role }) {
           <NavLink
             key={t.key}
             to={`/${t.key}`}
-            className={({ isActive }) =>
+            className={({ isActive }: { isActive: boolean }) =>
               `px-3 py-2 rounded-md text-sm ${
                 isActive
                   ? "bg-white text-sky-700 border border-sky-200 dark:bg-slate-800 dark:text-sky-400 dark:border-slate-700"

@@ -360,7 +360,7 @@ export function useAppState() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setQuickOpen(v => !v);
+        setQuickOpen((v: boolean) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -421,7 +421,7 @@ export function useAppState() {
     push("Лид создан", "success");
   };
   const addQuickTask = () => {
-    const admin = db.staff.find(s => s.role === "Администратор");
+    const admin = db.staff.find((s: StaffMember) => s.role === "Администратор");
     const t: TaskItem = {
       id: uid(),
       title: "Новая задача",
