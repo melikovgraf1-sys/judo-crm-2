@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db as firestore } from "../firebase";
 import type {
   DB,
   UIState,
@@ -23,7 +23,6 @@ import type {
   TabKey,
 } from "../types";
 
-const fs = db;
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
@@ -237,11 +236,14 @@ export function makeSeedDB(): DB {
   };
 }
 
-export async function saveDB(data: DB) {
-  if (!fs) return;
-  const ref = doc(fs, "app", "main");
+export async function saveDB(dbData: DB) {
+  if (!firestore) {
+    console.warn("Firestore not initialized");
+    return;
+  }
+  const ref = doc(firestore, "app", "main");
   try {
-    await setDoc(ref, data);
+    await setDoc(ref, dbData);
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
@@ -340,8 +342,12 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    if (!fs) return;
-    const ref = doc(fs, "app", "main");
+    if (!firestore) {
+      console.warn("Firestore not initialized");
+      push("Нет подключения к базе данных", "error");
+      return;
+    }
+    const ref = doc(firestore, "app", "main");
     let unsub = () => {};
     try {
       unsub = onSnapshot(ref, async snap => {
