@@ -236,9 +236,12 @@ export function makeSeedDB(): DB {
   };
 }
 
-export async function saveDB(db: DB): Promise<void> {
-  if (!firestore) return;
-  const ref = doc(firestore, "app", "main"); 
+export async function saveDB(data: DB) {
+  if (!fs) {
+    console.warn("Firestore not initialized");
+    return;
+  }
+  const ref = doc(fs, "app", "main");
   try {
     await setDoc(ref, db);
   } catch (err) {
@@ -339,8 +342,12 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    if (!firestore) return;
-    const ref = doc(firestore, "app", "main");
+    if (!fs) {
+      console.warn("Firestore not initialized");
+      push("Нет подключения к базе данных", "warning");
+      return;
+    }
+    const ref = doc(fs, "app", "main");
     let unsub = () => {};
     try {
       unsub = onSnapshot(ref, async snap => {
