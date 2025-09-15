@@ -236,12 +236,11 @@ export function makeSeedDB(): DB {
   };
 }
 
-export async function saveDB(data: DB) {
-  const fs = firestore;
-  if (!fs) throw new Error("Firestore is not initialized");
+export async function saveDB(db: DB): Promise<void> {
+  if (!fs) return;
   const ref = doc(fs, "app", "main");
   try {
-    await setDoc(ref, data);
+    await setDoc(ref, db);
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
