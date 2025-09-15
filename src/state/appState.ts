@@ -23,6 +23,7 @@ import type {
   TabKey,
 } from "../types";
 
+const firestore = db;
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
@@ -237,11 +238,12 @@ export function makeSeedDB(): DB {
 }
 
 export async function saveDB(data: DB) {
-  if (!fs) {
+  if (!firestore) {
     console.warn("Firestore not initialized");
     return;
   }
-  const ref = doc(fs, "app", "main");
+  const ref = doc(firestore, "app", "main");
+
   try {
     await setDoc(ref, db);
   } catch (err) {
@@ -342,12 +344,12 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    if (!fs) {
+    if (!firestore) {
       console.warn("Firestore not initialized");
-      push("Нет подключения к базе данных", "warning");
+      push("Нет подключения к базе данных", "error");
       return;
     }
-    const ref = doc(fs, "app", "main");
+    const ref = doc(firestore, "app", "main");
     let unsub = () => {};
     try {
       unsub = onSnapshot(ref, async snap => {
