@@ -24,6 +24,7 @@ import type {
 } from "../types";
 
 const fs = db;
+if (!fs) throw new Error("Firestore is not initialized");
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
@@ -238,7 +239,6 @@ export function makeSeedDB(): DB {
 }
 
 export async function saveDB(data: DB) {
-  if (!fs) return;
   const ref = doc(fs, "app", "main");
   try {
     await setDoc(ref, data);
@@ -340,7 +340,6 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    if (!fs) return;
     const ref = doc(fs, "app", "main");
     let unsub = () => {};
     try {
