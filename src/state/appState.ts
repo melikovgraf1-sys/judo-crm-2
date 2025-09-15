@@ -4,6 +4,7 @@ import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db as fs } from "../firebase";
+
 import type {
   DB,
   UIState,
@@ -240,7 +241,7 @@ export async function saveDB(data: DB): Promise<void> {
   if (!fs) return;
   const ref = doc(fs, "app", "main");
   try {
-    await setDoc(ref, data);
+    await setDoc(ref, db);
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
@@ -339,7 +340,11 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    if (!fs) return;
+    const fs = firestore;
+    if (!fs) {
+      console.error("Firestore is not initialized");
+      return;
+    }
     const ref = doc(fs, "app", "main");
     let unsub = () => {};
     try {
