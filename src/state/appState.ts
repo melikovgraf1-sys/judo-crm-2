@@ -23,7 +23,7 @@ import type {
   TabKey,
 } from "../types";
 
-const fs = db!;
+const fs = db;
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
@@ -238,6 +238,7 @@ export function makeSeedDB(): DB {
 }
 
 export async function saveDB(data: DB) {
+  if (!fs) return;
   const ref = doc(fs, "app", "main");
   try {
     await setDoc(ref, data);
@@ -339,6 +340,7 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
+    if (!fs) return;
     const ref = doc(fs, "app", "main");
     let unsub = () => {};
     try {
