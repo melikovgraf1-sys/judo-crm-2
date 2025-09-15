@@ -238,7 +238,10 @@ export function makeSeedDB(): DB {
 }
 
 export async function saveDB(data: DB) {
-  if (!fs) return;
+  if (!fs) {
+    console.warn("Firestore not initialized");
+    return;
+  }
   const ref = doc(fs, "app", "main");
   try {
     await setDoc(ref, data);
@@ -340,7 +343,11 @@ export function useAppState() {
   }, [ui.theme]);
 
   useEffect(() => {
-    if (!fs) return;
+    if (!fs) {
+      console.warn("Firestore not initialized");
+      push("Нет подключения к базе данных", "warning");
+      return;
+    }
     const ref = doc(fs, "app", "main");
     let unsub = () => {};
     try {
