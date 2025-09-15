@@ -14,3 +14,5 @@ const firebaseConfig: FirebaseOptions = {
 const app: FirebaseApp | undefined = Object.values(firebaseConfig).every(Boolean)
   ? initializeApp(firebaseConfig)
   : (console.warn("Firebase configuration is incomplete. Skipping initialization."), undefined);
+
+export const db: Firestore | undefined = app ? getFirestore(app) : undefined;
