@@ -242,8 +242,9 @@ export async function saveDB(data: DB) {
     return;
   }
   const ref = doc(firestore, "app", "main");
+
   try {
-    await setDoc(ref, data);
+    await setDoc(ref, db);
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
