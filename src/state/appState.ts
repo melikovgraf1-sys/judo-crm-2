@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db as firestore } from "../firebase";
 import type {
   DB,
   UIState,
@@ -23,7 +23,6 @@ import type {
   TabKey,
 } from "../types";
 
-const fs = db;
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
@@ -244,7 +243,7 @@ export async function saveDB(data: DB) {
   }
   const ref = doc(fs, "app", "main");
   try {
-    await setDoc(ref, data);
+    await setDoc(ref, db);
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
