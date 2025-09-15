@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+import { db as firestore } from "../firebase";
 import type {
   DB,
   UIState,
@@ -243,8 +243,9 @@ export async function saveDB(data: DB) {
     return;
   }
   const ref = doc(firestore, "app", "main");
+
   try {
-    await setDoc(ref, data);
+    await setDoc(ref, db);
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
