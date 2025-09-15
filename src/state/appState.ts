@@ -238,7 +238,7 @@ export function makeSeedDB(): DB {
 
 export async function saveDB(db: DB): Promise<void> {
   if (!firestore) return;
-  const ref = doc(firestore, "app", "main");
+  const ref = doc(firestore, "app", "main"); 
   try {
     await setDoc(ref, db);
   } catch (err) {
