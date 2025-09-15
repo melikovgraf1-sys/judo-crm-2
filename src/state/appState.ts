@@ -23,7 +23,6 @@ import type {
   TabKey,
 } from "../types";
 
-const firestore = db;
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
