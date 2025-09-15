@@ -1,6 +1,6 @@
 import type { FirebaseApp, FirebaseOptions } from "firebase/app";
 import { initializeApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig: FirebaseOptions = {
 
@@ -15,4 +15,4 @@ const app: FirebaseApp | undefined = Object.values(firebaseConfig).every(Boolean
   ? initializeApp(firebaseConfig)
   : (console.warn("Firebase configuration is incomplete. Skipping initialization."), undefined);
 
-export const db: Firestore | undefined = app ? getFirestore(app) : undefined;
+export const db = app ? getFirestore(app) : undefined;
