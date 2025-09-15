@@ -3,7 +3,8 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db as firestore } from "../firebase";
+import { db as fs } from "../firebase";
+
 import type {
   DB,
   UIState,
@@ -236,7 +237,7 @@ export function makeSeedDB(): DB {
   };
 }
 
-export async function saveDB(db: DB): Promise<void> {
+export async function saveDB(data: DB): Promise<void> {
   if (!fs) return;
   const ref = doc(fs, "app", "main");
   try {
