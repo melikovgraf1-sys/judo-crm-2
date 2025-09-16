@@ -5,7 +5,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
-import { FixedSizeList } from "react-window";
+import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, saveDB, uid, fmtDate } from "../state/appState";
 import type { DB, Lead, LeadStage, StaffMember } from "../types";
 
@@ -29,7 +29,9 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
       <Breadcrumbs items={["Лиды"]} />
       <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
         {stages.map(s => {
-          const leads = groupedLeads[s] || [];
+
+          const leads: Lead[] = groupedLeads[s] ?? [];
+
           return (
             <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
               <div className="text-xs text-slate-500 mb-2">{s}</div>
@@ -39,7 +41,7 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
                 itemSize={90}
                 width="100%"
               >
-                {({ index, style }) => {
+                {({ index, style }: ListChildComponentProps) => {
                   const l = leads[index];
                   return (
                     <div key={l.id} style={style} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
@@ -103,7 +105,7 @@ function LeadModal(
 
   useEffect(() => reset(lead), [lead, reset]);
 
-  const save = async (data: any) => {
+  const save = async (data: Lead) => {
     const nextLead: Lead = { ...lead, ...data, updatedAt: todayISO() };
     const next = {
       ...db,
