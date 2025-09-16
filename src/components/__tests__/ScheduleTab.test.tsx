@@ -5,11 +5,16 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
 jest.mock('../../state/appState', () => ({
-  uid: () => 'id-1',
+  __esModule: true,
   saveDB: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../state/utils', () => ({
+  __esModule: true,
+  uid: () => 'id-1',
   todayISO: () => new Date().toISOString(),
-  parseDateInput: (s) => s,
-  fmtMoney: (v) => String(v),
+  parseDateInput: (s: string) => s,
+  fmtMoney: (v: number) => String(v),
   calcAgeYears: () => 0,
   calcExperience: () => 0,
 }));

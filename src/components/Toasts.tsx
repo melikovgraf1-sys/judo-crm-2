@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { uid } from "../state/appState";
+import { uid } from "../state/utils";
 import type { Toast } from "../types";
 
 export function useToasts() {

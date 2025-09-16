@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import { uid, saveDB } from "../state/appState";
+import { uid } from "../state/utils";
+import { saveDB } from "../state/appState";
 import type { DB, ScheduleSlot } from "../types";
 
 export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {

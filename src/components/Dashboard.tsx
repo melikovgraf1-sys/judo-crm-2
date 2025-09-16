@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import { fmtMoney, fmtDate } from "../state/appState";
+import { fmtMoney, fmtDate } from "../state/utils";
 import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
 
 function OfflineTip() {

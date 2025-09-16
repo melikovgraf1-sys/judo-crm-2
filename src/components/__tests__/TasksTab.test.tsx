@@ -4,9 +4,14 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 jest.mock('../../state/appState', () => ({
-  fmtDate: (iso) => new Intl.DateTimeFormat('ru-RU').format(new Date(iso)),
-  uid: () => 'uid',
+  __esModule: true,
   saveDB: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../state/utils', () => ({
+  __esModule: true,
+  fmtDate: (iso: string) => new Intl.DateTimeFormat('ru-RU').format(new Date(iso)),
+  uid: () => 'uid',
   todayISO: () => '2025-01-01T00:00:00.000Z'
 }));
 import TasksTab from '../TasksTab';

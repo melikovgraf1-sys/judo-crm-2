@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
-import { fmtDate, uid, saveDB, todayISO } from "../state/appState";
+import { fmtDate, uid, todayISO } from "../state/utils";
+import { saveDB } from "../state/appState";
 import type { DB, TaskItem } from "../types";
 
 export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
