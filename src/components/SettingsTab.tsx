@@ -82,7 +82,7 @@ export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
       <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3">
         <div className="font-semibold">Лимиты мест</div>
         <div className="grid md:grid-cols-3 gap-4">
-          {["Центр", "Джикджилли", "Махмутлар"].map(area => (
+          {db.settings.areas.map(area => (
             <div key={area} className="space-y-2">
               <div className="font-medium">{area}</div>
               {db.settings.groups.map(group => {
@@ -94,7 +94,7 @@ export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
                       type="number"
                       min={0}
                       className="w-24 px-2 py-1 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                      value={db.settings.limits[key]}
+                      value={db.settings.limits[key] ?? 0}
                       onChange={async e => {
                         const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
                         setDB(next); await saveDB(next);

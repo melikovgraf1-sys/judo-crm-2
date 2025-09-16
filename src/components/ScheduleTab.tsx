@@ -18,24 +18,53 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
     const name = prompt("Название района");
     if (!name) return;
     if (db.settings.areas.includes(name)) return;
-    const next = { ...db, settings: { ...db.settings, areas: [...db.settings.areas, name] } };
+    const nextAreas = [...db.settings.areas, name];
+    const nextLimits: Record<string, number> = { ...db.settings.limits };
+    for (const group of db.settings.groups) {
+      const key: string = `${name}|${group}`;
+      if (!(key in nextLimits)) nextLimits[key] = 0;
+    }
+    const next = { ...db, settings: { ...db.settings, areas: nextAreas, limits: nextLimits } };
     setDB(next); await saveDB(next);
   };
   const renameArea = async (oldName: string) => {
     const name = prompt("Новое название района", oldName);
     if (!name || name === oldName) return;
+    const renamedAreas = db.settings.areas.map(a => a === oldName ? name : a);
+    const renamedLimits: Record<string, number> = {};
+    for (const [key, value] of Object.entries(db.settings.limits)) {
+      const separatorIndex = key.indexOf("|");
+      if (separatorIndex === -1) {
+        renamedLimits[key] = value;
+        continue;
+      }
+      const area = key.slice(0, separatorIndex);
+      const groupKey = key.slice(separatorIndex + 1);
+      const nextKey = area === oldName ? `${name}|${groupKey}` : key;
+      renamedLimits[nextKey] = value;
+    }
+    for (const group of db.settings.groups) {
+      const key: string = `${name}|${group}`;
+      if (!(key in renamedLimits)) renamedLimits[key] = 0;
+    }
     const next = {
       ...db,
-      settings: { ...db.settings, areas: db.settings.areas.map(a => a === oldName ? name : a) },
+      settings: { ...db.settings, areas: renamedAreas, limits: renamedLimits },
       schedule: db.schedule.map(s => s.area === oldName ? { ...s, area: name } : s),
     };
     setDB(next); await saveDB(next);
   };
   const deleteArea = async (name: string) => {
     if (!window.confirm(`Удалить район ${name}?`)) return;
+    const filteredLimits: Record<string, number> = {};
+    for (const [key, value] of Object.entries(db.settings.limits)) {
+      const separatorIndex = key.indexOf("|");
+      const area = separatorIndex === -1 ? key : key.slice(0, separatorIndex);
+      if (area !== name) filteredLimits[key] = value;
+    }
     const next = {
       ...db,
-      settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name) },
+      settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name), limits: filteredLimits },
       schedule: db.schedule.filter(s => s.area !== name),
     };
     setDB(next); await saveDB(next);
