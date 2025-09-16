@@ -29,7 +29,9 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
       <Breadcrumbs items={["Лиды"]} />
       <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
         {stages.map(s => {
+
           const leads: Lead[] = groupedLeads[s] ?? [];
+
           return (
             <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
               <div className="text-xs text-slate-500 mb-2">{s}</div>
