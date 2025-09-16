@@ -36,6 +36,22 @@ export interface Client {
   // Автополя (рассчитываются на лету)
 }
 
+export interface ClientFormValues {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  channel: ContactChannel;
+  birthDate: string;
+  parentName: string;
+  gender: Gender;
+  area: Area;
+  group: Group;
+  startDate: string;
+  payMethod: PaymentMethod;
+  payStatus: PaymentStatus;
+  payDate: string;
+}
+
 export interface AttendanceEntry {
   id: string;
   clientId: string;
@@ -71,6 +87,12 @@ export interface Lead {
   managerId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface LeadFormValues {
+  name: string;
+  parentName: string;
+  contact: string;
 }
 
 export interface TaskItem {
