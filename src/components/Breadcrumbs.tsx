@@ -1,4 +1,3 @@
-// @flow
 import React from "react";
 
 export default function Breadcrumbs({ items }: { items: string[] }) {

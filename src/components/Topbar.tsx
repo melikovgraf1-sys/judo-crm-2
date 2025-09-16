@@ -1,15 +1,22 @@
-// @flow
 import React, { useCallback, useRef } from "react";
+import type { Currency, Role, UIState } from "../types";
 
-export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
-  const searchTimeout = useRef();
+type TopbarProps = {
+  ui: UIState;
+  setUI: React.Dispatch<React.SetStateAction<UIState>>;
+  roleList: Role[];
+  onQuickAdd: () => void;
+};
 
-  const handleSearch = useCallback((e) => {
+export default function Topbar({ ui, setUI, roleList, onQuickAdd }: TopbarProps) {
+  const searchTimeout = useRef<number | null>(null);
+
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
+      window.clearTimeout(searchTimeout.current);
     }
-    searchTimeout.current = setTimeout(() => {
+    searchTimeout.current = window.setTimeout(() => {
       setUI(u => ({ ...u, search: value }));
     }, 300);
   }, [setUI]);
@@ -30,14 +37,16 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={ui.currency}
-          onChange={e => { const u = { ...ui, currency: e.target.value }; setUI(u); }}
+          onChange={e => { const u = { ...ui, currency: e.target.value as Currency }; setUI(u); }}
         >
           <option value="EUR">€</option>
           <option value="TRY">TRY</option>
           <option value="RUB">RUB</option>
         </select>
         <button
-          onClick={() => { const u = { ...ui, theme: ui.theme === "light" ? "dark" : "light" }; setUI(u); }}
+          onClick={() => {
+            setUI(prev => ({ ...prev, theme: prev.theme === "light" ? "dark" : "light" }));
+          }}
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           title="Переключить тему"
         >
@@ -47,7 +56,7 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }) {
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={ui.role}
-          onChange={e => { const u = { ...ui, role: e.target.value }; setUI(u); }}
+          onChange={e => { const u = { ...ui, role: e.target.value as Role }; setUI(u); }}
           title="Войти как"
         >
           {roleList.map(r => <option key={r} value={r}>{r}</option>)}
