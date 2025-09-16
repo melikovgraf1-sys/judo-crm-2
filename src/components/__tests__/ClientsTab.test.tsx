@@ -12,15 +12,20 @@ jest.mock('react-window', () => ({
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
+  saveDB: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../../state/utils', () => ({
+  __esModule: true,
   uid: jest.fn(),
   todayISO: jest.fn(),
-  saveDB: jest.fn().mockResolvedValue(undefined),
   parseDateInput: jest.fn(),
   fmtMoney: jest.fn(),
 }));
 
 import ClientsTab from '../ClientsTab';
-import { uid, todayISO, saveDB, parseDateInput, fmtMoney } from '../../state/appState';
+import { saveDB } from '../../state/appState';
+import { uid, todayISO, parseDateInput, fmtMoney } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();

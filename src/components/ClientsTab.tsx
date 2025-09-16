@@ -3,7 +3,8 @@ import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { uid, todayISO, parseDateInput, saveDB } from "../state/appState";
+import { uid, todayISO, parseDateInput } from "../state/utils";
+import { saveDB } from "../state/appState";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues } from "../types";
 
 

@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
-import { fmtDate, uid, saveDB } from "../state/appState";
+import { fmtDate, uid } from "../state/utils";
+import { saveDB } from "../state/appState";
 import type { DB, Area, Group, AttendanceEntry } from "../types";
 
 export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
