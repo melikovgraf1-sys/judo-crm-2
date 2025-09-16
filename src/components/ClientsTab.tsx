@@ -24,7 +24,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
       (pay === "all" || c.payStatus === pay) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
-  }, [db.clients, area, group, pay, ui.search]);
+  }, [db.clients, area, group, pay, ui.search, search]);
 
   const openAddModal = () => {
     setEditing(null);
