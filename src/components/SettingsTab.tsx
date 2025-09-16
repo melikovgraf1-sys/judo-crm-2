@@ -1,4 +1,3 @@
-// @flow
 import React, { useState, useEffect } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { saveDB } from "../state/appState";

@@ -1,8 +1,7 @@
-// @flow
 import React from "react";
 
 type Props = {
-  children: React.Node,
+  children: React.ReactNode,
 };
 
 type State = {

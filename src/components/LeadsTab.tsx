@@ -1,22 +1,22 @@
-// @flow
 import React, { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
-import { FixedSizeList } from "react-window";
+import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, saveDB, uid, fmtDate } from "../state/appState";
 import type { DB, Lead, LeadStage, StaffMember } from "../types";
 
 export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const [open, setOpen] = useState<Lead | null>(null);
-  const groupedLeads = useMemo((): { [LeadStage]: Lead[] } =>
+  const groupedLeads = useMemo((): Record<LeadStage, Lead[]> =>
     db.leads.reduce((acc, l) => {
       if (acc[l.stage]) acc[l.stage].push(l); else acc[l.stage] = [l];
       return acc;
-    }, {}), [db.leads]);
+    }, {} as Record<LeadStage, Lead[]>), [db.leads]);
   const move = async (id: string, dir: 1 | -1) => {
     const l = db.leads.find(x => x.id === id); if (!l) return;
     const idx = stages.indexOf(l.stage);
@@ -29,7 +29,7 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
       <Breadcrumbs items={["Лиды"]} />
       <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
         {stages.map(s => {
-          const leads = groupedLeads[s] || [];
+          const leads: Lead[] = groupedLeads[s] ?? [];
           return (
             <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
               <div className="text-xs text-slate-500 mb-2">{s}</div>
@@ -39,7 +39,7 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
                 itemSize={90}
                 width="100%"
               >
-                {({ index, style }) => {
+                {({ index, style }: ListChildComponentProps) => {
                   const l = leads[index];
                   return (
                     <div key={l.id} style={style} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
@@ -93,15 +93,17 @@ function LeadModal(
     parentName: yup.string().nullable(),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm({
-    resolver: yupResolver(schema),
+  const resolver = yupResolver(schema) as unknown as Resolver<Lead>;
+
+  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<Lead>({
+    resolver,
     mode: "onChange",
     defaultValues: lead,
   });
 
   useEffect(() => reset(lead), [lead, reset]);
 
-  const save = async (data: any) => {
+  const save = async (data: Lead) => {
     const nextLead: Lead = { ...lead, ...data, updatedAt: todayISO() };
     const next = {
       ...db,
@@ -126,10 +128,10 @@ function LeadModal(
       <div className="font-semibold text-slate-800">{lead.name}</div>
       <div className="grid gap-1 text-sm">
         <div><span className="text-slate-500">Родитель:</span> {lead.parentName || "—"}</div>
-        <div><span className="text-slate-500">Имя ребёнка:</span> {lead.firstName}</div>
-        <div><span className="text-slate-500">Фамилия:</span> {lead.lastName}</div>
-        <div><span className="text-slate-500">Дата рождения:</span> {fmtDate(lead.birthDate)}</div>
-        <div><span className="text-slate-500">Старт:</span> {fmtDate(lead.startDate)}</div>
+        <div><span className="text-slate-500">Имя ребёнка:</span> {lead.firstName ?? "—"}</div>
+        <div><span className="text-slate-500">Фамилия:</span> {lead.lastName ?? "—"}</div>
+        <div><span className="text-slate-500">Дата рождения:</span> {lead.birthDate ? fmtDate(lead.birthDate) : "—"}</div>
+        <div><span className="text-slate-500">Старт:</span> {lead.startDate ? fmtDate(lead.startDate) : "—"}</div>
         <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
         <div><span className="text-slate-500">Контакт:</span> {lead.contact || "—"}</div>
         <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>

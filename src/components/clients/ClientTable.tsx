@@ -1,4 +1,3 @@
-// @flow
 import React, { useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
 import Modal from "../Modal";

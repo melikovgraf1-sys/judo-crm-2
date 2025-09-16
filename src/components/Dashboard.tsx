@@ -1,7 +1,7 @@
-// @flow
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtMoney, fmtDate } from "../state/appState";
+import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
 
 function OfflineTip() {
   return (
@@ -16,7 +16,13 @@ function OfflineTip() {
   );
 }
 
-function MetricCard({ title, value, accent }) {
+type MetricCardProps = {
+  title: string;
+  value: string;
+  accent: "green" | "sky" | "slate";
+};
+
+function MetricCard({ title, value, accent }: MetricCardProps) {
   const cls = accent === "green"
     ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-700"
     : accent === "sky"
@@ -30,16 +36,19 @@ function MetricCard({ title, value, accent }) {
   );
 }
 
-export default function Dashboard({ db, ui }) {
+type DashboardProps = {
+  db: DB;
+  ui: UIState;
+};
+
+export default function Dashboard({ db, ui }: DashboardProps) {
   const currency = ui.currency;
   const totalClients = db.clients.length;
   const activeClients = useMemo(
     () => db.clients.filter(c => c.payStatus === "действует").length,
     [db.clients]
   );
-  const leadsCount = useMemo(() => db.leads.length, [db.leads]);
-
-  const leadStages = [
+  const leadStages: LeadStage[] = [
     "Очередь",
     "Задержка",
     "Пробное",
@@ -52,17 +61,17 @@ export default function Dashboard({ db, ui }) {
       db.leads.reduce((acc, l) => {
         acc[l.stage] = (acc[l.stage] || 0) + 1;
         return acc;
-      }, {}),
+      }, {} as Record<LeadStage, number>),
     [db.leads]
   );
 
   const sortedTasks = useMemo(
-    () => db.tasks.slice().sort((a, b) => +new Date(a.due) - +new Date(b.due)),
+    () => db.tasks.slice().sort((a: TaskItem, b: TaskItem) => +new Date(a.due) - +new Date(b.due)),
     [db.tasks]
   );
 
   const revenueEUR = activeClients * 55;
-  const rate = cur => (cur === "EUR" ? 1 : cur === "TRY" ? db.settings.currencyRates.TRY : db.settings.currencyRates.RUB);
+  const rate = (cur: Currency) => (cur === "EUR" ? 1 : cur === "TRY" ? db.settings.currencyRates.TRY : db.settings.currencyRates.RUB);
   const revenue = revenueEUR * rate(currency);
 
   const totalLimit = Object.values(db.settings.limits).reduce((a, b) => a + b, 0);
