@@ -77,7 +77,7 @@ function usePersistentState<T>(
   key: string,
   defaultValue: T,
   delay: number = 300,
-): [T, (v: T) => void] {
+): [T, Dispatch<SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
     try {
       const raw = localStorage.getItem(key);
@@ -126,7 +126,7 @@ export interface AppState {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
   ui: UIState;
-  setUI: (ui: UIState) => void;
+  setUI: Dispatch<SetStateAction<UIState>>;
   roles: Role[];
   toasts: Toast[];
   quickOpen: boolean;
@@ -213,11 +213,15 @@ export function useAppState(): AppState {
     let key = location.pathname.replace(/^\/+/, "");
     if (key === "") key = "dashboard";
     if (!TAB_TITLES[key as TabKey]) key = "dashboard";
-    if (ui.activeTab !== key) {
-      const next = { ...ui, activeTab: key as TabKey, breadcrumbs: [TAB_TITLES[key as TabKey]] };
-      setUI(next);
-    }
-  }, [location.pathname]);
+    const tabKey = key as TabKey;
+    const breadcrumb = TAB_TITLES[tabKey];
+    setUI(prev => {
+      if (prev.activeTab === tabKey) {
+        return prev;
+      }
+      return { ...prev, activeTab: tabKey, breadcrumbs: [breadcrumb] };
+    });
+  }, [location.pathname, setUI]);
 
   const onQuickAdd = () => setQuickOpen(true);
   const addQuickClient = async () => {
