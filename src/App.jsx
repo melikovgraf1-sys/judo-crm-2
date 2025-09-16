@@ -16,6 +16,9 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { useAppState, can } from "./state/appState";
 
 export default function App() {
+  /** @type {import("./state/appState").AppState} */
+  const appState = useAppState();
+
   const {
     db,
     setDB,
@@ -29,7 +32,7 @@ export default function App() {
     addQuickClient,
     addQuickLead,
     addQuickTask,
-  } = useAppState();
+  } = appState;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100">

@@ -3,7 +3,13 @@ import Breadcrumbs from "./Breadcrumbs";
 import { saveDB } from "../state/appState";
 import type { DB } from "../types";
 
-export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function SettingsTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: React.Dispatch<React.SetStateAction<DB>>;
+}) {
   const [rates, setRates] = useState({
     eurTry: db.settings.currencyRates.TRY,
     eurRub: db.settings.currencyRates.RUB,
@@ -30,15 +36,25 @@ export default function SettingsTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
           tryRub: tryRub ?? rates.tryRub,
         };
         setRates(nextRates);
-        const nextDB = {
-          ...db,
-          settings: {
-            ...db.settings,
-            currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
-          },
-        };
-        setDB(nextDB);
-        await saveDB(nextDB);
+        setDB(prev => {
+          const hasChanged =
+            prev.settings.currencyRates.TRY !== nextRates.eurTry ||
+            prev.settings.currencyRates.RUB !== nextRates.eurRub;
+
+          if (!hasChanged) {
+            return prev;
+          }
+
+          const updated = {
+            ...prev,
+            settings: {
+              ...prev.settings,
+              currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
+            },
+          };
+          void saveDB(updated);
+          return updated;
+        });
       } catch (e) {
         console.error(e);
       }

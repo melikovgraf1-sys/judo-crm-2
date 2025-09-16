@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
@@ -15,6 +16,7 @@ import type {
   Role,
   StaffMember,
   TabKey,
+  Toast,
 } from "../types";
 
 
@@ -115,7 +117,22 @@ function usePersistentState<T>(
   return [state, setState];
 }
 
-export function useAppState() {
+export interface AppState {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+  ui: UIState;
+  setUI: (ui: UIState) => void;
+  roles: Role[];
+  toasts: Toast[];
+  quickOpen: boolean;
+  onQuickAdd: () => void;
+  setQuickOpen: Dispatch<SetStateAction<boolean>>;
+  addQuickClient: () => Promise<void>;
+  addQuickLead: () => Promise<void>;
+  addQuickTask: () => Promise<void>;
+}
+
+export function useAppState(): AppState {
   const [db, setDB] = useState<DB>(makeSeedDB());
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
