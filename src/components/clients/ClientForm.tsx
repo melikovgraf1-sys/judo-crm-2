@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -15,7 +15,7 @@ type Props = {
 };
 
 export default function ClientForm({ db, editing, onSave, onClose }: Props) {
-  const blankForm = (): ClientFormValues => ({
+  const blankForm = useCallback((): ClientFormValues => ({
     firstName: "",
     lastName: "",
     phone: "",
@@ -29,7 +29,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     birthDate: "2017-01-01",
     payDate: todayISO().slice(0, 10),
     parentName: "",
-  });
+  }), [db.settings.areas, db.settings.groups]);
 
   const schema = yup.object({
     firstName: yup.string().required("Имя обязательно"),
@@ -73,7 +73,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     } else {
       reset(blankForm());
     }
-  }, [editing, reset, db.settings.areas, db.settings.groups]);
+  }, [editing, reset, blankForm]);
 
   return (
     <Modal size="xl" onClose={onClose}>
