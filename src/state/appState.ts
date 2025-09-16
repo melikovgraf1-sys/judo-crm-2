@@ -153,7 +153,7 @@ export function useAppState(): AppState {
       return;
     }
     const ref = doc(firestore, "app", "main");
-    let unsub = () => {};
+    let unsub: (() => void) | undefined;
     try {
       unsub = onSnapshot(ref, async snap => {
         try {
@@ -173,8 +173,12 @@ export function useAppState(): AppState {
       console.error("Failed to subscribe to snapshot", err);
       push("Не удалось подписаться на обновления", "error");
     }
-    return () => unsub();
-  }, []);
+    return () => {
+      if (unsub) {
+        unsub();
+      }
+    };
+  }, [push, setDB]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
