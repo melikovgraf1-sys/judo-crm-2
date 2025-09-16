@@ -30,37 +30,49 @@ export default function SettingsTab({
           fetchRate('EUR-RUB'),
           fetchRate('TRY-RUB'),
         ]);
-        const nextRates = {
-          eurTry: eurTry ?? rates.eurTry,
-          eurRub: eurRub ?? rates.eurRub,
-          tryRub: tryRub ?? rates.tryRub,
-        };
-        setRates(nextRates);
-        setDB(prev => {
-          const hasChanged =
-            prev.settings.currencyRates.TRY !== nextRates.eurTry ||
-            prev.settings.currencyRates.RUB !== nextRates.eurRub;
+        setRates(prevRates => {
+          const nextRates = {
+            eurTry: eurTry ?? prevRates.eurTry,
+            eurRub: eurRub ?? prevRates.eurRub,
+            tryRub: tryRub ?? prevRates.tryRub,
+          };
 
-          if (!hasChanged) {
-            return prev;
+          setDB(prevDB => {
+            const hasChanged =
+              prevDB.settings.currencyRates.TRY !== nextRates.eurTry ||
+              prevDB.settings.currencyRates.RUB !== nextRates.eurRub;
+
+            if (!hasChanged) {
+              return prevDB;
+            }
+
+            const updated = {
+              ...prevDB,
+              settings: {
+                ...prevDB.settings,
+                currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
+              },
+            };
+            void saveDB(updated);
+            return updated;
+          });
+
+          if (
+            nextRates.eurTry === prevRates.eurTry &&
+            nextRates.eurRub === prevRates.eurRub &&
+            nextRates.tryRub === prevRates.tryRub
+          ) {
+            return prevRates;
           }
 
-          const updated = {
-            ...prev,
-            settings: {
-              ...prev.settings,
-              currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
-            },
-          };
-          void saveDB(updated);
-          return updated;
+          return nextRates;
         });
       } catch (e) {
         console.error(e);
       }
     }
     fetchRates();
-  }, []);
+  }, [setDB]);
 
   return (
     <div className="space-y-3">
