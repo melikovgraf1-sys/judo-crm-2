@@ -187,7 +187,7 @@ export function useAppState(): AppState {
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, []);
+  }, [setUI]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
