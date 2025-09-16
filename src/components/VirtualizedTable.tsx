@@ -1,20 +1,20 @@
 import React from "react";
 
-type VirtualizedTableProps<TItem> = {
+type VirtualizedTableProps<T> = {
   header: React.ReactNode;
-  items: TItem[];
+  items: T[];
   rowHeight: number;
   height?: number;
-  renderRow: (item: TItem, style: React.CSSProperties) => React.ReactNode;
+  renderRow: (item: T, style: React.CSSProperties) => React.ReactNode;
 };
 
-export default function VirtualizedTable<TItem>({
+export default function VirtualizedTable<T>({
   header,
   items,
   rowHeight,
   height = 400,
   renderRow,
-}: VirtualizedTableProps<TItem>) {
+}: VirtualizedTableProps<T>) {
   // Render a simple scrollable table. Virtualization was causing rows to
   // overlap which resulted in unreadable data. For the current dataset size a
   // basic table is sufficient and keeps the markup correct, preventing rows
@@ -24,7 +24,10 @@ export default function VirtualizedTable<TItem>({
       <table className="w-full text-sm" style={{ maxHeight: height }}>
         {header}
         <tbody>
-          {items.map(item => renderRow(item, { height: rowHeight } as React.CSSProperties))}
+          {items.map(item => {
+            const style: React.CSSProperties = { height: rowHeight };
+            return renderRow(item, style);
+          })}
         </tbody>
       </table>
     </div>

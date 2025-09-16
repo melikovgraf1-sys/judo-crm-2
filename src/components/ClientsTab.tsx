@@ -4,7 +4,7 @@ import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { uid, todayISO, parseDateInput, saveDB } from "../state/appState";
-import type { DB, UIState, Client, Area, Group, PaymentStatus } from "../types";
+import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues } from "../types";
 
 
 export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UIState }) {
@@ -35,7 +35,7 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
     setModalOpen(true);
   };
 
-  const saveClient = async (data: any) => {
+  const saveClient = async (data: ClientFormValues) => {
     const prepared = {
       ...data,
       birthDate: parseDateInput(data.birthDate),
