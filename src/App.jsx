@@ -102,16 +102,6 @@ export default function App() {
               }
             />
             <Route
-              path="/appeals"
-              element={
-                can(ui.role, "appeals") ? (
-                  <AppealsTab />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
               path="/settings"
               element={
                 can(ui.role, "settings") ? (
