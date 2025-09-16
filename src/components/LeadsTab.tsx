@@ -7,7 +7,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, saveDB, uid, fmtDate } from "../state/appState";
-import type { DB, Lead, LeadStage, StaffMember } from "../types";
+import type { DB, Lead, LeadStage, StaffMember, LeadFormValues } from "../types";
 
 export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
@@ -72,6 +72,12 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
   );
 }
 
+const toLeadFormValues = (current: Lead): LeadFormValues => ({
+  name: current.name,
+  contact: current.contact ?? "",
+  parentName: current.parentName ?? "",
+});
+
 function LeadModal(
   {
     lead,
@@ -95,18 +101,23 @@ function LeadModal(
     parentName: yup.string().nullable(),
   });
 
-  const resolver = yupResolver(schema) as unknown as Resolver<Lead>;
+  const resolver = yupResolver(schema) as unknown as Resolver<LeadFormValues>;
 
-  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<Lead>({
+  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<LeadFormValues>({
     resolver,
     mode: "onChange",
-    defaultValues: lead,
+    defaultValues: toLeadFormValues(lead),
   });
 
-  useEffect(() => reset(lead), [lead, reset]);
+  useEffect(() => reset(toLeadFormValues(lead)), [lead, reset]);
 
-  const save = async (data: Lead) => {
-    const nextLead: Lead = { ...lead, ...data, updatedAt: todayISO() };
+  const save = async (data: LeadFormValues) => {
+    const nextLead: Lead = {
+      ...lead,
+      ...data,
+      parentName: data.parentName || undefined,
+      updatedAt: todayISO(),
+    };
     const next = {
       ...db,
       leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),

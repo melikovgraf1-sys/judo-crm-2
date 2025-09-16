@@ -5,28 +5,12 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Modal from "../Modal";
 import { todayISO } from "../../state/appState";
-import type { DB, Client } from "../../types";
-
-type ClientFormValues = {
-  firstName: string;
-  lastName: string;
-  phone: string;
-  gender: Client["gender"];
-  area: Client["area"];
-  group: Client["group"];
-  channel: Client["channel"];
-  startDate: string;
-  payMethod: Client["payMethod"];
-  payStatus: Client["payStatus"];
-  birthDate: string;
-  payDate: string;
-  parentName: string;
-};
+import type { DB, Client, ClientFormValues } from "../../types";
 
 type Props = {
   db: DB,
   editing: Client | null,
-  onSave: (data: any) => void,
+  onSave: (data: ClientFormValues) => void,
   onClose: () => void,
 };
 
