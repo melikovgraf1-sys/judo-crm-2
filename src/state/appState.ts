@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
@@ -91,6 +91,16 @@ function usePersistentState<T>(
 
   const timeoutRef = useRef<number | null>(null);
 
+  const flush = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {}
+  }, [key, state]);
+
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = window.setTimeout(() => {
@@ -105,14 +115,9 @@ function usePersistentState<T>(
 
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        try {
-          localStorage.setItem(key, JSON.stringify(state));
-        } catch {}
-      }
+      flush();
     };
-  }, []);
+  }, [flush]);
 
   return [state, setState];
 }
