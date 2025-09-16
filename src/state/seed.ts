@@ -43,7 +43,6 @@ export function makeSeedDB(): DB {
       groups: ["4–6", "6–9", "7–14", "9–14"],
     },
   ];
-  const coachIds = staff.filter(s => s.role === "Тренер").map(s => s.id);
 
   const firstNames = [
     "Иван",
@@ -120,7 +119,6 @@ export function makeSeedDB(): DB {
 
   const schedule: ScheduleSlot[] = [];
   const coachAlexey = staff.find(s => s.name === "Алексей")?.id || "";
-  const coachSergey = staff.find(s => s.name === "Сергей")?.id || "";
   schedule.push(
     { id: uid(), area: "Центр", group: "6–9", coachId: coachAlexey, weekday: 2, time: "17:30", location: "" },
     { id: uid(), area: "Центр", group: "4–6", coachId: coachAlexey, weekday: 2, time: "18:30", location: "" },
