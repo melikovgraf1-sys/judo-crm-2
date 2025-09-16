@@ -1,11 +1,27 @@
-// @flow
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Modal from "../Modal";
 import { todayISO } from "../../state/appState";
 import type { DB, Client } from "../../types";
+
+type ClientFormValues = {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  gender: Client["gender"];
+  area: Client["area"];
+  group: Client["group"];
+  channel: Client["channel"];
+  startDate: string;
+  payMethod: Client["payMethod"];
+  payStatus: Client["payStatus"];
+  birthDate: string;
+  payDate: string;
+  parentName: string;
+};
 
 type Props = {
   db: DB,
@@ -15,7 +31,7 @@ type Props = {
 };
 
 export default function ClientForm({ db, editing, onSave, onClose }: Props) {
-  const blankForm = () => ({
+  const blankForm = (): ClientFormValues => ({
     firstName: "",
     lastName: "",
     phone: "",
@@ -44,20 +60,32 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
       .matches(/\d{4}-\d{2}-\d{2}/, "Неверный формат даты"),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm({
-    resolver: yupResolver(schema),
+  const resolver = yupResolver(schema) as unknown as Resolver<ClientFormValues>;
+
+  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<ClientFormValues>({
+    resolver,
     mode: "onChange",
     defaultValues: blankForm(),
   });
 
   useEffect(() => {
     if (editing) {
-      reset({
-        ...editing,
-        birthDate: editing.birthDate?.slice(0, 10),
-        startDate: editing.startDate?.slice(0, 10),
-        payDate: editing.payDate?.slice(0, 10),
-      });
+      const values: ClientFormValues = {
+        firstName: editing.firstName,
+        lastName: editing.lastName ?? "",
+        phone: editing.phone ?? "",
+        gender: editing.gender,
+        area: editing.area,
+        group: editing.group,
+        channel: editing.channel,
+        startDate: editing.startDate?.slice(0, 10) ?? "",
+        payMethod: editing.payMethod,
+        payStatus: editing.payStatus,
+        birthDate: editing.birthDate?.slice(0, 10) ?? "",
+        payDate: editing.payDate?.slice(0, 10) ?? "",
+        parentName: editing.parentName ?? "",
+      };
+      reset(values);
     } else {
       reset(blankForm());
     }

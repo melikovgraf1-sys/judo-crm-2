@@ -1,4 +1,3 @@
-// @flow
 import React from "react";
 import type { DB, Area, Group, PaymentStatus } from "../../types";
 
@@ -14,7 +13,7 @@ type Props = {
   onAddClient: () => void,
 };
 
-function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.Node }) {
+function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}
@@ -70,7 +69,7 @@ export default function ClientFilters({
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={pay}
-          onChange={e => setPay(e.target.value)}
+          onChange={e => setPay(e.target.value as PaymentStatus | "all")}
         >
           <option value="all">Все статусы оплаты</option>
           <option value="ожидание">ожидание</option>

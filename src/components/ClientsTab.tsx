@@ -1,4 +1,3 @@
-// @flow
 import React, { useState, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
