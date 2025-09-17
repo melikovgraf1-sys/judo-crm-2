@@ -2,9 +2,211 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Разрешаем доступ только авторизованным пользователям к документам приложения
+    function isStringList(list) {
+      return list is list && list.all(item, item is string);
+    }
+
+    function isNumberMap(mapValue) {
+      return mapValue is map && mapValue.values().all(value, value is number);
+    }
+
+    function isValidChangelogEntry(entry) {
+      return entry is map
+        && entry.keys().hasOnly(["id", "who", "what", "when"])
+        && entry.id is string
+        && entry.who is string
+        && entry.what is string
+        && entry.when is string;
+    }
+
+    function isValidClient(client) {
+      return client is map
+        && client.keys().hasAll([
+          "id",
+          "firstName",
+          "channel",
+          "birthDate",
+          "gender",
+          "area",
+          "group",
+          "startDate",
+          "payMethod",
+          "payStatus",
+        ])
+        && client.id is string
+        && client.firstName is string
+        && client.channel is string
+        && client.birthDate is string
+        && client.gender is string
+        && client.area is string
+        && client.group is string
+        && client.startDate is string
+        && client.payMethod is string
+        && client.payStatus is string
+        && (!client.keys().hasAny(["lastName"]) || client.lastName is string)
+        && (!client.keys().hasAny(["phone"]) || client.phone is string)
+        && (!client.keys().hasAny(["parentName"]) || client.parentName is string)
+        && (!client.keys().hasAny(["coachId"]) || client.coachId is string)
+        && (!client.keys().hasAny(["payDate"]) || client.payDate is string)
+        && (!client.keys().hasAny(["payAmount"]) || client.payAmount is number);
+    }
+
+    function isValidAttendance(entry) {
+      return entry is map
+        && entry.keys().hasAll(["id", "clientId", "date", "came"])
+        && entry.id is string
+        && entry.clientId is string
+        && entry.date is string
+        && entry.came is bool
+        && (!entry.keys().hasAny(["sourceArea"]) || entry.sourceArea is string);
+    }
+
+    function isValidSchedule(slot) {
+      return slot is map
+        && slot.keys().hasAll([
+          "id",
+          "area",
+          "group",
+          "coachId",
+          "weekday",
+          "time",
+          "location",
+        ])
+        && slot.id is string
+        && slot.area is string
+        && slot.group is string
+        && slot.coachId is string
+        && slot.weekday is number
+        && slot.time is string
+        && slot.location is string;
+    }
+
+    function isValidLead(lead) {
+      return lead is map
+        && lead.keys().hasAll([
+          "id",
+          "name",
+          "source",
+          "stage",
+          "createdAt",
+          "updatedAt",
+        ])
+        && lead.id is string
+        && lead.name is string
+        && lead.source is string
+        && lead.stage is string
+        && lead.createdAt is string
+        && lead.updatedAt is string
+        && (!lead.keys().hasAny(["parentName"]) || lead.parentName is string)
+        && (!lead.keys().hasAny(["firstName"]) || lead.firstName is string)
+        && (!lead.keys().hasAny(["lastName"]) || lead.lastName is string)
+        && (!lead.keys().hasAny(["birthDate"]) || lead.birthDate is string)
+        && (!lead.keys().hasAny(["startDate"]) || lead.startDate is string)
+        && (!lead.keys().hasAny(["area"]) || lead.area is string)
+        && (!lead.keys().hasAny(["group"]) || lead.group is string)
+        && (!lead.keys().hasAny(["contact"]) || lead.contact is string)
+        && (!lead.keys().hasAny(["notes"]) || lead.notes is string)
+        && (!lead.keys().hasAny(["managerId"]) || lead.managerId is string);
+    }
+
+    function isValidTask(task) {
+      return task is map
+        && task.keys().hasAll(["id", "title", "due", "status"])
+        && task.id is string
+        && task.title is string
+        && task.due is string
+        && task.status is string
+        && (!task.keys().hasAny(["assigneeType"]) || task.assigneeType is string)
+        && (!task.keys().hasAny(["assigneeId"]) || task.assigneeId is string)
+        && (!task.keys().hasAny(["topic"]) || task.topic is string)
+        && (!task.keys().hasAny(["area"]) || task.area is string);
+    }
+
+    function isValidStaff(member) {
+      return member is map
+        && member.keys().hasAll(["id", "role", "name", "areas", "groups"])
+        && member.id is string
+        && member.role is string
+        && member.name is string
+        && isStringList(member.areas)
+        && isStringList(member.groups);
+    }
+
+    function isValidSettings(settings) {
+      return settings is map
+        && settings.keys().hasAll([
+          "areas",
+          "groups",
+          "limits",
+          "rentByAreaEUR",
+          "currencyRates",
+          "coachPayFormula",
+        ])
+        && settings.keys().hasOnly([
+          "areas",
+          "groups",
+          "limits",
+          "rentByAreaEUR",
+          "currencyRates",
+          "coachPayFormula",
+        ])
+        && isStringList(settings.areas)
+        && isStringList(settings.groups)
+        && isNumberMap(settings.limits)
+        && isNumberMap(settings.rentByAreaEUR)
+        && settings.currencyRates is map
+        && settings.currencyRates.keys().hasOnly(["EUR", "TRY", "RUB"])
+        && settings.currencyRates.keys().hasAll(["EUR", "TRY", "RUB"])
+        && settings.currencyRates.EUR is number
+        && settings.currencyRates.TRY is number
+        && settings.currencyRates.RUB is number
+        && settings.coachPayFormula is string;
+    }
+
+    function isValidMainDoc(data) {
+      return data.keys().hasAll([
+          "clients",
+          "attendance",
+          "schedule",
+          "leads",
+          "tasks",
+          "staff",
+          "settings",
+          "changelog",
+        ])
+        && data.keys().hasOnly([
+          "clients",
+          "attendance",
+          "schedule",
+          "leads",
+          "tasks",
+          "staff",
+          "settings",
+          "changelog",
+        ])
+        && data.clients is list
+        && data.clients.all(client, isValidClient(client))
+        && data.attendance is list
+        && data.attendance.all(entry, isValidAttendance(entry))
+        && data.schedule is list
+        && data.schedule.all(slot, isValidSchedule(slot))
+        && data.leads is list
+        && data.leads.all(lead, isValidLead(lead))
+        && data.tasks is list
+        && data.tasks.all(task, isValidTask(task))
+        && data.staff is list
+        && data.staff.all(member, isValidStaff(member))
+        && isValidSettings(data.settings)
+        && data.changelog is list
+        && data.changelog.all(entry, isValidChangelogEntry(entry));
+    }
+
+    // Разрешаем доступ только авторизованным пользователям к документам приложения,
+    // а также открываем документ /app/main для неавторизованных пользователей при валидации данных
     match /app/{documentId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null || documentId == "main";
+      allow write: if request.auth != null
+        || (documentId == "main" && request.resource != null && isValidMainDoc(request.resource.data));
     }
 
     // По умолчанию запрещаем любые другие операции
