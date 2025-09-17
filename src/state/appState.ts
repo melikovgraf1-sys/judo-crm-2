@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db as firestore } from "../firebase";
+import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
 import type {
@@ -29,6 +29,7 @@ export async function saveDB(dbData: DB) {
     console.warn("Firestore not initialized");
     return;
   }
+  await ensureSignedIn();
   const ref = doc(firestore, "app", "main");
   try {
     await setDoc(ref, dbData);

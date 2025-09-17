@@ -1,6 +1,11 @@
 import type { FirebaseApp, FirebaseOptions } from "firebase/app";
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  getAuth,
+  setPersistence,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig: FirebaseOptions = {
@@ -18,5 +23,36 @@ const app: FirebaseApp | undefined = Object.values(firebaseConfig).every(Boolean
 
 const db = app ? getFirestore(app) : undefined;
 const auth = app ? getAuth(app) : undefined;
+
+let signingIn: Promise<boolean> | null = null;
+
+export async function ensureSignedIn(): Promise<boolean> {
+  if (!auth) return false;
+  if (auth.currentUser) return true;
+  if (signingIn) return signingIn;
+
+  const email = process.env.REACT_APP_FIREBASE_AUTH_EMAIL;
+  const password = process.env.REACT_APP_FIREBASE_AUTH_PASSWORD;
+
+  if (!email || !password) {
+    console.warn(
+      "Firebase Auth credentials are not configured. Continuing without authentication.",
+    );
+    return false;
+  }
+
+  signingIn = setPersistence(auth, browserLocalPersistence)
+    .then(() => signInWithEmailAndPassword(auth, email, password))
+    .then(() => true)
+    .catch((error) => {
+      console.error("Failed to authenticate with Firebase", error);
+      return false;
+    })
+    .finally(() => {
+      signingIn = null;
+    });
+
+  return signingIn;
+}
 
 export { db, auth };
