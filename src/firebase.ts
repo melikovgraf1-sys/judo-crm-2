@@ -8,22 +8,32 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-interface FirebaseConfigWithAuth extends FirebaseOptions {
-  authEmail?: string;
-  authPassword?: string;
-}
-
-const firebaseConfig: FirebaseConfigWithAuth = {
-  apiKey: "AIzaSyAulX_16s1hU8Y-WT0IaWQmmoZJhr_0Xy0",
-  authDomain: "precise-slice-397909.firebaseapp.com",
-  projectId: "precise-slice-397909",
-  storageBucket: "precise-slice-397909.firebasestorage.app",
-  messagingSenderId: "952584870116",
-  appId: "1:952584870116:web:4d801cf061511d8c5934f1",
-  authEmail: "admin@mail.ru",
-  authPassword: "admins"
+const firebaseConfig: FirebaseOptions = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
 };
-const app: FirebaseApp | undefined = Object.values(firebaseConfig).every(Boolean)
+
+const firebaseAuthEmail = process.env.REACT_APP_FIREBASE_AUTH_EMAIL;
+const firebaseAuthPassword = process.env.REACT_APP_FIREBASE_AUTH_PASSWORD;
+
+const requiredConfigKeys: Array<keyof FirebaseOptions> = [
+  "apiKey",
+  "authDomain",
+  "projectId",
+  "storageBucket",
+  "messagingSenderId",
+  "appId",
+];
+
+const hasRequiredFirebaseConfig = requiredConfigKeys.every((key) =>
+  Boolean(firebaseConfig[key])
+);
+
+const app: FirebaseApp | undefined = hasRequiredFirebaseConfig
   ? initializeApp(firebaseConfig)
   : (console.warn("Firebase configuration is incomplete. Skipping initialization."), undefined);
 
@@ -37,21 +47,15 @@ export async function ensureSignedIn(): Promise<boolean> {
   if (auth.currentUser) return true;
   if (signingIn) return signingIn;
 
-
-  const email = process.env.REACT_APP_FIREBASE_AUTH_EMAIL ?? firebaseConfig.authEmail;
-  const password =
-    process.env.REACT_APP_FIREBASE_AUTH_PASSWORD ?? firebaseConfig.authPassword;
-
-
-  if (!email || !password) {
+  if (!firebaseAuthEmail || !firebaseAuthPassword) {
     console.warn(
-      "Firebase Auth credentials are not configured. Continuing without authentication.",
+      "Firebase Auth credentials (REACT_APP_FIREBASE_AUTH_EMAIL/REACT_APP_FIREBASE_AUTH_PASSWORD) are not configured. Continuing without authentication.",
     );
     return false;
   }
 
   signingIn = setPersistence(auth, browserLocalPersistence)
-    .then(() => signInWithEmailAndPassword(auth, email, password))
+    .then(() => signInWithEmailAndPassword(auth, firebaseAuthEmail, firebaseAuthPassword))
     .then(() => true)
     .catch((error) => {
       console.error("Failed to authenticate with Firebase", error);
