@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import { saveDB } from "../state/appState";
+import { commitDBUpdate } from "../state/appState";
 import type { DB } from "../types";
 
 export default function SettingsTab({
@@ -30,33 +30,13 @@ export default function SettingsTab({
           fetchRate('EUR-RUB'),
           fetchRate('TRY-RUB'),
         ]);
+        const nextRates = {
+          eurTry: eurTry ?? db.settings.currencyRates.TRY,
+          eurRub: eurRub ?? db.settings.currencyRates.RUB,
+          tryRub: tryRub ?? db.settings.currencyRates.RUB / db.settings.currencyRates.TRY,
+        };
+
         setRates(prevRates => {
-          const nextRates = {
-            eurTry: eurTry ?? prevRates.eurTry,
-            eurRub: eurRub ?? prevRates.eurRub,
-            tryRub: tryRub ?? prevRates.tryRub,
-          };
-
-          setDB(prevDB => {
-            const hasChanged =
-              prevDB.settings.currencyRates.TRY !== nextRates.eurTry ||
-              prevDB.settings.currencyRates.RUB !== nextRates.eurRub;
-
-            if (!hasChanged) {
-              return prevDB;
-            }
-
-            const updated = {
-              ...prevDB,
-              settings: {
-                ...prevDB.settings,
-                currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
-              },
-            };
-            void saveDB(updated);
-            return updated;
-          });
-
           if (
             nextRates.eurTry === prevRates.eurTry &&
             nextRates.eurRub === prevRates.eurRub &&
@@ -64,15 +44,32 @@ export default function SettingsTab({
           ) {
             return prevRates;
           }
-
           return nextRates;
         });
+
+        const hasChanged =
+          db.settings.currencyRates.TRY !== nextRates.eurTry ||
+          db.settings.currencyRates.RUB !== nextRates.eurRub;
+
+        if (hasChanged) {
+          const updated = {
+            ...db,
+            settings: {
+              ...db.settings,
+              currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
+            },
+          };
+          const ok = await commitDBUpdate(updated, setDB);
+          if (!ok) {
+            console.error("Failed to update currency rates in Firestore");
+          }
+        }
       } catch (e) {
         console.error(e);
       }
     }
     fetchRates();
-  }, [setDB]);
+  }, [db, setDB]);
 
   return (
     <div className="space-y-3">
@@ -125,7 +122,10 @@ export default function SettingsTab({
                       value={db.settings.limits[key] ?? 0}
                       onChange={async e => {
                         const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
-                        setDB(next); await saveDB(next);
+                        const ok = await commitDBUpdate(next, setDB);
+                        if (!ok) {
+                          window.alert("Не удалось сохранить лимит. Проверьте доступ к базе данных.");
+                        }
                       }}
                     />
                   </div>

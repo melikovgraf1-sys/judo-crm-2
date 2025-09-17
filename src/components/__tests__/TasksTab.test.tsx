@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  saveDB: jest.fn().mockResolvedValue(undefined),
+  commitDBUpdate: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -15,6 +15,7 @@ jest.mock('../../state/utils', () => ({
   todayISO: () => '2025-01-01T00:00:00.000Z'
 }));
 import TasksTab from '../TasksTab';
+import { commitDBUpdate } from '../../state/appState';
 
 function setup(initialTasks) {
   const Wrapper = () => {
@@ -31,7 +32,12 @@ describe('TasksTab CRUD operations', () => {
   ];
 
   beforeEach(() => {
+    commitDBUpdate.mockImplementation(async (next, setDB) => {
+      setDB(next);
+      return true;
+    });
     window.confirm = jest.fn(() => true);
+    window.alert = jest.fn();
   });
 
   test('Read: renders initial tasks', () => {

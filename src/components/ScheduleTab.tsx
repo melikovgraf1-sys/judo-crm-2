@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { uid } from "../state/utils";
-import { saveDB } from "../state/appState";
+import { commitDBUpdate } from "../state/appState";
 import type { DB, ScheduleSlot } from "../types";
 
 export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
@@ -25,7 +25,10 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
       if (!(key in nextLimits)) nextLimits[key] = 0;
     }
     const next = { ...db, settings: { ...db.settings, areas: nextAreas, limits: nextLimits } };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось добавить район. Проверьте доступ к базе данных.");
+    }
   };
   const renameArea = async (oldName: string) => {
     const name = prompt("Новое название района", oldName);
@@ -52,7 +55,10 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
       settings: { ...db.settings, areas: renamedAreas, limits: renamedLimits },
       schedule: db.schedule.map(s => s.area === oldName ? { ...s, area: name } : s),
     };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось переименовать район. Проверьте доступ к базе данных.");
+    }
   };
   const deleteArea = async (name: string) => {
     if (!window.confirm(`Удалить район ${name}?`)) return;
@@ -67,7 +73,10 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
       settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name), limits: filteredLimits },
       schedule: db.schedule.filter(s => s.area !== name),
     };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось удалить район. Проверьте доступ к базе данных.");
+    }
   };
 
   const pickGroup = (init: string) => {
@@ -91,7 +100,10 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
         ? db.settings
         : { ...db.settings, groups: [...db.settings.groups, group] },
     };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось добавить слот расписания. Проверьте доступ к базе данных.");
+    }
   };
   const editSlot = async (id: string) => {
     const s = db.schedule.find(x => x.id === id);
@@ -107,12 +119,18 @@ export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => 
         ? db.settings
         : { ...db.settings, groups: [...db.settings.groups, group] },
     };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось обновить слот расписания. Проверьте доступ к базе данных.");
+    }
   };
   const deleteSlot = async (id: string) => {
     if (!window.confirm("Удалить группу?")) return;
     const next = { ...db, schedule: db.schedule.filter(x => x.id !== id) };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось удалить слот расписания. Проверьте доступ к базе данных.");
+    }
   };
 
   return (
