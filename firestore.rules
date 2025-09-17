@@ -2,9 +2,71 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Разрешаем доступ только авторизованным пользователям к документам приложения
+    function isStringList(list) {
+      return list is list && list.all(item, item is string);
+    }
+
+    function isMapOfNumbers(mapValue) {
+      return mapValue is map && mapValue.values().all(value, value is number);
+    }
+
+    function isSimpleMapList(list) {
+      return list is list && list.all(item, item is map);
+    }
+
+    function isValidSettings(settings) {
+      return settings is map
+        && settings.keys().hasAll(["areas", "groups", "limits", "rentByAreaEUR", "currencyRates", "coachPayFormula"])
+        && isStringList(settings.areas)
+        && isStringList(settings.groups)
+        && isMapOfNumbers(settings.limits)
+        && isMapOfNumbers(settings.rentByAreaEUR)
+        && settings.currencyRates is map
+        && settings.currencyRates.values().all(rate, rate is number)
+        && settings.coachPayFormula is string;
+    }
+
+    function isValidChangelog(list) {
+      return list is list
+        && list.all(entry,
+          entry is map
+            && entry.keys().hasAll(["id", "who", "what", "when"])
+            && entry.id is string
+            && entry.who is string
+            && entry.what is string
+            && entry.when is string
+        );
+    }
+
+    function isValidMainDoc(data) {
+      return data is map
+        && data.keys().hasAll([
+          "clients",
+          "attendance",
+          "schedule",
+          "leads",
+          "tasks",
+          "staff",
+          "settings",
+          "changelog",
+        ])
+        && isSimpleMapList(data.clients)
+        && isSimpleMapList(data.attendance)
+        && isSimpleMapList(data.schedule)
+        && isSimpleMapList(data.leads)
+        && isSimpleMapList(data.tasks)
+        && isSimpleMapList(data.staff)
+        && data.settings is map
+        && isValidSettings(data.settings)
+        && isValidChangelog(data.changelog);
+    }
+
+    // Разрешаем доступ только авторизованным пользователям к документам приложения,
+    // а также открываем документ /app/main для неавторизованных пользователей при валидации данных
     match /app/{documentId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null || documentId == "main";
+      allow write: if request.auth != null
+        || (documentId == "main" && request.resource != null && isValidMainDoc(request.resource.data));
     }
 
     // По умолчанию запрещаем любые другие операции
