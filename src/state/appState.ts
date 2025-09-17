@@ -25,7 +25,6 @@ export const LS_KEYS = {
 };
 
 export async function saveDB(dbData: DB) {
-
   if (!firestore) {
     console.warn("Firestore not initialized");
     return;
@@ -33,10 +32,23 @@ export async function saveDB(dbData: DB) {
   const ref = doc(firestore, "app", "main");
   try {
     await setDoc(ref, dbData);
-
   } catch (err) {
     console.error("Failed to save DB", err);
     throw err;
+  }
+}
+
+export async function commitDBUpdate(
+  next: DB,
+  setDB: Dispatch<SetStateAction<DB>>,
+): Promise<boolean> {
+  try {
+    await saveDB(next);
+    setDB(next);
+    return true;
+  } catch (err) {
+    console.error("Failed to persist DB update", err);
+    return false;
   }
 }
 
@@ -239,10 +251,12 @@ export function useAppState(): AppState {
       payStatus: "ожидание",
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
-    setDB(next);
-    await saveDB(next);
-    setQuickOpen(false);
-    push("Клиент создан", "success");
+    if (await commitDBUpdate(next, setDB)) {
+      setQuickOpen(false);
+      push("Клиент создан", "success");
+    } else {
+      push("Не удалось сохранить клиента", "error");
+    }
   };
   const addQuickLead = async () => {
     const l: Lead = {
@@ -261,10 +275,12 @@ export function useAppState(): AppState {
       updatedAt: todayISO(),
     } as Lead;
     const next = { ...db, leads: [l, ...db.leads] };
-    setDB(next);
-    await saveDB(next);
-    setQuickOpen(false);
-    push("Лид создан", "success");
+    if (await commitDBUpdate(next, setDB)) {
+      setQuickOpen(false);
+      push("Лид создан", "success");
+    } else {
+      push("Не удалось сохранить лида", "error");
+    }
   };
   const addQuickTask = async () => {
     const admin = db.staff.find((s: StaffMember) => s.role === "Администратор");
@@ -280,10 +296,12 @@ export function useAppState(): AppState {
       group: db.settings.groups[0],
     } as TaskItem;
     const next = { ...db, tasks: [t, ...db.tasks] };
-    setDB(next);
-    await saveDB(next);
-    setQuickOpen(false);
-    push("Задача создана", "success");
+    if (await commitDBUpdate(next, setDB)) {
+      setQuickOpen(false);
+      push("Задача создана", "success");
+    } else {
+      push("Не удалось сохранить задачу", "error");
+    }
   };
 
   return {

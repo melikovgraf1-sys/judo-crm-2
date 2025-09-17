@@ -1,33 +1,54 @@
 import React, { useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
 import { fmtDate, uid, todayISO } from "../state/utils";
-import { saveDB } from "../state/appState";
+import { commitDBUpdate } from "../state/appState";
 import type { DB, TaskItem } from "../types";
 
-export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function TasksTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+}) {
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = async (id: string) => {
     const next: DB = {
       ...db,
       tasks: db.tasks.map<TaskItem>(t => (t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t)),
     };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось обновить задачу. Проверьте доступ к базе данных.");
+    }
   };
   const save = async () => {
     if (!edit) return;
     const next: DB = { ...db, tasks: db.tasks.map<TaskItem>(t => (t.id === edit.id ? edit : t)) };
-    setDB(next); await saveDB(next); setEdit(null);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось сохранить задачу. Проверьте доступ к базе данных.");
+      return;
+    }
+    setEdit(null);
   };
   const add = async () => {
     const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
     const next: DB = { ...db, tasks: [t, ...db.tasks] };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось добавить задачу. Проверьте доступ к базе данных.");
+    }
   };
   const remove = async (id: string) => {
     if (!window.confirm("Удалить задачу?")) return;
     const next: DB = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось удалить задачу. Проверьте доступ к базе данных.");
+    }
   };
   return (
     <div className="space-y-3">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -7,10 +8,16 @@ import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
-import { saveDB } from "../state/appState";
+import { commitDBUpdate } from "../state/appState";
 import type { DB, Lead, LeadStage, StaffMember, LeadFormValues } from "../types";
 
-export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function LeadsTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+}) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const [open, setOpen] = useState<Lead | null>(null);
   const groupedLeads = useMemo((): Record<LeadStage, Lead[]> =>
@@ -23,7 +30,10 @@ export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => voi
     const idx = stages.indexOf(l.stage);
     const nextStage = stages[Math.min(stages.length - 1, Math.max(0, idx + dir))];
     const next = { ...db, leads: db.leads.map(x => x.id === id ? { ...x, stage: nextStage, updatedAt: todayISO() } : x) };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось обновить статус лида. Проверьте доступ к базе данных.");
+    }
   };
   return (
     <div className="space-y-3">
@@ -91,7 +101,7 @@ function LeadModal(
     onClose: () => void;
     staff: StaffMember[];
     db: DB;
-    setDB: (db: DB) => void;
+    setDB: Dispatch<SetStateAction<DB>>;
   },
 ) {
   const [edit, setEdit] = useState(false);
@@ -124,7 +134,12 @@ function LeadModal(
       leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
     };
-    setDB(next); await saveDB(next); setEdit(false); onClose();
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось сохранить изменения лида. Проверьте доступ к базе данных.");
+      return;
+    }
+    setEdit(false); onClose();
   };
 
   const remove = async () => {
@@ -134,7 +149,12 @@ function LeadModal(
       leads: db.leads.filter(l => l.id !== lead.id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.id}`, when: todayISO() }],
     };
-    setDB(next); await saveDB(next); onClose();
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось удалить лида. Проверьте доступ к базе данных.");
+      return;
+    }
+    onClose();
   };
 
   return (
