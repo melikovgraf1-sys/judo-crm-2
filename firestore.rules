@@ -16,6 +16,7 @@ service cloud.firestore {
 
     function isValidSettings(settings) {
       return settings is map
+
         && settings.keys().hasAll(["areas", "groups", "limits", "rentByAreaEUR", "currencyRates", "coachPayFormula"])
         && isStringList(settings.areas)
         && isStringList(settings.groups)
