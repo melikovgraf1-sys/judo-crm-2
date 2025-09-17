@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { db as firestore } from "../firebase";
+import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
 import type {
@@ -28,6 +28,10 @@ export async function saveDB(dbData: DB) {
   if (!firestore) {
     console.warn("Firestore not initialized");
     return;
+  }
+  const signedIn = await ensureSignedIn();
+  if (!signedIn) {
+    throw new Error("Firebase authentication is required before saving data");
   }
   const ref = doc(firestore, "app", "main");
   try {
@@ -179,6 +183,11 @@ export function useAppState(): AppState {
           } else {
             const seed = makeSeedDB();
             setDB(seed);
+            const signedIn = await ensureSignedIn();
+            if (!signedIn) {
+              push("Не удалось авторизоваться в Firebase", "error");
+              throw new Error("Firebase authentication required before seeding data");
+            }
             await setDoc(ref, seed);
           }
         } catch (err) {
