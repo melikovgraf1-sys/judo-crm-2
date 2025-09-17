@@ -8,8 +8,12 @@ import {
 } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-const firebaseConfig: FirebaseOptions = {
+interface FirebaseConfigWithAuth extends FirebaseOptions {
+  authEmail?: string;
+  authPassword?: string;
+}
 
+const firebaseConfig: FirebaseConfigWithAuth = {
   apiKey: "AIzaSyAulX_16s1hU8Y-WT0IaWQmmoZJhr_0Xy0",
   authDomain: "precise-slice-397909.firebaseapp.com",
   projectId: "precise-slice-397909",
@@ -33,8 +37,11 @@ export async function ensureSignedIn(): Promise<boolean> {
   if (auth.currentUser) return true;
   if (signingIn) return signingIn;
 
-  const email = process.env.REACT_APP_FIREBASE_AUTH_EMAIL;
-  const password = process.env.REACT_APP_FIREBASE_AUTH_PASSWORD;
+
+  const email = process.env.REACT_APP_FIREBASE_AUTH_EMAIL ?? firebaseConfig.authEmail;
+  const password =
+    process.env.REACT_APP_FIREBASE_AUTH_PASSWORD ?? firebaseConfig.authPassword;
+
 
   if (!email || !password) {
     console.warn(

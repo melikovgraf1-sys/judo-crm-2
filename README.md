@@ -53,7 +53,6 @@ npm run build     # сборка production-версии в каталог build
    # Обязательно для работы с защищёнными правилами Firestore:
    REACT_APP_FIREBASE_AUTH_EMAIL=...
    REACT_APP_FIREBASE_AUTH_PASSWORD=...
-
    ```
 
 4. Перезапустите `npm start`, чтобы подтянуть новые переменные окружения.
