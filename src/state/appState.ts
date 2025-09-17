@@ -29,6 +29,7 @@ export async function saveDB(dbData: DB) {
     console.warn("Firestore not initialized");
     return;
   }
+
   const signedIn = await ensureSignedIn();
   if (!signedIn) {
     throw new Error("Firebase authentication is required before saving data");
