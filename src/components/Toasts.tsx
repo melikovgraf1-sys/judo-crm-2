@@ -1,17 +1,20 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { uid } from "../state/utils";
 import type { Toast } from "../types";
 
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const push = (text: string, type: Toast["type"] = "info") => {
-    const t: Toast = { id: uid(), text, type };
-    setToasts((prev: Toast[]) => [...prev, t]);
-    setTimeout(
-      () => setToasts((prev: Toast[]) => prev.filter((x: Toast) => x.id !== t.id)),
-      3500
-    );
-  };
+  const push = useCallback(
+    (text: string, type: Toast["type"] = "info") => {
+      const t: Toast = { id: uid(), text, type };
+      setToasts((prev: Toast[]) => [...prev, t]);
+      setTimeout(
+        () => setToasts((prev: Toast[]) => prev.filter((x: Toast) => x.id !== t.id)),
+        3500,
+      );
+    },
+    [setToasts],
+  );
   return { toasts, push };
 }
 
