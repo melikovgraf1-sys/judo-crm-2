@@ -20,6 +20,8 @@ const firebaseConfig: FirebaseConfigWithAuth = {
   storageBucket: "precise-slice-397909.firebasestorage.app",
   messagingSenderId: "952584870116",
   appId: "1:952584870116:web:4d801cf061511d8c5934f1",
+  authEmail: "admin@mail.ru",
+  authPassword: "admins"
 };
 const app: FirebaseApp | undefined = Object.values(firebaseConfig).every(Boolean)
   ? initializeApp(firebaseConfig)
@@ -35,9 +37,11 @@ export async function ensureSignedIn(): Promise<boolean> {
   if (auth.currentUser) return true;
   if (signingIn) return signingIn;
 
+
   const email = process.env.REACT_APP_FIREBASE_AUTH_EMAIL ?? firebaseConfig.authEmail;
   const password =
     process.env.REACT_APP_FIREBASE_AUTH_PASSWORD ?? firebaseConfig.authPassword;
+
 
   if (!email || !password) {
     console.warn(
