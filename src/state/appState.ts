@@ -29,7 +29,11 @@ export async function saveDB(dbData: DB) {
     console.warn("Firestore not initialized");
     return;
   }
-  await ensureSignedIn();
+
+  const signedIn = await ensureSignedIn();
+  if (!signedIn) {
+    throw new Error("Firebase authentication is required before saving data");
+  }
   const ref = doc(firestore, "app", "main");
   try {
     await setDoc(ref, dbData);
@@ -180,6 +184,11 @@ export function useAppState(): AppState {
           } else {
             const seed = makeSeedDB();
             setDB(seed);
+            const signedIn = await ensureSignedIn();
+            if (!signedIn) {
+              push("Не удалось авторизоваться в Firebase", "error");
+              throw new Error("Firebase authentication required before seeding data");
+            }
             await setDoc(ref, seed);
           }
         } catch (err) {

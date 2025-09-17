@@ -50,9 +50,10 @@ npm run build     # сборка production-версии в каталог build
    REACT_APP_FIREBASE_STORAGE_BUCKET=...
    REACT_APP_FIREBASE_MESSAGING_SENDER_ID=...
    REACT_APP_FIREBASE_APP_ID=...
-   # Необязательно: учётные данные для авторизации перед записью в Firestore
-    REACT_APP_FIREBASE_AUTH_EMAIL=...
-    REACT_APP_FIREBASE_AUTH_PASSWORD=...
+   # Обязательно для работы с защищёнными правилами Firestore:
+   REACT_APP_FIREBASE_AUTH_EMAIL=...
+   REACT_APP_FIREBASE_AUTH_PASSWORD=...
+
    ```
 
 4. Перезапустите `npm start`, чтобы подтянуть новые переменные окружения.
@@ -66,9 +67,9 @@ npm run build     # сборка production-версии в каталог build
 
 1. Откройте проект в Firebase Console и перейдите в раздел **Build → Authentication**.
 2. Нажмите **Get Started/Начать**, чтобы активировать модуль авторизации.
-3. Включите нужные провайдеры входа (например, Email/Password) и сохраните настройки.
+3. Включите провайдер **Email/Password** (и при необходимости создайте техническую учётку через вкладку Users).
 4. На вкладке **Settings** добавьте домены, с которых будет доступно приложение (например, `localhost` для разработки).
-5. После включения авторизации импортируйте `auth` из `src/firebase.ts`, чтобы использовать `signInWithEmailAndPassword`, `onAuthStateChanged` и другие методы SDK в приложении.
+5. Убедитесь, что переменные окружения `REACT_APP_FIREBASE_AUTH_EMAIL/REACT_APP_FIREBASE_AUTH_PASSWORD` указывают на существующего пользователя. Эти данные используются приложением для фоновой авторизации перед любой записью в Firestore.
 
 ### Устранение неполадок
 
