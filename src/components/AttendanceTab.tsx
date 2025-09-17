@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
 import { fmtDate, uid } from "../state/utils";
-import { saveDB } from "../state/appState";
+import { commitDBUpdate } from "../state/appState";
 import type { DB, Area, Group, AttendanceEntry } from "../types";
 
 export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
@@ -30,11 +30,17 @@ export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) =
     if (mark) {
       const updated = { ...mark, came: !mark.came };
       const next = { ...db, attendance: db.attendance.map(a => a.id === mark.id ? updated : a) };
-      setDB(next); await saveDB(next);
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert("Не удалось обновить отметку посещаемости. Проверьте доступ к базе данных.");
+      }
     } else {
       const entry: AttendanceEntry = { id: uid(), clientId, date: new Date().toISOString(), came: true };
       const next = { ...db, attendance: [entry, ...db.attendance] };
-      setDB(next); await saveDB(next);
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert("Не удалось сохранить отметку посещаемости. Проверьте доступ к базе данных.");
+      }
     }
   };
 

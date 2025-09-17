@@ -4,7 +4,7 @@ import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { uid, todayISO, parseDateInput } from "../state/utils";
-import { saveDB } from "../state/appState";
+import { commitDBUpdate } from "../state/appState";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues } from "../types";
 
 
@@ -50,7 +50,11 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
         changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
       };
-      setDB(next); await saveDB(next);
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert("Не удалось сохранить изменения клиента. Проверьте доступ к базе данных.");
+        return;
+      }
     } else {
       const c: Client = {
         id: uid(),
@@ -63,7 +67,11 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
         clients: [c, ...db.clients],
         changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
       };
-      setDB(next); await saveDB(next);
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert("Не удалось сохранить нового клиента. Проверьте доступ к базе данных.");
+        return;
+      }
     }
     setModalOpen(false);
     setEditing(null);
@@ -76,7 +84,10 @@ export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) 
       clients: db.clients.filter(c => c.id !== id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }],
     };
-    setDB(next); await saveDB(next);
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось удалить клиента. Проверьте доступ к базе данных.");
+    }
   };
 
   return (

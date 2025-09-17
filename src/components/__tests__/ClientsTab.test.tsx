@@ -12,7 +12,7 @@ jest.mock('react-window', () => ({
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  saveDB: jest.fn().mockResolvedValue(undefined),
+  commitDBUpdate: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -24,16 +24,21 @@ jest.mock('../../state/utils', () => ({
 }));
 
 import ClientsTab from '../ClientsTab';
-import { saveDB } from '../../state/appState';
+import { commitDBUpdate } from '../../state/appState';
 import { uid, todayISO, parseDateInput, fmtMoney } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
+  commitDBUpdate.mockImplementation(async (next, setDB) => {
+    setDB(next);
+    return true;
+  });
   uid.mockReturnValue('uid-123');
   todayISO.mockReturnValue('2024-01-01T00:00:00.000Z');
   parseDateInput.mockImplementation((v) => (v ? v + 'T00:00:00.000Z' : ''));
   fmtMoney.mockImplementation((v, c) => v + ' ' + c);
   global.confirm = jest.fn(() => true);
+  window.alert = jest.fn();
 });
 
 const makeDB = () => ({

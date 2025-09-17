@@ -6,7 +6,7 @@ import '@testing-library/jest-dom';
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  saveDB: jest.fn().mockResolvedValue(undefined),
+  commitDBUpdate: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -22,10 +22,20 @@ jest.mock('../../state/utils', () => ({
 jest.mock('../VirtualizedTable', () => (props) => <table>{props.children}</table>);
 
 import ScheduleTab from '../ScheduleTab';
+import { commitDBUpdate } from '../../state/appState';
+
+beforeEach(() => {
+  commitDBUpdate.mockImplementation(async (next, setDB) => {
+    setDB(next);
+    return true;
+  });
+  window.alert = jest.fn();
+});
 
 afterEach(() => {
   cleanup();
   jest.restoreAllMocks();
+  commitDBUpdate.mockResolvedValue(true);
 });
 
 function makeDb() {

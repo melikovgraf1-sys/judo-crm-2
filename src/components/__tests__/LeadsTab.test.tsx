@@ -12,7 +12,7 @@ jest.mock('react-window', () => ({
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  saveDB: jest.fn().mockResolvedValue(undefined),
+  commitDBUpdate: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -24,13 +24,18 @@ jest.mock('../../state/utils', () => ({
 
 import LeadsTab from '../LeadsTab';
 import QuickAddModal from '../QuickAddModal';
-import { saveDB } from '../../state/appState';
+import { commitDBUpdate } from '../../state/appState';
 import { todayISO, uid } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
+  commitDBUpdate.mockImplementation(async (next, setDB) => {
+    setDB(next);
+    return true;
+  });
   global.confirm = jest.fn(() => true);
   global.prompt = jest.fn();
+  window.alert = jest.fn();
 });
 
 const makeDB = () => ({
@@ -120,9 +125,10 @@ test('create: adds new lead via modal', async () => {
         updatedAt: todayISO(),
       };
       const next = { ...state, leads: [l, ...state.leads] };
-      setDB(next);
-      await saveDB(next);
-      setOpen(false);
+      const ok = await commitDBUpdate(next, setDB);
+      if (ok) {
+        setOpen(false);
+      }
     };
     return (
       <>
