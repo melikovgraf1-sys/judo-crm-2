@@ -1,11 +1,18 @@
 import React, { useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
 import { fmtDate, uid, todayISO } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import type { DB, TaskItem } from "../types";
 
-export default function TasksTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function TasksTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+}) {
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = async (id: string) => {
     const next: DB = {

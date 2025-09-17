@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
@@ -8,7 +9,15 @@ import { commitDBUpdate } from "../state/appState";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues } from "../types";
 
 
-export default function ClientsTab({ db, setDB, ui }: { db: DB; setDB: (db: DB) => void; ui: UIState }) {
+export default function ClientsTab({
+  db,
+  setDB,
+  ui,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+  ui: UIState;
+}) {
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
   const [pay, setPay] = useState<PaymentStatus | "all">("all");

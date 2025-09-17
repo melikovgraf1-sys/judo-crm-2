@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -10,7 +11,13 @@ import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import type { DB, Lead, LeadStage, StaffMember, LeadFormValues } from "../types";
 
-export default function LeadsTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function LeadsTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+}) {
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
   const [open, setOpen] = useState<Lead | null>(null);
   const groupedLeads = useMemo((): Record<LeadStage, Lead[]> =>
@@ -94,7 +101,7 @@ function LeadModal(
     onClose: () => void;
     staff: StaffMember[];
     db: DB;
-    setDB: (db: DB) => void;
+    setDB: Dispatch<SetStateAction<DB>>;
   },
 ) {
   const [edit, setEdit] = useState(false);

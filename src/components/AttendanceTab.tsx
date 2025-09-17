@@ -1,11 +1,18 @@
 import React, { useState, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
 import { fmtDate, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import type { DB, Area, Group, AttendanceEntry } from "../types";
 
-export default function AttendanceTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function AttendanceTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+}) {
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
   const today = new Date();

@@ -1,10 +1,17 @@
 import React, { useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import type { DB, ScheduleSlot } from "../types";
 
-export default function ScheduleTab({ db, setDB }: { db: DB; setDB: (db: DB) => void }) {
+export default function ScheduleTab({
+  db,
+  setDB,
+}: {
+  db: DB;
+  setDB: Dispatch<SetStateAction<DB>>;
+}) {
   const byArea = useMemo(() => {
     const m: Record<string, ScheduleSlot[]> = {};
     for (const a of db.settings.areas) m[a] = [];
