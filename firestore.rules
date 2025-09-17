@@ -12,7 +12,7 @@ service cloud.firestore {
 
     function isValidChangelogEntry(entry) {
       return entry is map
-        && entry.keys().hasOnly(["id", "who", "what", "when"])
+        && entry.keys().hasAll(["id", "who", "what", "when"])
         && entry.id is string
         && entry.who is string
         && entry.what is string
@@ -142,20 +142,12 @@ service cloud.firestore {
           "currencyRates",
           "coachPayFormula",
         ])
-        && settings.keys().hasOnly([
-          "areas",
-          "groups",
-          "limits",
-          "rentByAreaEUR",
-          "currencyRates",
-          "coachPayFormula",
-        ])
+
         && isStringList(settings.areas)
         && isStringList(settings.groups)
         && isNumberMap(settings.limits)
         && isNumberMap(settings.rentByAreaEUR)
         && settings.currencyRates is map
-        && settings.currencyRates.keys().hasOnly(["EUR", "TRY", "RUB"])
         && settings.currencyRates.keys().hasAll(["EUR", "TRY", "RUB"])
         && settings.currencyRates.EUR is number
         && settings.currencyRates.TRY is number
@@ -164,17 +156,8 @@ service cloud.firestore {
     }
 
     function isValidMainDoc(data) {
-      return data.keys().hasAll([
-          "clients",
-          "attendance",
-          "schedule",
-          "leads",
-          "tasks",
-          "staff",
-          "settings",
-          "changelog",
-        ])
-        && data.keys().hasOnly([
+      return data is map
+        && data.keys().hasAll([
           "clients",
           "attendance",
           "schedule",
@@ -196,6 +179,7 @@ service cloud.firestore {
         && data.tasks.all(task, isValidTask(task))
         && data.staff is list
         && data.staff.all(member, isValidStaff(member))
+        && data.settings is map
         && isValidSettings(data.settings)
         && data.changelog is list
         && data.changelog.all(entry, isValidChangelogEntry(entry));
