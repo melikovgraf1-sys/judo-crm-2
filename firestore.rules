@@ -142,6 +142,7 @@ service cloud.firestore {
           "currencyRates",
           "coachPayFormula",
         ])
+
         && isStringList(settings.areas)
         && isStringList(settings.groups)
         && isNumberMap(settings.limits)
