@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
 import Modal from "../Modal";
-import { fmtMoney, calcAgeYears, calcExperience } from "../../state/utils";
+import { fmtMoney, calcAgeYears, calcExperience, fmtDate } from "../../state/utils";
 import type { Client, UIState } from "../../types";
 
 type Props = {
@@ -9,9 +9,11 @@ type Props = {
   ui: UIState,
   onEdit: (c: Client) => void,
   onRemove: (id: string) => void,
+  onTogglePayFact: (id: string, value: boolean) => void,
+  onCreateTask: (client: Client) => void,
 };
 
-export default function ClientTable({ list, ui, onEdit, onRemove }: Props) {
+export default function ClientTable({ list, ui, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
   const [selected, setSelected] = useState<Client | null>(null);
 
   return (
@@ -26,6 +28,8 @@ export default function ClientTable({ list, ui, onEdit, onRemove }: Props) {
               <th className="text-left p-2">Группа</th>
               <th className="text-left p-2">Статус оплаты</th>
               <th className="text-left p-2">Сумма оплаты</th>
+              <th className="text-center p-2">Факт оплаты</th>
+              <th className="text-left p-2">Дата оплаты</th>
               <th className="text-right p-2">Действия</th>
             </tr>
           </thead>
@@ -54,7 +58,22 @@ export default function ClientTable({ list, ui, onEdit, onRemove }: Props) {
               </span>
             </td>
             <td className="p-2">{c.payAmount != null ? fmtMoney(c.payAmount, ui.currency) : "—"}</td>
+            <td className="p-2 text-center">
+              <input
+                type="checkbox"
+                aria-label={`Факт оплаты ${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`.trim()}
+                checked={Boolean(c.payConfirmed)}
+                onChange={e => onTogglePayFact(c.id, e.target.checked)}
+              />
+            </td>
+            <td className="p-2">{c.payDate ? fmtDate(c.payDate) : "—"}</td>
             <td className="p-2 text-right">
+              <button
+                onClick={() => onCreateTask(c)}
+                className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 mr-1 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                Создать задачу
+              </button>
               <button
                 onClick={() => onEdit(c)}
                 className="px-2 py-1 text-xs rounded-md border border-slate-300 mr-1 dark:border-slate-700 dark:bg-slate-800"

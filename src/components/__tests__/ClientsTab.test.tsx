@@ -21,11 +21,12 @@ jest.mock('../../state/utils', () => ({
   todayISO: jest.fn(),
   parseDateInput: jest.fn(),
   fmtMoney: jest.fn(),
+  fmtDate: jest.fn(),
 }));
 
 import ClientsTab from '../ClientsTab';
 import { commitDBUpdate } from '../../state/appState';
-import { uid, todayISO, parseDateInput, fmtMoney } from '../../state/utils';
+import { uid, todayISO, parseDateInput, fmtMoney, fmtDate } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -37,6 +38,7 @@ beforeEach(() => {
   todayISO.mockReturnValue('2024-01-01T00:00:00.000Z');
   parseDateInput.mockImplementation((v) => (v ? v + 'T00:00:00.000Z' : ''));
   fmtMoney.mockImplementation((v, c) => v + ' ' + c);
+  fmtDate.mockImplementation((iso) => iso);
   global.confirm = jest.fn(() => true);
   window.alert = jest.fn();
 });
@@ -188,4 +190,71 @@ test('delete: removes client after confirmation', async () => {
   expect(global.confirm).toHaveBeenCalled();
   await waitFor(() => expect(screen.queryByText('Del')).not.toBeInTheDocument());
   expect(getDB().clients.find(c => c.id === 'c1')).toBeUndefined();
+});
+
+test('updates payment fact when checkbox toggled', async () => {
+  const db = makeDB();
+  db.clients = [
+    {
+      id: 'c1',
+      firstName: 'Client',
+      lastName: '',
+      phone: '',
+      area: 'Area1',
+      group: 'Group1',
+      payStatus: 'ожидание',
+      payAmount: 0,
+      payConfirmed: false,
+    },
+  ];
+  const { getDB } = renderClients(db);
+
+  const checkbox = screen.getByRole('checkbox', { name: 'Факт оплаты Client' });
+  expect(checkbox).not.toBeChecked();
+
+  await userEvent.click(checkbox);
+
+  await waitFor(() => expect(getDB().clients[0].payConfirmed).toBe(true));
+});
+
+test('creates payment task with client info', async () => {
+  uid.mockReset();
+  uid
+    .mockReturnValueOnce('task-1')
+    .mockReturnValueOnce('log-1');
+
+  const db = makeDB();
+  db.clients = [
+    {
+      id: 'c1',
+      firstName: 'Ivan',
+      lastName: 'Petrov',
+      parentName: 'Parent',
+      phone: '',
+      area: 'Area1',
+      group: 'Group1',
+      payStatus: 'действует',
+      payAmount: 50,
+      payDate: '2024-02-01T00:00:00.000Z',
+      payConfirmed: true,
+    },
+  ];
+
+  const { getDB } = renderClients(db);
+
+  const row = screen.getByText('Ivan Petrov').closest('tr');
+  const createTaskBtn = within(row).getByRole('button', { name: 'Создать задачу' });
+
+  await userEvent.click(createTaskBtn);
+
+  await waitFor(() => expect(getDB().tasks).toHaveLength(1));
+  expect(getDB().tasks[0]).toEqual({
+    id: 'task-1',
+    title: 'Оплата клиента — Ivan Petrov • родитель: Parent • сумма: 50 EUR • дата: 2024-02-01',
+    due: '2024-02-01T00:00:00.000Z',
+    status: 'open',
+    topic: 'оплата',
+    assigneeType: 'client',
+    assigneeId: 'c1',
+  });
 });

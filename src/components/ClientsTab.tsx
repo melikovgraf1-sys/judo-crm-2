@@ -4,9 +4,9 @@ import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { uid, todayISO, parseDateInput } from "../state/utils";
+import { uid, todayISO, parseDateInput, fmtMoney } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues } from "../types";
+import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
 
 
 export default function ClientsTab({
@@ -70,6 +70,7 @@ export default function ClientsTab({
         ...prepared,
         coachId: db.staff.find(s => s.role === "Тренер")?.id,
         payAmount: 0,
+        payConfirmed: false,
       };
       const next = {
         ...db,
@@ -84,6 +85,55 @@ export default function ClientsTab({
     }
     setModalOpen(false);
     setEditing(null);
+  };
+
+  const togglePayFact = async (id: string, value: boolean) => {
+    const target = db.clients.find(c => c.id === id);
+    if (!target) return;
+    const next = {
+      ...db,
+      clients: db.clients.map(c => (c.id === id ? { ...c, payConfirmed: value } : c)),
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Обновлён факт оплаты ${target.firstName}`, when: todayISO() },
+      ],
+    };
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось обновить факт оплаты. Проверьте доступ к базе данных.");
+    }
+  };
+
+  const createPaymentTask = async (client: Client) => {
+    const titleParts = [
+      `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
+      client.parentName ? `родитель: ${client.parentName}` : null,
+      client.payAmount != null ? `сумма: ${fmtMoney(client.payAmount, ui.currency)}` : null,
+      client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
+    ].filter(Boolean);
+
+    const task: TaskItem = {
+      id: uid(),
+      title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
+      due: client.payDate || todayISO(),
+      status: "open",
+      topic: "оплата",
+      assigneeType: "client",
+      assigneeId: client.id,
+    };
+
+    const next = {
+      ...db,
+      tasks: [task, ...db.tasks],
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Создана задача по оплате ${client.firstName}`, when: todayISO() },
+      ],
+    };
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось создать задачу. Проверьте доступ к базе данных.");
+    }
   };
 
   const removeClient = async (id: string) => {
@@ -118,6 +168,8 @@ export default function ClientsTab({
         ui={ui}
         onEdit={startEdit}
         onRemove={removeClient}
+        onTogglePayFact={togglePayFact}
+        onCreateTask={createPaymentTask}
       />
       {modalOpen && (
         <ClientForm

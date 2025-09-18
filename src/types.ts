@@ -33,6 +33,7 @@ export interface Client {
   payStatus: PaymentStatus;
   payDate?: string; // ISO
   payAmount?: number;
+  payConfirmed?: boolean;
   // Автополя (рассчитываются на лету)
 }
 
