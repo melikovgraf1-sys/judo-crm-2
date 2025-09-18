@@ -1,19 +1,19 @@
 import React, { useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
-import Modal from "../Modal";
-import { fmtMoney, calcAgeYears, calcExperience, fmtDate } from "../../state/utils";
-import type { Client, UIState } from "../../types";
+import ClientDetailsModal from "./ClientDetailsModal";
+import { fmtMoney, fmtDate } from "../../state/utils";
+import type { Client, Currency } from "../../types";
 
 type Props = {
-  list: Client[],
-  ui: UIState,
-  onEdit: (c: Client) => void,
-  onRemove: (id: string) => void,
-  onTogglePayFact: (id: string, value: boolean) => void,
-  onCreateTask: (client: Client) => void,
+  list: Client[];
+  currency: Currency;
+  onEdit: (c: Client) => void;
+  onRemove: (id: string) => void;
+  onTogglePayFact: (id: string, value: boolean) => void;
+  onCreateTask: (client: Client) => void;
 };
 
-export default function ClientTable({ list, ui, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
+export default function ClientTable({ list, currency, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
 
   const [selected, setSelected] = useState<Client | null>(null);
 
@@ -58,7 +58,7 @@ export default function ClientTable({ list, ui, onEdit, onRemove, onTogglePayFac
                 {c.payStatus}
               </span>
             </td>
-            <td className="p-2">{c.payAmount != null ? fmtMoney(c.payAmount, ui.currency) : "—"}</td>
+            <td className="p-2">{c.payAmount != null ? fmtMoney(c.payAmount, currency) : "—"}</td>
             <td className="p-2 text-center">
               <input
                 type="checkbox"
