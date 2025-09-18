@@ -22,23 +22,50 @@ import type {
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
+  db: "judo_crm_db_v1",
 };
 
-export async function saveDB(dbData: DB) {
-  if (!firestore) {
-    console.warn("Firestore not initialized");
-    return;
+function readLocalDB(): DB | null {
+  try {
+    const raw = localStorage.getItem(LS_KEYS.db);
+    if (raw) {
+      return JSON.parse(raw) as DB;
+    }
+  } catch (err) {
+    console.warn("Failed to read DB from localStorage", err);
   }
+  return null;
+}
+
+function writeLocalDB(dbData: DB) {
+  try {
+    localStorage.setItem(LS_KEYS.db, JSON.stringify(dbData));
+  } catch (err) {
+    console.warn("Failed to persist DB to localStorage", err);
+  }
+}
+
+export async function saveDB(dbData: DB): Promise<boolean> {
+  writeLocalDB(dbData);
+
+  if (!firestore) {
+    console.warn("Firestore not initialized. Changes stored locally only.");
+    return true;
+  }
+
   const signedIn = await ensureSignedIn();
   if (!signedIn) {
-    throw new Error("Firebase authentication is required before saving data");
+    console.warn("Firebase authentication is required before saving data. Using local fallback.");
+    return true;
   }
+
   const ref = doc(firestore, "app", "main");
   try {
     await setDoc(ref, dbData);
+    return true;
   } catch (err) {
     console.error("Failed to save DB", err);
-    throw err;
+    return true;
   }
 }
 
@@ -46,14 +73,9 @@ export async function commitDBUpdate(
   next: DB,
   setDB: Dispatch<SetStateAction<DB>>,
 ): Promise<boolean> {
-  try {
-    await saveDB(next);
-    setDB(next);
-    return true;
-  } catch (err) {
-    console.error("Failed to persist DB update", err);
-    return false;
-  }
+  const persisted = await saveDB(next);
+  setDB(next);
+  return persisted;
 }
 
 const defaultUI: UIState = {
@@ -155,7 +177,7 @@ export interface AppState {
 }
 
 export function useAppState(): AppState {
-  const [db, setDB] = useState<DB>(makeSeedDB());
+  const [db, setDB] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
@@ -172,17 +194,21 @@ export function useAppState(): AppState {
     if (!firestore) {
       console.warn("Firestore not initialized");
       push("Нет подключения к базе данных", "error");
-      return;
+      return () => undefined;
     }
+
     const ref = doc(firestore, "app", "main");
     let unsub: (() => void) | undefined;
     try {
       unsub = onSnapshot(ref, async snap => {
         try {
           if (snap.exists()) {
-            setDB(snap.data() as DB);
+            const data = snap.data() as DB;
+            writeLocalDB(data);
+            setDB(data);
           } else {
             const seed = makeSeedDB();
+            writeLocalDB(seed);
             setDB(seed);
             const signedIn = await ensureSignedIn();
             if (!signedIn) {
