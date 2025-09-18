@@ -33,7 +33,6 @@ export interface Client {
   payStatus: PaymentStatus;
   payDate?: string; // ISO
   payAmount?: number;
-  payConfirmed?: boolean;
   // Автополя (рассчитываются на лету)
 }
 
@@ -51,6 +50,7 @@ export interface ClientFormValues {
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
   payDate: string;
+  payAmount: string;
 }
 
 export interface AttendanceEntry {

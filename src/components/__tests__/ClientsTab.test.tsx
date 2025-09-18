@@ -105,6 +105,7 @@ test('create: adds client through modal', async () => {
 
   await waitFor(() => expect(screen.getByText(/^Вася/)).toBeInTheDocument());
   expect(getDB().clients).toHaveLength(1);
+  expect(getDB().clients[0].payAmount).toBe(55);
 });
 
 test('read: filters clients by area, group and pay status', async () => {
@@ -158,7 +159,7 @@ test('update: edits client name', async () => {
   ];
   const { getDB } = renderClients(db);
 
-  await userEvent.click(screen.getByText('Редактировать'));
+  await userEvent.click(screen.getByRole('button', { name: /Old/ }));
   const modal = screen.getByText('Редактирование клиента').parentElement;
   const input = within(modal).getByText('Имя').parentElement.querySelector('input');
   const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');
@@ -192,31 +193,6 @@ test('delete: removes client after confirmation', async () => {
   expect(getDB().clients.find(c => c.id === 'c1')).toBeUndefined();
 });
 
-test('updates payment fact when checkbox toggled', async () => {
-  const db = makeDB();
-  db.clients = [
-    {
-      id: 'c1',
-      firstName: 'Client',
-      lastName: '',
-      phone: '',
-      area: 'Area1',
-      group: 'Group1',
-      payStatus: 'ожидание',
-      payAmount: 0,
-      payConfirmed: false,
-    },
-  ];
-  const { getDB } = renderClients(db);
-
-  const checkbox = screen.getByRole('checkbox', { name: 'Факт оплаты Client' });
-  expect(checkbox).not.toBeChecked();
-
-  await userEvent.click(checkbox);
-
-  await waitFor(() => expect(getDB().clients[0].payConfirmed).toBe(true));
-});
-
 test('creates payment task with client info', async () => {
   uid.mockReset();
   uid
@@ -236,7 +212,6 @@ test('creates payment task with client info', async () => {
       payStatus: 'действует',
       payAmount: 50,
       payDate: '2024-02-01T00:00:00.000Z',
-      payConfirmed: true,
     },
   ];
 
@@ -257,4 +232,39 @@ test('creates payment task with client info', async () => {
     assigneeType: 'client',
     assigneeId: 'c1',
   });
+  expect(getDB().clients[0].payStatus).toBe('задолженность');
+});
+
+test('individual group allows custom payment amount', async () => {
+  const db = makeDB();
+  db.settings.groups = ['Group1', 'индивидуальные'];
+  const { getDB } = renderClients(db);
+
+  await userEvent.click(screen.getByText('+ Добавить клиента'));
+  const modal = screen.getByText('Новый клиент').parentElement;
+
+  const groupSelect = within(modal).getByText('Группа').parentElement.querySelector('select');
+  await userEvent.selectOptions(groupSelect, 'индивидуальные');
+
+  const firstName = within(modal).getByText('Имя').parentElement.querySelector('input');
+  const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');
+  const birthDate = within(modal).getByText('Дата рождения').parentElement.querySelector('input');
+  const startDate = within(modal).getByText('Дата начала').parentElement.querySelector('input');
+  const payAmount = within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input');
+
+  await userEvent.type(firstName, 'Люба');
+  await userEvent.type(phone, '999');
+  fireEvent.change(birthDate, { target: { value: '2010-01-01' } });
+  fireEvent.change(startDate, { target: { value: '2024-01-01' } });
+
+  await waitFor(() => expect(payAmount).toHaveValue(125));
+  await userEvent.clear(payAmount);
+  await userEvent.type(payAmount, '200');
+
+  const saveBtn = within(modal).getByText('Сохранить');
+  await waitFor(() => expect(saveBtn).toBeEnabled());
+  await userEvent.click(saveBtn);
+
+  await waitFor(() => expect(getDB().clients[0].group).toBe('индивидуальные'));
+  expect(getDB().clients[0].payAmount).toBe(200);
 });

@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Modal from "../Modal";
 import { todayISO } from "../../state/utils";
+import { getDefaultPayAmount, shouldAllowCustomPayAmount } from "../../state/payments";
 import type { DB, Client, ClientFormValues } from "../../types";
 
 type Props = {
@@ -29,6 +30,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     birthDate: "2017-01-01",
     payDate: todayISO().slice(0, 10),
     parentName: "",
+    payAmount: String(getDefaultPayAmount(db.settings.groups[0]) ?? ""),
   }), [db.settings.areas, db.settings.groups]);
 
   const schema = yup.object({
@@ -46,7 +48,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
 
   const resolver = yupResolver(schema) as unknown as Resolver<ClientFormValues>;
 
-  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<ClientFormValues>({
+  const { register, handleSubmit, reset, formState: { errors, isValid }, watch, setValue } = useForm<ClientFormValues>({
     resolver,
     mode: "onChange",
     defaultValues: blankForm(),
@@ -68,12 +70,39 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         birthDate: editing.birthDate?.slice(0, 10) ?? "",
         payDate: editing.payDate?.slice(0, 10) ?? "",
         parentName: editing.parentName ?? "",
+        payAmount: editing.payAmount != null ? String(editing.payAmount) : String(getDefaultPayAmount(editing.group) ?? ""),
       };
       reset(values);
     } else {
       reset(blankForm());
     }
   }, [editing, reset, blankForm]);
+
+  const selectedGroup = watch("group");
+  const currentPayAmount = watch("payAmount");
+  const canEditPayAmount = shouldAllowCustomPayAmount(selectedGroup);
+  const defaultPayAmount = getDefaultPayAmount(selectedGroup);
+  const prevGroupRef = useRef<string | undefined>();
+
+  useEffect(() => {
+    const previousGroup = prevGroupRef.current;
+    prevGroupRef.current = selectedGroup;
+
+    if (!canEditPayAmount && defaultPayAmount != null) {
+      const targetValue = String(defaultPayAmount);
+      if (currentPayAmount !== targetValue) {
+        setValue("payAmount", targetValue, { shouldDirty: true, shouldValidate: false });
+      }
+      return;
+    }
+
+    if (canEditPayAmount && defaultPayAmount != null) {
+      const switchedGroup = previousGroup !== selectedGroup;
+      if (!currentPayAmount || switchedGroup) {
+        setValue("payAmount", String(defaultPayAmount), { shouldDirty: false, shouldValidate: false });
+      }
+    }
+  }, [canEditPayAmount, defaultPayAmount, currentPayAmount, selectedGroup, setValue]);
 
   return (
     <Modal size="xl" onClose={onClose}>
@@ -149,6 +178,20 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               <option>действует</option>
               <option>задолженность</option>
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">Сумма оплаты, €</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              className="px-3 py-2 rounded-md border border-slate-300"
+              {...register("payAmount")}
+              disabled={!canEditPayAmount && defaultPayAmount != null}
+              placeholder="Укажите сумму"
+            />
+            {!canEditPayAmount && defaultPayAmount != null && (
+              <span className="text-xs text-slate-500">Сумма фиксирована для этой группы</span>
+            )}
           </div>
         </div>
         <div className="flex justify-end gap-2">
