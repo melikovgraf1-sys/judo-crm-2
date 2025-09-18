@@ -8,37 +8,144 @@ import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
 import type {
-  DB,
-  UIState,
+  AttendanceEntry,
   Client,
+  DB,
   Lead,
-  TaskItem,
+  PerformanceEntry,
   Role,
+  ScheduleSlot,
+  Settings,
   StaffMember,
   TabKey,
+  TaskItem,
   Toast,
+  UIState,
 } from "../types";
 
 
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
+  db: "judo_crm_db_v1",
 };
 
-export async function saveDB(dbData: DB) {
+const DEFAULT_SETTINGS: Settings = {
+  areas: ["Махмутлар", "Центр", "Джикджилли"],
+  groups: ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"],
+  limits: Object.fromEntries(
+    ["Махмутлар", "Центр", "Джикджилли"].flatMap(area =>
+      ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"].map(group => [`${area}|${group}`, 20]),
+    ),
+  ) as Settings["limits"],
+  rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
+  currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
+  coachPayFormula: "фикс 100€ + 5€ за ученика",
+};
+
+function ensureArray<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is T => item != null);
+}
+
+function ensureObjectArray<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is T => typeof item === "object" && item != null);
+}
+
+function normalizeSettings(value: unknown): Settings {
+  if (!value || typeof value !== "object") {
+    return DEFAULT_SETTINGS;
+  }
+
+  const raw = value as Partial<Settings>;
+  const areas = ensureArray<string>(raw.areas);
+  const groups = ensureArray<string>(raw.groups);
+
+  return {
+    areas: areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
+    groups: groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,
+    limits: raw.limits && typeof raw.limits === "object" ? (raw.limits as Settings["limits"]) : DEFAULT_SETTINGS.limits,
+    rentByAreaEUR:
+      raw.rentByAreaEUR && typeof raw.rentByAreaEUR === "object"
+        ? (raw.rentByAreaEUR as Settings["rentByAreaEUR"])
+        : DEFAULT_SETTINGS.rentByAreaEUR,
+    currencyRates: raw.currencyRates
+      ? { ...DEFAULT_SETTINGS.currencyRates, ...raw.currencyRates }
+      : DEFAULT_SETTINGS.currencyRates,
+    coachPayFormula:
+      typeof raw.coachPayFormula === "string" ? raw.coachPayFormula : DEFAULT_SETTINGS.coachPayFormula,
+  };
+}
+
+function normalizeDB(value: unknown): DB | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const raw = value as Partial<DB>;
+
+  return {
+    clients: ensureObjectArray<Client>(raw.clients),
+    attendance: ensureObjectArray<AttendanceEntry>(raw.attendance),
+    performance: ensureObjectArray<PerformanceEntry>(raw.performance),
+    schedule: ensureObjectArray<ScheduleSlot>(raw.schedule),
+    leads: ensureObjectArray<Lead>(raw.leads),
+    tasks: ensureObjectArray<TaskItem>(raw.tasks),
+    staff: ensureObjectArray<StaffMember>(raw.staff),
+    settings: normalizeSettings(raw.settings),
+    changelog: ensureObjectArray<{ id: string; who: string; what: string; when: string }>(raw.changelog),
+  } as DB;
+}
+
+function readLocalDB(): DB | null {
+  try {
+    const raw = localStorage.getItem(LS_KEYS.db);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const normalized = normalizeDB(parsed);
+      if (normalized) {
+        return normalized;
+      }
+      localStorage.removeItem(LS_KEYS.db);
+    }
+  } catch (err) {
+    console.warn("Failed to read DB from localStorage", err);
+  }
+  return null;
+}
+
+function writeLocalDB(dbData: DB) {
+  try {
+    localStorage.setItem(LS_KEYS.db, JSON.stringify(dbData));
+  } catch (err) {
+    console.warn("Failed to persist DB to localStorage", err);
+  }
+}
+
+export async function saveDB(dbData: DB): Promise<boolean> {
   if (!firestore) {
-    console.warn("Firestore not initialized");
-    return;
+    console.warn("Firestore not initialized. Changes cannot be synchronized.");
+    return false;
   }
-  const signedIn = await ensureSignedIn();
-  if (!signedIn) {
-    throw new Error("Firebase authentication is required before saving data");
+
+  let signedIn = false;
+  try {
+    signedIn = await ensureSignedIn();
+  } catch (err) {
+    console.warn("Failed to verify Firebase authentication state", err);
   }
+
   const ref = doc(firestore, "app", "main");
   try {
     await setDoc(ref, dbData);
+    if (!signedIn) {
+      console.warn("Saved DB without confirmed Firebase authentication. Check security rules if data is missing remotely.");
+    }
+    writeLocalDB(dbData);
+    return true;
   } catch (err) {
     console.error("Failed to save DB", err);
-    throw err;
+    return false;
   }
 }
 
@@ -46,14 +153,11 @@ export async function commitDBUpdate(
   next: DB,
   setDB: Dispatch<SetStateAction<DB>>,
 ): Promise<boolean> {
-  try {
-    await saveDB(next);
+  const persisted = await saveDB(next);
+  if (persisted) {
     setDB(next);
-    return true;
-  } catch (err) {
-    console.error("Failed to persist DB update", err);
-    return false;
   }
+  return persisted;
 }
 
 const defaultUI: UIState = {
@@ -155,7 +259,7 @@ export interface AppState {
 }
 
 export function useAppState(): AppState {
-  const [db, setDB] = useState<DB>(makeSeedDB());
+  const [db, setDB] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
@@ -172,35 +276,70 @@ export function useAppState(): AppState {
     if (!firestore) {
       console.warn("Firestore not initialized");
       push("Нет подключения к базе данных", "error");
-      return;
+      return () => undefined;
     }
+
     const ref = doc(firestore, "app", "main");
     let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(ref, async snap => {
-        try {
-          if (snap.exists()) {
-            setDB(snap.data() as DB);
-          } else {
-            const seed = makeSeedDB();
-            setDB(seed);
-            const signedIn = await ensureSignedIn();
-            if (!signedIn) {
-              push("Не удалось авторизоваться в Firebase", "error");
-              throw new Error("Firebase authentication required before seeding data");
-            }
-            await setDoc(ref, seed);
-          }
-        } catch (err) {
-          console.error("Error processing snapshot", err);
-          push("Ошибка обновления данных", "error");
+    let cancelled = false;
+
+    const subscribe = async () => {
+      try {
+        const signedIn = await ensureSignedIn();
+        if (!signedIn) {
+          console.warn("Firebase authentication not confirmed. Firestore access may be limited.");
         }
-      });
-    } catch (err) {
-      console.error("Failed to subscribe to snapshot", err);
-      push("Не удалось подписаться на обновления", "error");
-    }
+      } catch (err) {
+        console.error("Failed to verify Firebase authentication state before subscribing", err);
+        push("Не удалось авторизоваться в Firebase", "error");
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      try {
+        unsub = onSnapshot(
+          ref,
+          async snap => {
+            try {
+              if (snap.exists()) {
+                const data = normalizeDB(snap.data());
+                if (data) {
+                  writeLocalDB(data);
+                  setDB(data);
+                }
+              } else {
+                const seed = makeSeedDB();
+                writeLocalDB(seed);
+                setDB(seed);
+                const signedIn = await ensureSignedIn();
+                if (!signedIn) {
+                  push("Не удалось авторизоваться в Firebase", "error");
+                  throw new Error("Firebase authentication required before seeding data");
+                }
+                await setDoc(ref, seed);
+              }
+            } catch (err) {
+              console.error("Error processing snapshot", err);
+              push("Ошибка обновления данных", "error");
+            }
+          },
+          err => {
+            console.error("Firestore snapshot error", err);
+            push("Нет доступа к базе данных", "error");
+          },
+        );
+      } catch (err) {
+        console.error("Failed to subscribe to snapshot", err);
+        push("Не удалось подписаться на обновления", "error");
+      }
+    };
+
+    subscribe();
+
     return () => {
+      cancelled = true;
       if (unsub) {
         unsub();
       }
@@ -215,10 +354,22 @@ export function useAppState(): AppState {
           if (raw != null) setUI(JSON.parse(raw) as UIState);
         } catch {}
       }
+      if (e.key === LS_KEYS.db) {
+        try {
+          const raw = localStorage.getItem(LS_KEYS.db);
+          if (raw != null) {
+            const parsed = JSON.parse(raw);
+            const normalized = normalizeDB(parsed);
+            if (normalized) {
+              setDB(normalized);
+            }
+          }
+        } catch {}
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [setUI]);
+  }, [setUI, setDB]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
