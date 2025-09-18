@@ -5,6 +5,7 @@ import Tabs from "./components/Tabs";
 import Dashboard from "./components/Dashboard";
 import ClientsTab from "./components/ClientsTab";
 import AttendanceTab from "./components/AttendanceTab";
+import PerformanceTab from "./components/PerformanceTab";
 import TasksTab from "./components/TasksTab";
 import ScheduleTab from "./components/ScheduleTab";
 import LeadsTab from "./components/LeadsTab";
@@ -58,7 +59,17 @@ export default function App() {
               path="/attendance"
               element={
                 can(ui.role, "attendance") ? (
-                  <AttendanceTab db={db} setDB={setDB} />
+                  <AttendanceTab db={db} setDB={setDB} currency={ui.currency} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
+              path="/performance"
+              element={
+                can(ui.role, "performance") ? (
+                  <PerformanceTab db={db} setDB={setDB} currency={ui.currency} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

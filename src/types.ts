@@ -60,6 +60,14 @@ export interface AttendanceEntry {
   sourceArea?: Area; // для отработок
 }
 
+export interface PerformanceEntry {
+  id: string;
+  clientId: string;
+  date: string; // ISO
+  successful: boolean;
+  note?: string;
+}
+
 export interface ScheduleSlot {
   id: string;
   area: Area;
@@ -127,6 +135,7 @@ export interface Settings {
 export interface DB {
   clients: Client[];
   attendance: AttendanceEntry[];
+  performance: PerformanceEntry[];
   schedule: ScheduleSlot[];
   leads: Lead[];
   tasks: TaskItem[];
@@ -148,6 +157,7 @@ export type TabKey =
   | "dashboard"
   | "clients"
   | "attendance"
+  | "performance"
   | "tasks"
   | "schedule"
   | "leads"

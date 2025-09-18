@@ -115,7 +115,7 @@ export default function ClientsTab({
       />
       <ClientTable
         list={list}
-        ui={ui}
+        currency={ui.currency}
         onEdit={startEdit}
         onRemove={removeClient}
       />
