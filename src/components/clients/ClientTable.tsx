@@ -25,6 +25,7 @@ const COLUMN_WIDTHS = [
   "260px", // actions
 ];
 
+
 export default function ClientTable({ list, currency, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
 
   const [selected, setSelected] = useState<Client | null>(null);
