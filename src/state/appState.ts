@@ -8,15 +8,19 @@ import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
 import type {
-  DB,
-  UIState,
+  AttendanceEntry,
   Client,
+  DB,
   Lead,
-  TaskItem,
+  PerformanceEntry,
   Role,
+  ScheduleSlot,
+  Settings,
   StaffMember,
   TabKey,
+  TaskItem,
   Toast,
+  UIState,
 } from "../types";
 
 
@@ -25,11 +29,84 @@ export const LS_KEYS = {
   db: "judo_crm_db_v1",
 };
 
+const DEFAULT_SETTINGS: Settings = {
+  areas: ["Махмутлар", "Центр", "Джикджилли"],
+  groups: ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"],
+  limits: Object.fromEntries(
+    ["Махмутлар", "Центр", "Джикджилли"].flatMap(area =>
+      ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"].map(group => [`${area}|${group}`, 20]),
+    ),
+  ) as Settings["limits"],
+  rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
+  currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
+  coachPayFormula: "фикс 100€ + 5€ за ученика",
+};
+
+function ensureArray<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is T => item != null);
+}
+
+function ensureObjectArray<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is T => typeof item === "object" && item != null);
+}
+
+function normalizeSettings(value: unknown): Settings {
+  if (!value || typeof value !== "object") {
+    return DEFAULT_SETTINGS;
+  }
+
+  const raw = value as Partial<Settings>;
+  const areas = ensureArray<string>(raw.areas);
+  const groups = ensureArray<string>(raw.groups);
+
+  return {
+    areas: areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
+    groups: groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,
+    limits: raw.limits && typeof raw.limits === "object" ? (raw.limits as Settings["limits"]) : DEFAULT_SETTINGS.limits,
+    rentByAreaEUR:
+      raw.rentByAreaEUR && typeof raw.rentByAreaEUR === "object"
+        ? (raw.rentByAreaEUR as Settings["rentByAreaEUR"])
+        : DEFAULT_SETTINGS.rentByAreaEUR,
+    currencyRates: raw.currencyRates
+      ? { ...DEFAULT_SETTINGS.currencyRates, ...raw.currencyRates }
+      : DEFAULT_SETTINGS.currencyRates,
+    coachPayFormula:
+      typeof raw.coachPayFormula === "string" ? raw.coachPayFormula : DEFAULT_SETTINGS.coachPayFormula,
+  };
+}
+
+function normalizeDB(value: unknown): DB | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const raw = value as Partial<DB>;
+
+  return {
+    clients: ensureObjectArray<Client>(raw.clients),
+    attendance: ensureObjectArray<AttendanceEntry>(raw.attendance),
+    performance: ensureObjectArray<PerformanceEntry>(raw.performance),
+    schedule: ensureObjectArray<ScheduleSlot>(raw.schedule),
+    leads: ensureObjectArray<Lead>(raw.leads),
+    tasks: ensureObjectArray<TaskItem>(raw.tasks),
+    staff: ensureObjectArray<StaffMember>(raw.staff),
+    settings: normalizeSettings(raw.settings),
+    changelog: ensureObjectArray<{ id: string; who: string; what: string; when: string }>(raw.changelog),
+  } as DB;
+}
+
 function readLocalDB(): DB | null {
   try {
     const raw = localStorage.getItem(LS_KEYS.db);
     if (raw) {
-      return JSON.parse(raw) as DB;
+      const parsed = JSON.parse(raw);
+      const normalized = normalizeDB(parsed);
+      if (normalized) {
+        return normalized;
+      }
+      localStorage.removeItem(LS_KEYS.db);
     }
   } catch (err) {
     console.warn("Failed to read DB from localStorage", err);
@@ -203,9 +280,11 @@ export function useAppState(): AppState {
       unsub = onSnapshot(ref, async snap => {
         try {
           if (snap.exists()) {
-            const data = snap.data() as DB;
-            writeLocalDB(data);
-            setDB(data);
+            const data = normalizeDB(snap.data());
+            if (data) {
+              writeLocalDB(data);
+              setDB(data);
+            }
           } else {
             const seed = makeSeedDB();
             writeLocalDB(seed);
