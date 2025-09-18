@@ -25,7 +25,7 @@ type VirtualizedTableProps<T> = {
   items: T[];
   rowHeight: number;
   height?: number;
-  renderRow: (item: T, style: React.CSSProperties) => React.ReactNode;
+  renderRow: (item: T, style: React.CSSProperties) => React.ReactElement;
 };
 
 export default function VirtualizedTable<T>({
