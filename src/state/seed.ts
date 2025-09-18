@@ -11,6 +11,7 @@ import type {
   StaffMember,
   TaskItem,
   AttendanceEntry,
+  PerformanceEntry,
 } from "../types";
 
 export function makeSeedDB(): DB {
@@ -128,12 +129,19 @@ export function makeSeedDB(): DB {
 
   const leads: Lead[] = [];
   const attendance: AttendanceEntry[] = [];
+  const performance: PerformanceEntry[] = [];
   for (const c of clients) {
     const entries = rnd(3, 8);
     for (let i = 0; i < entries; i++) {
       const d = new Date();
       d.setDate(d.getDate() - rnd(1, 25));
       attendance.push({ id: uid(), clientId: c.id, date: d.toISOString(), came: Math.random() < 0.8 });
+    }
+    const perfEntries = rnd(2, 5);
+    for (let i = 0; i < perfEntries; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - rnd(1, 30));
+      performance.push({ id: uid(), clientId: c.id, date: d.toISOString(), successful: Math.random() < 0.7 });
     }
   }
 
@@ -171,6 +179,7 @@ export function makeSeedDB(): DB {
   return {
     clients,
     attendance,
+    performance,
     schedule,
     leads,
     tasks,

@@ -1,4 +1,24 @@
 import React from "react";
+import { FixedSizeList, ListChildComponentProps } from "react-window";
+
+type TableBodyProps = React.HTMLAttributes<HTMLTableSectionElement> & {
+  style: React.CSSProperties;
+};
+
+const TableBodyInnerElement = React.forwardRef<HTMLTableSectionElement, TableBodyProps>(({ style, ...rest }, ref) => (
+  <tbody
+    ref={ref}
+    style={{
+      ...style,
+      position: "relative",
+      display: "block",
+      minWidth: "100%",
+    }}
+    {...rest}
+  />
+));
+
+TableBodyInnerElement.displayName = "TableBodyInnerElement";
 
 type VirtualizedTableProps<T> = {
   header: React.ReactNode;
@@ -15,21 +35,46 @@ export default function VirtualizedTable<T>({
   height = 400,
   renderRow,
 }: VirtualizedTableProps<T>) {
-  // Render a simple scrollable table. Virtualization was causing rows to
-  // overlap which resulted in unreadable data. For the current dataset size a
-  // basic table is sufficient and keeps the markup correct, preventing rows
-  // from stacking on top of each other.
+  const OuterElement = React.useMemo(
+    () =>
+      React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+        ({ children, className, style, ...rest }, ref) => (
+          <div
+            ref={ref}
+            className={`w-full overflow-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 ${
+              className ?? ""
+            }`}
+            style={{ ...style, height, maxHeight: height }}
+            {...rest}
+          >
+            <table className="w-full text-sm">
+              {header}
+              {children}
+            </table>
+          </div>
+        ),
+      ),
+    [header, height],
+  );
+
+  const renderItem = ({ index, style }: ListChildComponentProps) => {
+    const rowStyle: React.CSSProperties = {
+      ...style,
+      width: "100%",
+    };
+    return renderRow(items[index], rowStyle);
+  };
+
   return (
-    <div className="w-full overflow-auto rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-      <table className="w-full text-sm" style={{ maxHeight: height }}>
-        {header}
-        <tbody>
-          {items.map(item => {
-            const style: React.CSSProperties = { height: rowHeight };
-            return renderRow(item, style);
-          })}
-        </tbody>
-      </table>
-    </div>
+    <FixedSizeList
+      height={height}
+      itemCount={items.length}
+      itemSize={rowHeight}
+      width="100%"
+      outerElementType={OuterElement as unknown as React.ComponentType}
+      innerElementType={TableBodyInnerElement as unknown as React.ComponentType}
+    >
+      {renderItem}
+    </FixedSizeList>
   );
 }

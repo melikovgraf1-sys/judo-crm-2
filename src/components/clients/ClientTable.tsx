@@ -14,6 +14,7 @@ type Props = {
 };
 
 export default function ClientTable({ list, ui, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
+
   const [selected, setSelected] = useState<Client | null>(null);
 
   return (
@@ -92,71 +93,14 @@ export default function ClientTable({ list, ui, onEdit, onRemove, onTogglePayFac
       />
 
       {selected && (
-        <Modal size="md" onClose={() => setSelected(null)}>
-          <div className="font-semibold text-slate-800">
-            {selected.firstName} {selected.lastName}
-          </div>
-          <div className="grid gap-1 text-sm">
-            <div>
-              <span className="text-slate-500">Телефон:</span> {selected.phone || "—"}
-            </div>
-            <div>
-              <span className="text-slate-500">Канал:</span> {selected.channel}
-            </div>
-            <div>
-              <span className="text-slate-500">Родитель:</span> {selected.parentName || "—"}
-            </div>
-            <div>
-              <span className="text-slate-500">Дата рождения:</span> {selected.birthDate?.slice(0, 10)}
-            </div>
-            <div>
-              <span className="text-slate-500">Возраст:</span> {selected.birthDate ? `${calcAgeYears(selected.birthDate)} лет` : "—"}
-            </div>
-            <div>
-              <span className="text-slate-500">Район:</span> {selected.area}
-            </div>
-            <div>
-              <span className="text-slate-500">Группа:</span> {selected.group}
-            </div>
-            <div>
-              <span className="text-slate-500">Опыт:</span> {selected.startDate ? calcExperience(selected.startDate) : "—"}
-            </div>
-            <div>
-              <span className="text-slate-500">Статус оплаты:</span> {selected.payStatus}
-            </div>
-            <div>
-              <span className="text-slate-500">Дата оплаты:</span> {selected.payDate?.slice(0, 10) || "—"}
-            </div>
-            <div>
-              <span className="text-slate-500">Сумма оплаты:</span> {selected.payAmount != null ? fmtMoney(selected.payAmount, ui.currency) : "—"}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                onEdit(selected);
-                setSelected(null);
-              }}
-              className="px-3 py-2 rounded-md border border-slate-300"
-            >
-              Редактировать
-            </button>
-            <button
-              onClick={() => {
-                onRemove(selected.id);
-                setSelected(null);
-              }}
-              className="px-3 py-2 rounded-md border border-rose-200 text-rose-600"
-            >
-              Удалить
-            </button>
-            <button onClick={() => setSelected(null)} className="px-3 py-2 rounded-md border border-slate-300">
-              Закрыть
-            </button>
-          </div>
-        </Modal>
+        <ClientDetailsModal
+          client={selected}
+          currency={currency}
+          onEdit={onEdit}
+          onRemove={onRemove}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   );
 }
-
