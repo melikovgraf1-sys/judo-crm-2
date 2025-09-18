@@ -281,36 +281,65 @@ export function useAppState(): AppState {
 
     const ref = doc(firestore, "app", "main");
     let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(ref, async snap => {
-        try {
-          if (snap.exists()) {
-            const data = normalizeDB(snap.data());
-            if (data) {
-              writeLocalDB(data);
-              setDB(data);
-            }
-          } else {
-            const seed = makeSeedDB();
-            writeLocalDB(seed);
-            setDB(seed);
-            const signedIn = await ensureSignedIn();
-            if (!signedIn) {
-              push("Не удалось авторизоваться в Firebase", "error");
-              throw new Error("Firebase authentication required before seeding data");
-            }
-            await setDoc(ref, seed);
-          }
-        } catch (err) {
-          console.error("Error processing snapshot", err);
-          push("Ошибка обновления данных", "error");
+    let cancelled = false;
+
+    const subscribe = async () => {
+      try {
+        const signedIn = await ensureSignedIn();
+        if (!signedIn) {
+          console.warn("Firebase authentication not confirmed. Firestore access may be limited.");
         }
-      });
-    } catch (err) {
-      console.error("Failed to subscribe to snapshot", err);
-      push("Не удалось подписаться на обновления", "error");
-    }
+      } catch (err) {
+        console.error("Failed to verify Firebase authentication state before subscribing", err);
+        push("Не удалось авторизоваться в Firebase", "error");
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      try {
+        unsub = onSnapshot(
+          ref,
+          async snap => {
+            try {
+              if (snap.exists()) {
+                const data = normalizeDB(snap.data());
+                if (data) {
+                  writeLocalDB(data);
+                  setDB(data);
+                }
+              } else {
+                const seed = makeSeedDB();
+                writeLocalDB(seed);
+                setDB(seed);
+                const signedIn = await ensureSignedIn();
+                if (!signedIn) {
+                  push("Не удалось авторизоваться в Firebase", "error");
+                  throw new Error("Firebase authentication required before seeding data");
+                }
+                await setDoc(ref, seed);
+              }
+            } catch (err) {
+              console.error("Error processing snapshot", err);
+              push("Ошибка обновления данных", "error");
+            }
+          },
+          err => {
+            console.error("Firestore snapshot error", err);
+            push("Нет доступа к базе данных", "error");
+          },
+        );
+      } catch (err) {
+        console.error("Failed to subscribe to snapshot", err);
+        push("Не удалось подписаться на обновления", "error");
+      }
+    };
+
+    subscribe();
+
     return () => {
+      cancelled = true;
       if (unsub) {
         unsub();
       }
