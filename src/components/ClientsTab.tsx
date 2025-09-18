@@ -6,6 +6,7 @@ import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { uid, todayISO, parseDateInput, fmtMoney } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import { applyPaymentStatusRules, getDefaultPayAmount, shouldAllowCustomPayAmount } from "../state/payments";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
 
 
@@ -45,9 +46,31 @@ export default function ClientsTab({
     setModalOpen(true);
   };
 
+  const resolvePayAmount = (rawValue: string, group: Group, previous?: number): number | undefined => {
+    const defaultAmount = getDefaultPayAmount(group);
+    if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    const parsed = Number.parseFloat(rawValue);
+    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+      return parsed;
+    }
+
+    if (defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    return previous;
+  };
+
   const saveClient = async (data: ClientFormValues) => {
+    const { payAmount: payAmountRaw, ...rest } = data;
+    const resolvedPayAmount = resolvePayAmount(payAmountRaw, rest.group, editing?.payAmount);
+
     const prepared = {
-      ...data,
+      ...rest,
+      payAmount: resolvedPayAmount,
       birthDate: parseDateInput(data.birthDate),
       startDate: parseDateInput(data.startDate),
       payDate: parseDateInput(data.payDate),
@@ -69,8 +92,6 @@ export default function ClientsTab({
         id: uid(),
         ...prepared,
         coachId: db.staff.find(s => s.role === "Тренер")?.id,
-        payAmount: 0,
-        payConfirmed: false,
       };
       const next = {
         ...db,
@@ -85,23 +106,6 @@ export default function ClientsTab({
     }
     setModalOpen(false);
     setEditing(null);
-  };
-
-  const togglePayFact = async (id: string, value: boolean) => {
-    const target = db.clients.find(c => c.id === id);
-    if (!target) return;
-    const next = {
-      ...db,
-      clients: db.clients.map(c => (c.id === id ? { ...c, payConfirmed: value } : c)),
-      changelog: [
-        ...db.changelog,
-        { id: uid(), who: "UI", what: `Обновлён факт оплаты ${target.firstName}`, when: todayISO() },
-      ],
-    };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось обновить факт оплаты. Проверьте доступ к базе данных.");
-    }
   };
 
   const createPaymentTask = async (client: Client) => {
@@ -122,9 +126,12 @@ export default function ClientsTab({
       assigneeId: client.id,
     };
 
+    const nextTasks = [task, ...db.tasks];
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks);
     const next = {
       ...db,
-      tasks: [task, ...db.tasks],
+      tasks: nextTasks,
+      clients: nextClients,
       changelog: [
         ...db.changelog,
         { id: uid(), who: "UI", what: `Создана задача по оплате ${client.firstName}`, when: todayISO() },
@@ -168,7 +175,6 @@ export default function ClientsTab({
         currency={ui.currency}
         onEdit={startEdit}
         onRemove={removeClient}
-        onTogglePayFact={togglePayFact}
         onCreateTask={createPaymentTask}
       />
       {modalOpen && (
