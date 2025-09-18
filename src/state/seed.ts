@@ -115,6 +115,7 @@ export function makeSeedDB(): DB {
       payStatus: "действует",
       payDate: start.toISOString(),
       payAmount: rnd(50, 100),
+      payConfirmed: Math.random() < 0.7,
     } as Client;
   });
 
