@@ -16,6 +16,7 @@ export default function AttendanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
+  const COLUMN_TEMPLATE = "220px 1fr 1fr 180px";
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
   const [selected, setSelected] = useState<Client | null>(null);
@@ -73,11 +74,15 @@ export default function AttendanceTab({
       <VirtualizedTable
         header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <tr>
+            <tr
+              style={{ display: "grid", gridTemplateColumns: COLUMN_TEMPLATE, alignItems: "center" }}
+            >
               <th className="text-left p-2">Ученик</th>
               <th className="text-left p-2">Район</th>
               <th className="text-left p-2">Группа</th>
-              <th className="text-left p-2">Отметка</th>
+              <th className="text-left p-2" style={{ justifySelf: "end" }}>
+                Отметка
+              </th>
             </tr>
           </thead>
         )}
@@ -86,7 +91,16 @@ export default function AttendanceTab({
         renderRow={(c, style) => {
           const m = todayMarks.get(c.id);
           return (
-            <tr key={c.id} style={style} className="border-t border-slate-100 dark:border-slate-700">
+            <tr
+              key={c.id}
+              style={{
+                ...style,
+                display: "grid",
+                gridTemplateColumns: COLUMN_TEMPLATE,
+                alignItems: "center",
+              }}
+              className="border-t border-slate-100 dark:border-slate-700"
+            >
               <td className="p-2">
                 <button
                   type="button"
@@ -98,8 +112,15 @@ export default function AttendanceTab({
               </td>
               <td className="p-2">{c.area}</td>
               <td className="p-2">{c.group}</td>
-              <td className="p-2">
-                <button onClick={() => toggle(c.id)} className={`px-3 py-1 rounded-md text-xs border ${m?.came ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700" : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"}`}>
+              <td className="p-2 flex justify-end">
+                <button
+                  onClick={() => toggle(c.id)}
+                  className={`px-3 py-1 rounded-md text-xs border ${
+                    m?.came
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
+                      : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
+                  }`}
+                >
                   {m?.came ? "пришёл" : "не отмечен"}
                 </button>
               </td>
