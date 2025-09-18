@@ -25,6 +25,7 @@ const COLUMN_WIDTHS = [
   "260px", // actions
 ];
 
+const COLUMN_TEMPLATE = COLUMN_WIDTHS.join(" ");
 
 export default function ClientTable({ list, currency, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
 
@@ -35,32 +36,35 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onToggle
       <VirtualizedTable
         header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <tr className="w-full">
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[0] }}>
+            <tr
+              className="w-full"
+              style={{ display: "grid", gridTemplateColumns: COLUMN_TEMPLATE, alignItems: "center" }}
+            >
+              <th className="text-left p-2">
                 Имя
               </th>
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[1] }}>
+              <th className="text-left p-2">
                 Телефон
               </th>
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[2] }}>
+              <th className="text-left p-2">
                 Район
               </th>
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[3] }}>
+              <th className="text-left p-2">
                 Группа
               </th>
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[4] }}>
+              <th className="text-left p-2">
                 Статус оплаты
               </th>
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[5] }}>
+              <th className="text-left p-2">
                 Сумма оплаты
               </th>
-              <th className="text-center p-2" style={{ width: COLUMN_WIDTHS[6] }}>
+              <th className="text-center p-2">
                 Факт оплаты
               </th>
-              <th className="text-left p-2" style={{ width: COLUMN_WIDTHS[7] }}>
+              <th className="text-left p-2">
                 Дата оплаты
               </th>
-              <th className="text-right p-2" style={{ width: COLUMN_WIDTHS[8] }}>
+              <th className="text-right p-2" style={{ justifySelf: "end" }}>
                 Действия
               </th>
             </tr>
@@ -69,20 +73,38 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onToggle
         items={list}
         rowHeight={48}
         renderRow={(c, style) => (
-          <tr key={c.id} style={style} className="border-t border-slate-100 dark:border-slate-700">
-            <td className="p-2 cursor-pointer" style={{ width: COLUMN_WIDTHS[0] }} onClick={() => setSelected(c)}>
-              {c.firstName} {c.lastName}
+          <tr
+            key={c.id}
+            style={{
+              ...style,
+              display: "grid",
+              gridTemplateColumns: COLUMN_TEMPLATE,
+              alignItems: "center",
+            }}
+            className="border-t border-slate-100 dark:border-slate-700"
+          >
+            <td className="p-2" onClick={() => setSelected(c)}>
+              <button
+                type="button"
+                onClick={e => {
+                  e.stopPropagation();
+                  onEdit(c);
+                }}
+                className="text-left text-sky-600 hover:underline focus:outline-none dark:text-sky-400"
+              >
+                {c.firstName} {c.lastName}
+              </button>
             </td>
-            <td className="p-2" style={{ width: COLUMN_WIDTHS[1] }}>
+            <td className="p-2">
               {c.phone}
             </td>
-            <td className="p-2" style={{ width: COLUMN_WIDTHS[2] }}>
+            <td className="p-2">
               {c.area}
             </td>
-            <td className="p-2" style={{ width: COLUMN_WIDTHS[3] }}>
+            <td className="p-2">
               {c.group}
             </td>
-            <td className="p-2" style={{ width: COLUMN_WIDTHS[4] }}>
+            <td className="p-2">
               <span
                 className={`px-2 py-1 rounded-full text-xs ${
                   c.payStatus === "действует"
@@ -95,10 +117,10 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onToggle
                 {c.payStatus}
               </span>
             </td>
-            <td className="p-2" style={{ width: COLUMN_WIDTHS[5] }}>
+            <td className="p-2">
               {c.payAmount != null ? fmtMoney(c.payAmount, currency) : "—"}
             </td>
-            <td className="p-2 text-center" style={{ width: COLUMN_WIDTHS[6] }}>
+            <td className="p-2 text-center">
               <input
                 type="checkbox"
                 aria-label={`Факт оплаты ${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`.trim()}
@@ -106,19 +128,19 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onToggle
                 onChange={e => onTogglePayFact(c.id, e.target.checked)}
               />
             </td>
-            <td className="p-2" style={{ width: COLUMN_WIDTHS[7] }}>
+            <td className="p-2">
               {c.payDate ? fmtDate(c.payDate) : "—"}
             </td>
-            <td className="p-2 text-right" style={{ width: COLUMN_WIDTHS[8] }}>
+            <td className="p-2 flex justify-end gap-1">
               <button
                 onClick={() => onCreateTask(c)}
-                className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 mr-1 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
               >
                 Создать задачу
               </button>
               <button
                 onClick={() => onEdit(c)}
-                className="px-2 py-1 text-xs rounded-md border border-slate-300 mr-1 dark:border-slate-700 dark:bg-slate-800"
+                className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
               >
                 Редактировать
               </button>
