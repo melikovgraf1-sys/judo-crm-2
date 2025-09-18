@@ -123,11 +123,9 @@ function writeLocalDB(dbData: DB) {
 }
 
 export async function saveDB(dbData: DB): Promise<boolean> {
-  writeLocalDB(dbData);
-
   if (!firestore) {
-    console.warn("Firestore not initialized. Changes stored locally only.");
-    return true;
+    console.warn("Firestore not initialized. Changes cannot be synchronized.");
+    return false;
   }
 
   let signedIn = false;
@@ -143,6 +141,7 @@ export async function saveDB(dbData: DB): Promise<boolean> {
     if (!signedIn) {
       console.warn("Saved DB without confirmed Firebase authentication. Check security rules if data is missing remotely.");
     }
+    writeLocalDB(dbData);
     return true;
   } catch (err) {
     console.error("Failed to save DB", err);
@@ -155,7 +154,9 @@ export async function commitDBUpdate(
   setDB: Dispatch<SetStateAction<DB>>,
 ): Promise<boolean> {
   const persisted = await saveDB(next);
-  setDB(next);
+  if (persisted) {
+    setDB(next);
+  }
   return persisted;
 }
 
