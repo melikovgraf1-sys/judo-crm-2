@@ -29,13 +29,15 @@ const requiredConfigKeys: Array<keyof FirebaseOptions> = [
   "appId",
 ];
 
-const hasRequiredFirebaseConfig = requiredConfigKeys.every((key) =>
-  Boolean(firebaseConfig[key])
-);
+const missingKeys = requiredConfigKeys.filter((key) => !firebaseConfig[key]);
+
+const hasRequiredFirebaseConfig = missingKeys.length === 0;
 
 const app: FirebaseApp | undefined = hasRequiredFirebaseConfig
   ? initializeApp(firebaseConfig)
-  : (console.warn("Firebase configuration is incomplete. Skipping initialization."), undefined);
+  : (console.warn(
+      `Firebase configuration is missing required keys: ${missingKeys.join(", ")}. Refer to .env.example to configure them so Firebase sync can initialize.`,
+    ), undefined);
 
 const db = app ? getFirestore(app) : undefined;
 const auth = app ? getAuth(app) : undefined;
