@@ -128,7 +128,8 @@ function writeLocalDB(dbData: DB) {
 export async function saveDB(dbData: DB): Promise<boolean> {
   if (!firestore) {
     console.warn("Firestore not initialized. Changes cannot be synchronized.");
-    return false;
+    writeLocalDB(dbData);
+    return true;
   }
 
   let signedIn = false;
