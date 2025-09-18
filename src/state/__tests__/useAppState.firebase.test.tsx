@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 
-import { useAppState } from "../appState";
+import { LOCAL_ONLY_MESSAGE, useAppState } from "../appState";
 
 const mockPush = jest.fn();
 
@@ -26,12 +26,13 @@ describe("useAppState without firebase configuration", () => {
     mockPush.mockClear();
   });
 
-  it("shows the offline toast only once", async () => {
+  it("shows the local-only toast only once", async () => {
     const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
 
-    renderHook(() => useAppState(), { wrapper });
+    const { result } = renderHook(() => useAppState(), { wrapper });
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
-    expect(mockPush).toHaveBeenCalledWith("Нет подключения к базе данных", "error");
+    expect(mockPush).toHaveBeenCalledWith(LOCAL_ONLY_MESSAGE, "warning");
+    expect(result.current.isLocalOnly).toBe(true);
   });
 });

@@ -29,6 +29,9 @@ export const LS_KEYS = {
   db: "judo_crm_db_v1",
 };
 
+export const LOCAL_ONLY_MESSAGE =
+  "Данные сейчас сохраняются только в этом браузере — синхронизация с Firebase отключена, поэтому содержимое может отличаться в других окнах.";
+
 const DEFAULT_SETTINGS: Settings = {
   areas: ["Махмутлар", "Центр", "Джикджилли"],
   groups: ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"],
@@ -250,6 +253,7 @@ export interface AppState {
   setUI: Dispatch<SetStateAction<UIState>>;
   roles: Role[];
   toasts: Toast[];
+  isLocalOnly: boolean;
   quickOpen: boolean;
   onQuickAdd: () => void;
   setQuickOpen: Dispatch<SetStateAction<boolean>>;
@@ -264,7 +268,21 @@ export function useAppState(): AppState {
   const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
   const { toasts, push } = useToasts();
   const [quickOpen, setQuickOpen] = useState(false);
+  const [isLocalOnly, setIsLocalOnly] = useState<boolean>(() => !firestore);
   const location = useLocation();
+  const localOnlyToastShownRef = useRef(false);
+
+  useEffect(() => {
+    if (isLocalOnly) {
+      if (!localOnlyToastShownRef.current) {
+        console.info(LOCAL_ONLY_MESSAGE);
+        push(LOCAL_ONLY_MESSAGE, "warning");
+        localOnlyToastShownRef.current = true;
+      }
+    } else {
+      localOnlyToastShownRef.current = false;
+    }
+  }, [isLocalOnly, push]);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -275,7 +293,7 @@ export function useAppState(): AppState {
   useEffect(() => {
     if (!firestore) {
       console.warn("Firestore not initialized");
-      push("Нет подключения к базе данных", "error");
+      setIsLocalOnly(true);
       return () => undefined;
     }
 
@@ -308,8 +326,10 @@ export function useAppState(): AppState {
                 if (data) {
                   writeLocalDB(data);
                   setDB(data);
+                  setIsLocalOnly(false);
                 }
               } else {
+                setIsLocalOnly(true);
                 const seed = makeSeedDB();
                 writeLocalDB(seed);
                 setDB(seed);
@@ -328,6 +348,7 @@ export function useAppState(): AppState {
           err => {
             console.error("Firestore snapshot error", err);
             push("Нет доступа к базе данных", "error");
+            setIsLocalOnly(true);
           },
         );
       } catch (err) {
@@ -472,6 +493,7 @@ export function useAppState(): AppState {
     setUI,
     roles,
     toasts,
+    isLocalOnly,
     quickOpen,
     onQuickAdd,
     setQuickOpen,

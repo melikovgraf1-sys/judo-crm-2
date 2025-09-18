@@ -14,7 +14,7 @@ import AppealsTab from "./components/AppealsTab";
 import QuickAddModal from "./components/QuickAddModal";
 import Toasts from "./components/Toasts";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { useAppState, can } from "./state/appState";
+import { useAppState, can, LOCAL_ONLY_MESSAGE } from "./state/appState";
 
 export default function App() {
   /** @type {import("./state/appState").AppState} */
@@ -27,6 +27,7 @@ export default function App() {
     setUI,
     roles,
     toasts,
+    isLocalOnly,
     quickOpen,
     onQuickAdd,
     setQuickOpen,
@@ -38,6 +39,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100">
       <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
+      {isLocalOnly ? (
+        <div className="bg-amber-100 border-y border-amber-200 text-amber-900 dark:bg-amber-900/70 dark:border-amber-800 dark:text-amber-100">
+          <div className="max-w-7xl mx-auto px-3 py-2 text-sm font-medium" role="alert">
+            {LOCAL_ONLY_MESSAGE}
+          </div>
+        </div>
+      ) : null}
       <Tabs role={ui.role} />
 
       <main className="max-w-7xl mx-auto p-3 space-y-3">
