@@ -71,6 +71,7 @@ export function can(
     | "all"
     | "manage_clients"
     | "attendance"
+    | "performance"
     | "schedule"
     | "leads"
     | "tasks"
@@ -79,12 +80,12 @@ export function can(
 ) {
   if (role === "Администратор") return true;
   if (role === "Менеджер") {
-    return ["manage_clients", "leads", "tasks", "attendance", "schedule", "appeals"].includes(
+    return ["manage_clients", "leads", "tasks", "attendance", "performance", "schedule", "appeals"].includes(
       feature,
     );
   }
   if (role === "Тренер") {
-    return ["attendance", "schedule"].includes(feature);
+    return ["attendance", "performance", "schedule"].includes(feature);
   }
   return false;
 }
