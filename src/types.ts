@@ -165,5 +165,9 @@ export type TabKey =
   | "appeals"
   | "settings";
 
-export type Toast = { id: string; text: string; type?: "success" | "error" | "info" };
+export type Toast = {
+  id: string;
+  text: string;
+  type?: "success" | "error" | "info" | "warning";
+};
 
