@@ -130,19 +130,23 @@ export async function saveDB(dbData: DB): Promise<boolean> {
     return true;
   }
 
-  const signedIn = await ensureSignedIn();
-  if (!signedIn) {
-    console.warn("Firebase authentication is required before saving data. Using local fallback.");
-    return true;
+  let signedIn = false;
+  try {
+    signedIn = await ensureSignedIn();
+  } catch (err) {
+    console.warn("Failed to verify Firebase authentication state", err);
   }
 
   const ref = doc(firestore, "app", "main");
   try {
     await setDoc(ref, dbData);
+    if (!signedIn) {
+      console.warn("Saved DB without confirmed Firebase authentication. Check security rules if data is missing remotely.");
+    }
     return true;
   } catch (err) {
     console.error("Failed to save DB", err);
-    return true;
+    return false;
   }
 }
 
@@ -320,10 +324,22 @@ export function useAppState(): AppState {
           if (raw != null) setUI(JSON.parse(raw) as UIState);
         } catch {}
       }
+      if (e.key === LS_KEYS.db) {
+        try {
+          const raw = localStorage.getItem(LS_KEYS.db);
+          if (raw != null) {
+            const parsed = JSON.parse(raw);
+            const normalized = normalizeDB(parsed);
+            if (normalized) {
+              setDB(normalized);
+            }
+          }
+        } catch {}
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [setUI]);
+  }, [setUI, setDB]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
