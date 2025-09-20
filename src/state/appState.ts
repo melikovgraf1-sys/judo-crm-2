@@ -432,6 +432,7 @@ export function useAppState(): AppState {
       startDate: todayISO(),
       payMethod: "перевод",
       payStatus: "ожидание",
+      status: "новый",
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
     if (await commitDBUpdate(next, setDB)) {

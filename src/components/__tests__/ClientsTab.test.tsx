@@ -46,7 +46,11 @@ beforeEach(() => {
 const makeDB = () => ({
   clients: [],
   attendance: [],
-  schedule: [],
+  schedule: [
+    { id: 'slot-1', area: 'Area1', group: 'Group1', coachId: 's1', weekday: 1, time: '10:00', location: '' },
+    { id: 'slot-2', area: 'Area1', group: 'Group2', coachId: 's1', weekday: 2, time: '11:00', location: '' },
+    { id: 'slot-3', area: 'Area2', group: 'Group1', coachId: 's1', weekday: 3, time: '12:00', location: '' },
+  ],
   leads: [],
   tasks: [],
   staff: [{ id: 's1', role: 'Тренер', name: 'Coach1' }],
@@ -70,22 +74,43 @@ const makeUI = () => ({
   theme: 'light',
 });
 
-const renderClients = (db = makeDB(), ui = makeUI()) => {
+const renderClients = (db = makeDB(), ui = makeUI(), initialFilters = {}) => {
   let current = db;
   const Wrapper = () => {
     const [state, setState] = React.useState(db);
     const [uiState] = React.useState(ui);
     const setDB = (next) => { current = next; setState(next); };
-    return <ClientsTab db={state} setDB={setDB} ui={uiState} />;
+    return <ClientsTab db={state} setDB={setDB} ui={uiState} {...initialFilters} />;
   };
   const utils = render(<Wrapper />);
   return { ...utils, getDB: () => current };
 };
 
+const makeClient = (overrides = {}) => ({
+  id: 'client-id',
+  firstName: 'Имя',
+  lastName: '',
+  phone: '',
+  channel: 'Telegram',
+  birthDate: '2010-01-01T00:00:00.000Z',
+  parentName: '',
+  gender: 'м',
+  area: 'Area1',
+  group: 'Group1',
+  startDate: '2024-01-01T00:00:00.000Z',
+  payMethod: 'перевод',
+  payStatus: 'ожидание',
+  status: 'действующий',
+  payDate: '2024-01-10T00:00:00.000Z',
+  payAmount: 55,
+  remainingLessons: 5,
+  ...overrides,
+});
 
 test('create: adds client through modal', async () => {
-  const { getDB } = renderClients();
+  const { getDB, unmount } = renderClients();
 
+  expect(screen.getByText('Выберите район и группу')).toBeInTheDocument();
   await userEvent.click(screen.getByText('+ Добавить клиента'));
   const modal = screen.getByText('Новый клиент').parentElement;
 
@@ -103,40 +128,36 @@ test('create: adds client through modal', async () => {
   await waitFor(() => expect(saveBtn).toBeEnabled());
   await userEvent.click(saveBtn);
 
+  await waitFor(() => expect(getDB().clients).toHaveLength(1));
+  unmount();
+  renderClients(getDB(), makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
   await waitFor(() => expect(screen.getByText(/^Вася/)).toBeInTheDocument());
   expect(getDB().clients).toHaveLength(1);
   expect(getDB().clients[0].payAmount).toBe(55);
 });
 
-test('read: filters clients by area, group and pay status', async () => {
+test('read: filters clients by area, group and pay status', () => {
   const db = makeDB();
   db.clients = [
-    { id: 'c1', firstName: 'A', lastName: '', phone: '', area: 'Area1', group: 'Group1', payStatus: 'ожидание', payAmount: 0 },
-    { id: 'c2', firstName: 'B', lastName: '', phone: '', area: 'Area2', group: 'Group1', payStatus: 'действует', payAmount: 0 },
-    { id: 'c3', firstName: 'C', lastName: '', phone: '', area: 'Area1', group: 'Group2', payStatus: 'задолженность', payAmount: 0 },
+    makeClient({ id: 'c1', firstName: 'A', area: 'Area1', group: 'Group1', payStatus: 'ожидание' }),
+    makeClient({ id: 'c2', firstName: 'B', area: 'Area2', group: 'Group1', payStatus: 'действует' }),
+    makeClient({ id: 'c3', firstName: 'C', area: 'Area1', group: 'Group2', payStatus: 'задолженность' }),
   ];
-  const { getByText } = renderClients(db);
 
-  expect(getByText('A')).toBeInTheDocument();
-  expect(getByText('B')).toBeInTheDocument();
-  expect(getByText('C')).toBeInTheDocument();
-
-  await userEvent.click(screen.getByRole('button', { name: 'Area1' }));
-  expect(getByText('A')).toBeInTheDocument();
-  expect(getByText('C')).toBeInTheDocument();
+  const view1 = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+  expect(screen.getByText('A')).toBeInTheDocument();
   expect(screen.queryByText('B')).not.toBeInTheDocument();
+  expect(screen.queryByText('C')).not.toBeInTheDocument();
+  view1.unmount();
 
-  await userEvent.click(getByText('Все районы'));
-  const [groupSelect, paySelect] = screen.getAllByRole('combobox');
-
-  await userEvent.selectOptions(groupSelect, 'Group2');
-  expect(getByText('C')).toBeInTheDocument();
+  const view2 = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group2' });
+  expect(screen.getByText('C')).toBeInTheDocument();
   expect(screen.queryByText('A')).not.toBeInTheDocument();
   expect(screen.queryByText('B')).not.toBeInTheDocument();
+  view2.unmount();
 
-  await userEvent.selectOptions(groupSelect, 'all');
-  await userEvent.selectOptions(paySelect, 'действует');
-  expect(getByText('B')).toBeInTheDocument();
+  renderClients(db, makeUI(), { initialArea: 'Area2', initialGroup: 'Group1', initialPay: 'действует' });
+  expect(screen.getByText('B')).toBeInTheDocument();
   expect(screen.queryByText('A')).not.toBeInTheDocument();
   expect(screen.queryByText('C')).not.toBeInTheDocument();
 });
@@ -144,21 +165,10 @@ test('read: filters clients by area, group and pay status', async () => {
 test('update: edits client name', async () => {
   const db = makeDB();
   db.clients = [
-    {
-      id: 'c1',
-      firstName: 'Old',
-      lastName: '',
-      phone: '123',
-      area: 'Area1',
-      group: 'Group1',
-      payStatus: 'ожидание',
-      payAmount: 0,
-      birthDate: '2010-01-01T00:00:00.000Z',
-      startDate: '2024-01-01T00:00:00.000Z',
-    },
+    makeClient({ id: 'c1', firstName: 'Old', phone: '123' }),
   ];
-  const { getDB } = renderClients(db);
-
+  const { getDB } = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+  await waitFor(() => expect(screen.getByRole('button', { name: /Old/ })).toBeInTheDocument());
   await userEvent.click(screen.getByRole('button', { name: /Old/ }));
   const modal = screen.getByText('Редактирование клиента').parentElement;
   const input = within(modal).getByText('Имя').parentElement.querySelector('input');
@@ -181,11 +191,9 @@ test('update: edits client name', async () => {
 
 test('delete: removes client after confirmation', async () => {
   const db = makeDB();
-  db.clients = [
-    { id: 'c1', firstName: 'Del', lastName: '', phone: '', area: 'Area1', group: 'Group1', payStatus: 'ожидание', payAmount: 0 },
-  ];
-  const { getDB } = renderClients(db);
-
+  db.clients = [makeClient({ id: 'c1', firstName: 'Del' })];
+  const { getDB } = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+  await waitFor(() => expect(screen.getByText('Del')).toBeInTheDocument());
   await userEvent.click(screen.getByText('Удалить'));
 
   expect(global.confirm).toHaveBeenCalled();
@@ -201,24 +209,20 @@ test('creates payment task with client info', async () => {
 
   const db = makeDB();
   db.clients = [
-    {
+    makeClient({
       id: 'c1',
       firstName: 'Ivan',
       lastName: 'Petrov',
       parentName: 'Parent',
-      phone: '',
-      area: 'Area1',
-      group: 'Group1',
       payStatus: 'действует',
       payAmount: 50,
       payDate: '2024-02-01T00:00:00.000Z',
-    },
+    }),
   ];
 
-  const { getDB } = renderClients(db);
-
-  const row = screen.getByText('Ivan Petrov').closest('tr');
-  const createTaskBtn = within(row).getByRole('button', { name: 'Создать задачу' });
+  const { getDB } = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+  const row = await screen.findByText('Ivan Petrov');
+  const createTaskBtn = within(row.closest('tr')).getByRole('button', { name: 'Создать задачу' });
 
   await userEvent.click(createTaskBtn);
 
@@ -238,6 +242,8 @@ test('creates payment task with client info', async () => {
 test('individual group allows custom payment amount', async () => {
   const db = makeDB();
   db.settings.groups = ['Group1', 'индивидуальные'];
+  db.schedule.push({ id: 'slot-ind', area: 'Area1', group: 'индивидуальные', coachId: 's1', weekday: 4, time: '13:00', location: '' });
+
   const { getDB } = renderClients(db);
 
   await userEvent.click(screen.getByText('+ Добавить клиента'));

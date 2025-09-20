@@ -255,6 +255,7 @@ export default function PerformanceTab({
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          schedule={db.schedule}
           onClose={() => setSelected(null)}
         />
       )}

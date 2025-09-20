@@ -4,7 +4,8 @@ import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
 import { compareValues, toggleSort, type SortState } from "../tableUtils";
 import { fmtMoney, fmtDate } from "../../state/utils";
-import type { Client, Currency } from "../../types";
+import { getEffectiveRemainingLessons } from "../../state/lessons";
+import type { Client, Currency, ScheduleSlot } from "../../types";
 
 type Props = {
   list: Client[];
@@ -12,6 +13,7 @@ type Props = {
   onEdit: (c: Client) => void;
   onRemove: (id: string) => void;
   onCreateTask: (client: Client) => void;
+  schedule: ScheduleSlot[];
 };
 
 type ColumnConfig = {
@@ -25,25 +27,36 @@ type ColumnConfig = {
   headerAlign?: "left" | "center" | "right";
 };
 
-export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask }: Props) {
+export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask, schedule }: Props) {
+
   const [selected, setSelected] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
     "name",
     "phone",
     "area",
     "group",
+    "status",
     "payStatus",
+    "remainingLessons",
     "payAmount",
     "payDate",
     "actions",
   ]);
   const [sort, setSort] = useState<SortState | null>(null);
+  const remainingMap = useMemo(() => {
+    const map = new Map<string, number | null>();
+    list.forEach(client => {
+      map.set(client.id, getEffectiveRemainingLessons(client, schedule));
+    });
+    return map;
+  }, [list, schedule]);
+
 
   const columns: ColumnConfig[] = useMemo(() => [
     {
       id: "name",
       label: "Имя",
-      width: "220px",
+      width: "minmax(160px, max-content)",
       renderCell: client => (
         <button
           type="button"
@@ -61,28 +74,35 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
     {
       id: "phone",
       label: "Телефон",
-      width: "150px",
+      width: "minmax(140px, max-content)",
       renderCell: client => client.phone ?? "—",
       sortValue: client => client.phone ?? "",
     },
     {
       id: "area",
       label: "Район",
-      width: "140px",
+      width: "minmax(120px, max-content)",
       renderCell: client => client.area,
       sortValue: client => client.area,
     },
     {
       id: "group",
       label: "Группа",
-      width: "140px",
+      width: "minmax(120px, max-content)",
       renderCell: client => client.group,
       sortValue: client => client.group,
     },
     {
+      id: "status",
+      label: "Статус",
+      width: "minmax(140px, max-content)",
+      renderCell: client => client.status ?? "—",
+      sortValue: client => client.status ?? "",
+    },
+    {
       id: "payStatus",
       label: "Статус оплаты",
-      width: "160px",
+      width: "minmax(150px, max-content)",
       renderCell: client => (
         <span
           className={`px-2 py-1 text-xs ${
@@ -99,23 +119,35 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
       sortValue: client => client.payStatus,
     },
     {
+      id: "remainingLessons",
+      label: "Остаток занятий",
+      width: "minmax(150px, max-content)",
+      headerAlign: "center",
+      cellClassName: "text-center",
+      renderCell: client => {
+        const remaining = remainingMap.get(client.id);
+        return remaining != null ? remaining : "—";
+      },
+      sortValue: client => remainingMap.get(client.id) ?? -1,
+    },
+    {
       id: "payAmount",
       label: "Сумма оплаты",
-      width: "150px",
+      width: "minmax(130px, max-content)",
       renderCell: client => (client.payAmount != null ? fmtMoney(client.payAmount, currency) : "—"),
       sortValue: client => client.payAmount ?? 0,
     },
     {
       id: "payDate",
       label: "Дата оплаты",
-      width: "150px",
+      width: "minmax(140px, max-content)",
       renderCell: client => (client.payDate ? fmtDate(client.payDate) : "—"),
       sortValue: client => client.payDate ?? "",
     },
     {
       id: "actions",
       label: "Действия",
-      width: "260px",
+      width: "minmax(220px, 1fr)",
       headerClassName: "text-right",
       headerAlign: "right",
       cellClassName: "flex justify-end gap-1",
@@ -142,7 +174,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
         </>
       ),
     },
-  ], [currency, onCreateTask, onEdit, onRemove]);
+  ], [currency, onCreateTask, onEdit, onRemove, remainingMap]);
 
   const activeColumns = useMemo(
     () => columns.filter(column => visibleColumns.includes(column.id)),
@@ -241,6 +273,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          schedule={schedule}
           onEdit={onEdit}
           onRemove={onRemove}
           onClose={() => setSelected(null)}

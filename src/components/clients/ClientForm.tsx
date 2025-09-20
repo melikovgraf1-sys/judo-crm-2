@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import type { Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -6,7 +6,8 @@ import * as yup from "yup";
 import Modal from "../Modal";
 import { todayISO } from "../../state/utils";
 import { getDefaultPayAmount, shouldAllowCustomPayAmount } from "../../state/payments";
-import type { DB, Client, ClientFormValues } from "../../types";
+import { buildGroupsByArea, estimateGroupRemainingLessonsByParams, requiresManualRemainingLessons } from "../../state/lessons";
+import type { Area, DB, Client, ClientFormValues, Group } from "../../types";
 
 type Props = {
   db: DB,
@@ -16,22 +17,45 @@ type Props = {
 };
 
 export default function ClientForm({ db, editing, onSave, onClose }: Props) {
+  const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
+  const firstAreaWithSchedule = useMemo(() => {
+    for (const [area] of groupsByArea) {
+      return area;
+    }
+    return db.settings.areas[0];
+  }, [db.settings.areas, groupsByArea]);
+
+  const firstGroupForArea = useCallback(
+    (area: Area | undefined): Group => {
+      if (area) {
+        const fromSchedule = groupsByArea.get(area);
+        if (fromSchedule?.length) {
+          return fromSchedule[0];
+        }
+      }
+      return db.settings.groups[0];
+    },
+    [db.settings.groups, groupsByArea],
+  );
+
   const blankForm = useCallback((): ClientFormValues => ({
     firstName: "",
     lastName: "",
     phone: "",
     gender: "м",
-    area: db.settings.areas[0],
-    group: db.settings.groups[0],
+    area: firstAreaWithSchedule ?? db.settings.areas[0],
+    group: firstGroupForArea(firstAreaWithSchedule ?? db.settings.areas[0]),
     channel: "Telegram",
     startDate: todayISO().slice(0, 10),
     payMethod: "перевод",
     payStatus: "ожидание",
+    status: "новый",
     birthDate: "2017-01-01",
     payDate: todayISO().slice(0, 10),
     parentName: "",
     payAmount: String(getDefaultPayAmount(db.settings.groups[0]) ?? ""),
-  }), [db.settings.areas, db.settings.groups]);
+    remainingLessons: "",
+  }), [db.settings.areas, db.settings.groups, firstAreaWithSchedule, firstGroupForArea]);
 
   const schema = yup.object({
     firstName: yup.string().required("Имя обязательно"),
@@ -67,10 +91,13 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         startDate: editing.startDate?.slice(0, 10) ?? "",
         payMethod: editing.payMethod,
         payStatus: editing.payStatus,
+        status: editing.status ?? "действующий",
         birthDate: editing.birthDate?.slice(0, 10) ?? "",
         payDate: editing.payDate?.slice(0, 10) ?? "",
         parentName: editing.parentName ?? "",
         payAmount: editing.payAmount != null ? String(editing.payAmount) : String(getDefaultPayAmount(editing.group) ?? ""),
+        remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
+
       };
       reset(values);
     } else {
@@ -80,9 +107,28 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
 
   const selectedGroup = watch("group");
   const currentPayAmount = watch("payAmount");
+  const selectedArea = watch("area");
+  const manualRemaining = requiresManualRemainingLessons(selectedGroup);
+  const areaGroups = useMemo(() => {
+    const manualGroups = db.settings.groups.filter(groupName => requiresManualRemainingLessons(groupName));
+    if (!selectedArea) {
+      return Array.from(new Set([...db.settings.groups, ...manualGroups]));
+    }
+    const scheduled = groupsByArea.get(selectedArea) ?? [];
+    return Array.from(new Set([...scheduled, ...manualGroups]));
+  }, [db.settings.groups, groupsByArea, selectedArea]);
+  const selectedPayDate = watch("payDate");
+  const computedRemaining = useMemo(() => {
+    if (manualRemaining) return null;
+    if (!selectedArea || !selectedGroup) return null;
+    return (
+      estimateGroupRemainingLessonsByParams(selectedArea, selectedGroup, selectedPayDate, db.schedule) ?? null
+    );
+  }, [db.schedule, manualRemaining, selectedArea, selectedGroup, selectedPayDate]);
   const canEditPayAmount = shouldAllowCustomPayAmount(selectedGroup);
   const defaultPayAmount = getDefaultPayAmount(selectedGroup);
   const prevGroupRef = useRef<string | null>(null);
+  const prevAreaRef = useRef<string | null>(null);
 
   useEffect(() => {
     const previousGroup = prevGroupRef.current;
@@ -103,6 +149,25 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
       }
     }
   }, [canEditPayAmount, defaultPayAmount, currentPayAmount, selectedGroup, setValue]);
+
+  useEffect(() => {
+    const previousArea = prevAreaRef.current;
+    prevAreaRef.current = selectedArea ?? null;
+
+    if (!selectedArea) {
+      return;
+    }
+
+    const available = groupsByArea.get(selectedArea) ?? [];
+    if (!available.length) {
+      return;
+    }
+
+    if (!selectedGroup || !available.includes(selectedGroup)) {
+      setValue("group", available[0], { shouldDirty: previousArea !== null && previousArea !== selectedArea });
+    }
+  }, [groupsByArea, selectedArea, selectedGroup, setValue]);
+
 
   return (
     <Modal size="xl" onClose={onClose}>
@@ -149,8 +214,8 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Группа</label>
             <select className="px-3 py-2 rounded-md border border-slate-300" {...register("group")}>
-              {db.settings.groups.map(g => (
-                <option key={g}>{g}</option>
+              {areaGroups.map(g => (
+                <option key={g} value={g}>{g}</option>
               ))}
             </select>
           </div>
@@ -180,6 +245,17 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             </select>
           </div>
           <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">Статус</label>
+            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("status")}>
+              <option value="действующий">действующий</option>
+              <option value="отмена">отмена</option>
+              <option value="новый">новый</option>
+              <option value="вернувшийся">вернувшийся</option>
+              <option value="продлившийся">продлившийся</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+
             <label className="text-xs text-slate-500">Дата оплаты</label>
             <input type="date" className="px-3 py-2 rounded-md border border-slate-300" {...register("payDate")} />
           </div>
@@ -197,6 +273,29 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               <span className="text-xs text-slate-500">Сумма фиксирована для этой группы</span>
             )}
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">Остаток занятий</label>
+            {manualRemaining ? (
+              <input
+                type="number"
+                inputMode="numeric"
+                className="px-3 py-2 rounded-md border border-slate-300"
+                {...register("remainingLessons")}
+                placeholder="Укажите количество"
+              />
+            ) : (
+              <input
+                type="text"
+                value={computedRemaining != null ? String(computedRemaining) : "—"}
+                readOnly
+                className="px-3 py-2 rounded-md border border-slate-300 bg-slate-100 text-slate-600"
+              />
+            )}
+            {!manualRemaining && (
+              <span className="text-xs text-slate-500">Значение рассчитывается автоматически от даты оплаты</span>
+            )}
+          </div>
+
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">

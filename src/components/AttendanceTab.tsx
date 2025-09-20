@@ -7,6 +7,7 @@ import { fmtDate, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import ColumnSettings from "./ColumnSettings";
 import { compareValues, toggleSort, type SortState } from "./tableUtils";
+import { requiresManualRemainingLessons } from "../state/lessons";
 import type { DB, Area, Group, AttendanceEntry, Client, Currency } from "../types";
 
 export default function AttendanceTab({
@@ -42,16 +43,46 @@ export default function AttendanceTab({
 
   const toggle = async (clientId: string) => {
     const mark = todayMarks.get(clientId);
+    const client = db.clients.find(c => c.id === clientId);
+    if (!client) return;
+    const manual = requiresManualRemainingLessons(client.group);
     if (mark) {
       const updated = { ...mark, came: !mark.came };
-      const next = { ...db, attendance: db.attendance.map(a => a.id === mark.id ? updated : a) };
+      const nextClients = !manual
+        ? db.clients
+        : db.clients.map(c => {
+            if (c.id !== clientId) return c;
+            const delta = updated.came ? -1 : 1;
+            const current = c.remainingLessons ?? 0;
+            const nextRemaining = Math.max(0, current + delta);
+            if (nextRemaining === current) {
+              return c;
+            }
+            return { ...c, remainingLessons: nextRemaining };
+          });
+      const next = {
+        ...db,
+        attendance: db.attendance.map(a => a.id === mark.id ? updated : a),
+        clients: nextClients,
+      };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
         window.alert("Не удалось обновить отметку посещаемости. Проверьте доступ к базе данных.");
       }
     } else {
       const entry: AttendanceEntry = { id: uid(), clientId, date: new Date().toISOString(), came: true };
-      const next = { ...db, attendance: [entry, ...db.attendance] };
+      const nextClients = !manual
+        ? db.clients
+        : db.clients.map(c => {
+            if (c.id !== clientId) return c;
+            const current = c.remainingLessons ?? 0;
+            const nextRemaining = Math.max(0, current - 1);
+            if (nextRemaining === current) {
+              return c;
+            }
+            return { ...c, remainingLessons: nextRemaining };
+          });
+      const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
         window.alert("Не удалось сохранить отметку посещаемости. Проверьте доступ к базе данных.");
@@ -231,6 +262,7 @@ export default function AttendanceTab({
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          schedule={db.schedule}
           onClose={() => setSelected(null)}
         />
       )}
