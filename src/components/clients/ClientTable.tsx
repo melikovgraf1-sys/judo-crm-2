@@ -28,6 +28,7 @@ type ColumnConfig = {
 };
 
 export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask, schedule }: Props) {
+
   const [selected, setSelected] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
     "name",
@@ -49,6 +50,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
     });
     return map;
   }, [list, schedule]);
+
 
   const columns: ColumnConfig[] = useMemo(() => [
     {

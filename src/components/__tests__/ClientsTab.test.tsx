@@ -243,6 +243,7 @@ test('individual group allows custom payment amount', async () => {
   const db = makeDB();
   db.settings.groups = ['Group1', 'индивидуальные'];
   db.schedule.push({ id: 'slot-ind', area: 'Area1', group: 'индивидуальные', coachId: 's1', weekday: 4, time: '13:00', location: '' });
+
   const { getDB } = renderClients(db);
 
   await userEvent.click(screen.getByText('+ Добавить клиента'));
