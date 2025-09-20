@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
@@ -6,6 +6,8 @@ import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { uid, todayISO, parseDateInput, fmtMoney } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import { applyPaymentStatusRules, getDefaultPayAmount, shouldAllowCustomPayAmount } from "../state/payments";
+import { requiresManualRemainingLessons, buildGroupsByArea } from "../state/lessons";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
 
 
@@ -13,27 +15,54 @@ export default function ClientsTab({
   db,
   setDB,
   ui,
+  initialArea = null,
+  initialGroup = null,
+  initialPay = "all",
 }: {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
   ui: UIState;
+  initialArea?: Area | null;
+  initialGroup?: Group | null;
+  initialPay?: PaymentStatus | "all";
 }) {
-  const [area, setArea] = useState<Area | "all">("all");
-  const [group, setGroup] = useState<Group | "all">("all");
-  const [pay, setPay] = useState<PaymentStatus | "all">("all");
+  const [area, setArea] = useState<Area | null>(initialArea);
+  const [group, setGroup] = useState<Group | null>(initialGroup);
+  const [pay, setPay] = useState<PaymentStatus | "all">(initialPay);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
 
   const search = ui.search.toLowerCase();
+  const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
+  const availableGroups = useMemo(() => {
+    if (!area) return [];
+    return groupsByArea.get(area) ?? [];
+  }, [area, groupsByArea]);
+
+  useEffect(() => {
+    if (!area) {
+      if (group !== null) {
+        setGroup(null);
+      }
+      return;
+    }
+    if (group && !availableGroups.includes(group)) {
+      setGroup(null);
+    }
+  }, [area, availableGroups, group]);
 
   const list = useMemo(() => {
+    if (!area || !group) {
+      return [];
+    }
     return db.clients.filter(c =>
-      (area === "all" || c.area === area) &&
-      (group === "all" || c.group === group) &&
+      c.area === area &&
+      c.group === group &&
       (pay === "all" || c.payStatus === pay) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search, search]);
+
 
   const openAddModal = () => {
     setEditing(null);
@@ -45,9 +74,39 @@ export default function ClientsTab({
     setModalOpen(true);
   };
 
+  const resolvePayAmount = (rawValue: string, group: Group, previous?: number): number | undefined => {
+    const defaultAmount = getDefaultPayAmount(group);
+    if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    const parsed = Number.parseFloat(rawValue);
+    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+      return parsed;
+    }
+
+    if (defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    return previous;
+  };
+
   const saveClient = async (data: ClientFormValues) => {
+    const { payAmount: payAmountRaw, remainingLessons: remainingLessonsRaw, ...rest } = data;
+    const resolvedPayAmount = resolvePayAmount(payAmountRaw, rest.group, editing?.payAmount);
+    let resolvedRemaining: number | undefined;
+    if (requiresManualRemainingLessons(rest.group)) {
+      const parsedRemaining = Number.parseInt(remainingLessonsRaw, 10);
+      if (!Number.isNaN(parsedRemaining)) {
+        resolvedRemaining = parsedRemaining;
+      }
+    }
+
     const prepared = {
-      ...data,
+      ...rest,
+      payAmount: resolvedPayAmount,
+      remainingLessons: resolvedRemaining,
       birthDate: parseDateInput(data.birthDate),
       startDate: parseDateInput(data.startDate),
       payDate: parseDateInput(data.payDate),
@@ -69,8 +128,6 @@ export default function ClientsTab({
         id: uid(),
         ...prepared,
         coachId: db.staff.find(s => s.role === "Тренер")?.id,
-        payAmount: 0,
-        payConfirmed: false,
       };
       const next = {
         ...db,
@@ -85,23 +142,6 @@ export default function ClientsTab({
     }
     setModalOpen(false);
     setEditing(null);
-  };
-
-  const togglePayFact = async (id: string, value: boolean) => {
-    const target = db.clients.find(c => c.id === id);
-    if (!target) return;
-    const next = {
-      ...db,
-      clients: db.clients.map(c => (c.id === id ? { ...c, payConfirmed: value } : c)),
-      changelog: [
-        ...db.changelog,
-        { id: uid(), who: "UI", what: `Обновлён факт оплаты ${target.firstName}`, when: todayISO() },
-      ],
-    };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось обновить факт оплаты. Проверьте доступ к базе данных.");
-    }
   };
 
   const createPaymentTask = async (client: Client) => {
@@ -122,9 +162,12 @@ export default function ClientsTab({
       assigneeId: client.id,
     };
 
+    const nextTasks = [task, ...db.tasks];
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks);
     const next = {
       ...db,
-      tasks: [task, ...db.tasks],
+      tasks: nextTasks,
+      clients: nextClients,
       changelog: [
         ...db.changelog,
         { id: uid(), who: "UI", what: `Создана задача по оплате ${client.firstName}`, when: todayISO() },
@@ -160,6 +203,7 @@ export default function ClientsTab({
         setGroup={setGroup}
         pay={pay}
         setPay={setPay}
+        groups={availableGroups}
         listLength={list.length}
         onAddClient={openAddModal}
       />
@@ -168,8 +212,8 @@ export default function ClientsTab({
         currency={ui.currency}
         onEdit={startEdit}
         onRemove={removeClient}
-        onTogglePayFact={togglePayFact}
         onCreateTask={createPaymentTask}
+        schedule={db.schedule}
       />
       {modalOpen && (
         <ClientForm

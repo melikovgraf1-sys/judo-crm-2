@@ -5,6 +5,8 @@ import VirtualizedTable from "./VirtualizedTable";
 import ClientDetailsModal from "./clients/ClientDetailsModal";
 import { fmtDate, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import ColumnSettings from "./ColumnSettings";
+import { compareValues, toggleSort, type SortState } from "./tableUtils";
 import type { Area, Currency, DB, Group, PerformanceEntry, Client } from "../types";
 
 export default function PerformanceTab({
@@ -16,10 +18,11 @@ export default function PerformanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
-  const COLUMN_TEMPLATE = "220px 1fr 1fr 200px";
   const [area, setArea] = useState<Area | "all">("all");
   const [group, setGroup] = useState<Group | "all">("all");
   const [selected, setSelected] = useState<Client | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(["name", "area", "group", "mark"]);
+  const [sort, setSort] = useState<SortState | null>(null);
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
 
@@ -66,6 +69,90 @@ export default function PerformanceTab({
     }
   };
 
+  const columns = useMemo(
+    () => [
+      {
+        id: "name",
+        label: "Ученик",
+        width: "220px",
+        renderCell: (client: Client) => (
+          <button
+            type="button"
+            onClick={() => setSelected(client)}
+            className="text-sky-600 hover:underline focus:outline-none dark:text-sky-400"
+          >
+            {client.firstName} {client.lastName}
+          </button>
+        ),
+        sortValue: (client: Client) => `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase(),
+      },
+      {
+        id: "area",
+        label: "Район",
+        width: "1fr",
+        renderCell: (client: Client) => client.area,
+        sortValue: (client: Client) => client.area,
+      },
+      {
+        id: "group",
+        label: "Группа",
+        width: "1fr",
+        renderCell: (client: Client) => client.group,
+        sortValue: (client: Client) => client.group,
+      },
+      {
+        id: "mark",
+        label: "Оценка",
+        width: "200px",
+        headerAlign: "right",
+        renderCell: (client: Client) => {
+          const mark = todayMarks.get(client.id);
+          return (
+            <div className="flex justify-end">
+              <button
+                onClick={() => toggle(client.id)}
+                className={`px-3 py-1 rounded-md text-xs border ${
+                  mark
+                    ? mark.successful
+                      ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
+                      : "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                    : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
+                }`}
+              >
+                {mark ? (mark.successful ? "успевает" : "нужна работа") : "не оценён"}
+              </button>
+            </div>
+          );
+        },
+        sortValue: (client: Client) => {
+          const mark = todayMarks.get(client.id);
+          if (!mark) return 0;
+          return mark.successful ? 2 : 1;
+        },
+      },
+    ],
+    [setSelected, todayMarks, toggle],
+  );
+
+  const activeColumns = useMemo(
+    () => columns.filter(column => visibleColumns.includes(column.id)),
+    [columns, visibleColumns],
+  );
+
+  const sortedClients = useMemo(() => {
+    if (!sort) return list;
+    const column = columns.find(col => col.id === sort.columnId);
+    if (!column?.sortValue) return list;
+    const copy = [...list];
+    copy.sort((a, b) => {
+      const compare = compareValues(column.sortValue!(a), column.sortValue!(b));
+      return sort.direction === "asc" ? compare : -compare;
+    });
+    return copy;
+  }, [columns, list, sort]);
+
+  const columnTemplate = activeColumns.length ? activeColumns.map(column => column.width).join(" ") : "1fr";
+
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Успеваемость"]} />
@@ -91,63 +178,74 @@ export default function PerformanceTab({
           ))}
         </select>
         <div className="text-xs text-slate-500">Сегодня: {fmtDate(today.toISOString())}</div>
+        <div className="grow" />
+        <ColumnSettings
+          options={columns.map(column => ({ id: column.id, label: column.label }))}
+          value={visibleColumns}
+          onChange={setVisibleColumns}
+        />
       </div>
 
       <VirtualizedTable
         header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <tr
-              style={{ display: "grid", gridTemplateColumns: COLUMN_TEMPLATE, alignItems: "center" }}
+              style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
             >
-              <th className="text-left p-2">Ученик</th>
-              <th className="text-left p-2">Район</th>
-              <th className="text-left p-2">Группа</th>
-              <th className="text-left p-2" style={{ justifySelf: "end" }}>
-                Оценка
-              </th>
+              {activeColumns.map(column => {
+                const canSort = Boolean(column.sortValue);
+                const isSorted = sort?.columnId === column.id;
+                const indicator = isSorted ? (sort?.direction === "asc" ? "↑" : "↓") : null;
+                const alignment = column.headerAlign ?? "left";
+                const justify = alignment === "right" ? "justify-end" : alignment === "center" ? "justify-center" : "";
+                const content = (
+                  <div className={`flex items-center gap-1 ${justify}`}>
+                    <span>{column.label}</span>
+                    {indicator && <span className="text-xs">{indicator}</span>}
+                  </div>
+                );
+                return (
+                  <th
+                    key={column.id}
+                    className={`p-2 ${alignment === "right" ? "text-right" : alignment === "center" ? "text-center" : "text-left"}`}
+                    style={{ cursor: canSort ? "pointer" : "default" }}
+                  >
+                    {canSort ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-1 focus:outline-none"
+                        onClick={() => setSort(prev => toggleSort(prev, column.id))}
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      content
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
         )}
-        items={list}
+        items={sortedClients}
         rowHeight={44}
         renderRow={(c, style) => {
-          const m = todayMarks.get(c.id);
           return (
             <tr
               key={c.id}
               style={{
                 ...style,
                 display: "grid",
-                gridTemplateColumns: COLUMN_TEMPLATE,
+                gridTemplateColumns: columnTemplate,
                 alignItems: "center",
               }}
               className="border-t border-slate-100 dark:border-slate-700"
             >
-              <td className="p-2">
-                <button
-                  type="button"
-                  onClick={() => setSelected(c)}
-                  className="text-sky-600 hover:underline focus:outline-none dark:text-sky-400"
-                >
-                  {c.firstName} {c.lastName}
-                </button>
-              </td>
-              <td className="p-2">{c.area}</td>
-              <td className="p-2">{c.group}</td>
-              <td className="p-2 flex justify-end">
-                <button
-                  onClick={() => toggle(c.id)}
-                  className={`px-3 py-1 rounded-md text-xs border ${
-                    m
-                      ? m.successful
-                        ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
-                        : "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
-                      : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700"
-                  }`}
-                >
-                  {m ? (m.successful ? "успевает" : "нужна работа") : "не оценён"}
-                </button>
-              </td>
+              {activeColumns.map(column => (
+                <td key={column.id} className="p-2">
+                  {column.renderCell(c)}
+                </td>
+              ))}
             </tr>
           );
         }}
@@ -157,6 +255,7 @@ export default function PerformanceTab({
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          schedule={db.schedule}
           onClose={() => setSelected(null)}
         />
       )}

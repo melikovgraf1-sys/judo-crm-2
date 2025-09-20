@@ -19,7 +19,7 @@ import { commitDBUpdate } from '../../state/appState';
 
 function setup(initialTasks) {
   const Wrapper = () => {
-    const [db, setDB] = React.useState({ tasks: initialTasks });
+    const [db, setDB] = React.useState({ tasks: initialTasks, clients: [] });
     return <TasksTab db={db} setDB={setDB} />;
   };
   return render(<Wrapper />);

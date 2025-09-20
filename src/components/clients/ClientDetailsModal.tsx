@@ -1,17 +1,20 @@
 import React from "react";
 import Modal from "../Modal";
 import { calcAgeYears, calcExperience, fmtMoney } from "../../state/utils";
-import type { Client, Currency } from "../../types";
+import { getEffectiveRemainingLessons } from "../../state/lessons";
+import type { Client, Currency, ScheduleSlot } from "../../types";
 
 interface Props {
   client: Client;
   currency: Currency;
+  schedule: ScheduleSlot[];
   onClose: () => void;
   onEdit?: (client: Client) => void;
   onRemove?: (id: string) => void;
 }
 
-export default function ClientDetailsModal({ client, currency, onClose, onEdit, onRemove }: Props) {
+export default function ClientDetailsModal({ client, currency, schedule, onClose, onEdit, onRemove }: Props) {
+  const remaining = getEffectiveRemainingLessons(client, schedule);
   return (
     <Modal size="md" onClose={onClose}>
       <div className="font-semibold text-slate-800 dark:text-slate-100">
@@ -43,6 +46,9 @@ export default function ClientDetailsModal({ client, currency, onClose, onEdit, 
           <span className="text-slate-500">Опыт:</span> {client.startDate ? calcExperience(client.startDate) : "—"}
         </div>
         <div>
+          <span className="text-slate-500">Статус:</span> {client.status ?? "—"}
+        </div>
+        <div>
           <span className="text-slate-500">Статус оплаты:</span> {client.payStatus}
         </div>
         <div>
@@ -50,6 +56,9 @@ export default function ClientDetailsModal({ client, currency, onClose, onEdit, 
         </div>
         <div>
           <span className="text-slate-500">Сумма оплаты:</span> {client.payAmount != null ? fmtMoney(client.payAmount, currency) : "—"}
+        </div>
+        <div>
+          <span className="text-slate-500">Остаток занятий:</span> {remaining != null ? remaining : "—"}
         </div>
       </div>
       <div className="flex justify-end gap-2">
