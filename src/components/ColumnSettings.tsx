@@ -37,7 +37,10 @@ export default function ColumnSettings({ options, value, onChange, className }: 
       }
       onChange(next);
     } else {
-      onChange([...value, id]);
+      const order = options.map(option => option.id);
+      const withNew = [...value, id];
+      const sorted = [...withNew].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      onChange(sorted);
     }
   };
 
@@ -45,13 +48,14 @@ export default function ColumnSettings({ options, value, onChange, className }: 
     <div className={`relative ${className ?? ""}`} ref={containerRef}>
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => setOpen(prev => !prev)}
         className="px-3 py-2 rounded-md border border-slate-300 text-sm bg-white shadow-sm hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:hover:bg-slate-700"
       >
         Настроить столбцы
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-60 max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800">
+        <div className="absolute right-0 z-30 mt-2 w-60 max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <div className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
             Отображение столбцов
           </div>

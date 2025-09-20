@@ -82,11 +82,11 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
   const currentPayAmount = watch("payAmount");
   const canEditPayAmount = shouldAllowCustomPayAmount(selectedGroup);
   const defaultPayAmount = getDefaultPayAmount(selectedGroup);
-  const prevGroupRef = useRef<string | undefined>();
+  const prevGroupRef = useRef<string | null>(null);
 
   useEffect(() => {
     const previousGroup = prevGroupRef.current;
-    prevGroupRef.current = selectedGroup;
+    prevGroupRef.current = selectedGroup ?? null;
 
     if (!canEditPayAmount && defaultPayAmount != null) {
       const targetValue = String(defaultPayAmount);
@@ -178,6 +178,10 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               <option>действует</option>
               <option>задолженность</option>
             </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">Дата оплаты</label>
+            <input type="date" className="px-3 py-2 rounded-md border border-slate-300" {...register("payDate")} />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Сумма оплаты, €</label>
