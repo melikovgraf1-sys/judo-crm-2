@@ -1,76 +1,245 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
 import ClientDetailsModal from "./ClientDetailsModal";
+import ColumnSettings from "../ColumnSettings";
+import { compareValues, toggleSort, type SortState } from "../tableUtils";
 import { fmtMoney, fmtDate } from "../../state/utils";
-import type { Client, Currency } from "../../types";
+import { getEffectiveRemainingLessons } from "../../state/lessons";
+import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
 
 type Props = {
   list: Client[];
   currency: Currency;
   onEdit: (c: Client) => void;
   onRemove: (id: string) => void;
-  onTogglePayFact: (id: string, value: boolean) => void;
   onCreateTask: (client: Client) => void;
+  schedule: ScheduleSlot[];
+  attendance: AttendanceEntry[];
+  performance: PerformanceEntry[];
 };
 
-const COLUMN_WIDTHS = [
-  "220px", // name
-  "150px", // phone
-  "140px", // area
-  "140px", // group
-  "160px", // payment status
-  "150px", // payment amount
-  "120px", // payment fact
-  "150px", // payment date
-  "260px", // actions
-];
+type ColumnConfig = {
+  id: string;
+  label: string;
+  width: string;
+  headerClassName?: string;
+  cellClassName?: string;
+  renderCell: (client: Client) => React.ReactNode;
+  sortValue?: (client: Client) => unknown;
+  headerAlign?: "left" | "center" | "right";
+};
 
-const COLUMN_TEMPLATE = COLUMN_WIDTHS.join(" ");
-
-export default function ClientTable({ list, currency, onEdit, onRemove, onTogglePayFact, onCreateTask }: Props) {
-
+export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask, schedule, attendance, performance }: Props) {
   const [selected, setSelected] = useState<Client | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([
+    "name",
+    "phone",
+    "area",
+    "group",
+    "status",
+    "payStatus",
+    "remainingLessons",
+    "payAmount",
+    "payDate",
+    "actions",
+  ]);
+  const [sort, setSort] = useState<SortState | null>(null);
+  const remainingMap = useMemo(() => {
+    const map = new Map<string, number | null>();
+    list.forEach(client => {
+      map.set(client.id, getEffectiveRemainingLessons(client, schedule));
+    });
+    return map;
+  }, [list, schedule]);
+
+  const columns: ColumnConfig[] = useMemo(() => [
+    {
+      id: "name",
+      label: "Имя",
+      width: "minmax(160px, max-content)",
+      renderCell: client => (
+        <span className="font-medium text-slate-800 dark:text-slate-100">
+          {client.firstName} {client.lastName}
+        </span>
+      ),
+      sortValue: client => `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase(),
+    },
+    {
+      id: "phone",
+      label: "Телефон",
+      width: "minmax(140px, max-content)",
+      renderCell: client => client.phone ?? "—",
+      sortValue: client => client.phone ?? "",
+    },
+    {
+      id: "area",
+      label: "Район",
+      width: "minmax(120px, max-content)",
+      renderCell: client => client.area,
+      sortValue: client => client.area,
+    },
+    {
+      id: "group",
+      label: "Группа",
+      width: "minmax(120px, max-content)",
+      renderCell: client => client.group,
+      sortValue: client => client.group,
+    },
+    {
+      id: "status",
+      label: "Статус",
+      width: "minmax(140px, max-content)",
+      renderCell: client => client.status ?? "—",
+      sortValue: client => client.status ?? "",
+    },
+    {
+      id: "payStatus",
+      label: "Статус оплаты",
+      width: "minmax(150px, max-content)",
+      renderCell: client => (
+        <span
+          className={`px-2 py-1 text-xs ${
+            client.payStatus === "действует"
+              ? "rounded-full bg-emerald-100 text-emerald-700"
+              : client.payStatus === "задолженность"
+              ? "rounded-full bg-rose-100 text-rose-700"
+              : "rounded-full bg-amber-100 text-amber-700"
+          }`}
+        >
+          {client.payStatus}
+        </span>
+      ),
+      sortValue: client => client.payStatus,
+    },
+    {
+      id: "remainingLessons",
+      label: "Остаток занятий",
+      width: "minmax(150px, max-content)",
+      headerAlign: "center",
+      cellClassName: "text-center",
+      renderCell: client => {
+        const remaining = remainingMap.get(client.id);
+        return remaining != null ? remaining : "—";
+      },
+      sortValue: client => remainingMap.get(client.id) ?? -1,
+    },
+    {
+      id: "payAmount",
+      label: "Сумма оплаты",
+      width: "minmax(130px, max-content)",
+      renderCell: client => (client.payAmount != null ? fmtMoney(client.payAmount, currency) : "—"),
+      sortValue: client => client.payAmount ?? 0,
+    },
+    {
+      id: "payDate",
+      label: "Дата оплаты",
+      width: "minmax(140px, max-content)",
+      renderCell: client => (client.payDate ? fmtDate(client.payDate) : "—"),
+      sortValue: client => client.payDate ?? "",
+    },
+    {
+      id: "actions",
+      label: "Действия",
+      width: "minmax(220px, 1fr)",
+      headerClassName: "text-right",
+      headerAlign: "right",
+      cellClassName: "flex justify-end gap-1",
+      renderCell: client => (
+        <>
+          <button
+            onClick={event => {
+              event.stopPropagation();
+              onCreateTask(client);
+            }}
+            className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+          >
+            Создать задачу
+          </button>
+          <button
+            onClick={event => {
+              event.stopPropagation();
+              onRemove(client.id);
+            }}
+            className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
+          >
+            Удалить
+          </button>
+        </>
+      ),
+    },
+  ], [currency, onCreateTask, onEdit, onRemove, remainingMap]);
+
+  const activeColumns = useMemo(
+    () => columns.filter(column => visibleColumns.includes(column.id)),
+    [columns, visibleColumns],
+  );
+
+  const sortedList = useMemo(() => {
+    if (!sort) return list;
+    const column = columns.find(col => col.id === sort.columnId);
+    if (!column?.sortValue) return list;
+    const copy = [...list];
+    copy.sort((a, b) => {
+      const compare = compareValues(column.sortValue!(a), column.sortValue!(b));
+      return sort.direction === "asc" ? compare : -compare;
+    });
+    return copy;
+  }, [columns, list, sort]);
+
+  const columnTemplate = activeColumns.length ? activeColumns.map(column => column.width).join(" ") : "1fr";
 
   return (
     <>
+      <div className="flex justify-end">
+        <ColumnSettings
+          options={columns.map(column => ({ id: column.id, label: column.label }))}
+          value={visibleColumns}
+          onChange={setVisibleColumns}
+        />
+      </div>
       <VirtualizedTable
         header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <tr
               className="w-full"
-              style={{ display: "grid", gridTemplateColumns: COLUMN_TEMPLATE, alignItems: "center" }}
+              style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
             >
-              <th className="text-left p-2">
-                Имя
-              </th>
-              <th className="text-left p-2">
-                Телефон
-              </th>
-              <th className="text-left p-2">
-                Район
-              </th>
-              <th className="text-left p-2">
-                Группа
-              </th>
-              <th className="text-left p-2">
-                Статус оплаты
-              </th>
-              <th className="text-left p-2">
-                Сумма оплаты
-              </th>
-              <th className="text-center p-2">
-                Факт оплаты
-              </th>
-              <th className="text-left p-2">
-                Дата оплаты
-              </th>
-              <th className="text-right p-2" style={{ justifySelf: "end" }}>
-                Действия
-              </th>
+              {activeColumns.map(column => {
+                const isSorted = sort?.columnId === column.id;
+                const canSort = Boolean(column.sortValue);
+                const indicator = isSorted ? (sort?.direction === "asc" ? "↑" : "↓") : null;
+                const alignment = column.headerAlign ?? "left";
+                const justify = alignment === "right" ? "justify-end" : alignment === "center" ? "justify-center" : "";
+                const content = (
+                  <div className={`flex items-center gap-1 ${justify}`}>
+                    <span>{column.label}</span>
+                    {indicator && <span className="text-xs">{indicator}</span>}
+                  </div>
+                );
+                return (
+                  <th
+                    key={column.id}
+                    className={`p-2 ${column.headerClassName ?? "text-left"}`}
+                    style={{ cursor: canSort ? "pointer" : "default" }}
+                  >
+                    {canSort ? (
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-1 focus:outline-none"
+                        onClick={() => setSort(prev => toggleSort(prev, column.id))}
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      content
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
         )}
-        items={list}
+        items={sortedList}
         rowHeight={48}
         renderRow={(c, style) => (
           <tr
@@ -78,79 +247,17 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onToggle
             style={{
               ...style,
               display: "grid",
-              gridTemplateColumns: COLUMN_TEMPLATE,
+              gridTemplateColumns: columnTemplate,
               alignItems: "center",
             }}
             className="border-t border-slate-100 dark:border-slate-700"
+            onClick={() => setSelected(c)}
           >
-            <td className="p-2" onClick={() => setSelected(c)}>
-              <button
-                type="button"
-                onClick={e => {
-                  e.stopPropagation();
-                  onEdit(c);
-                }}
-                className="text-left text-sky-600 hover:underline focus:outline-none dark:text-sky-400"
-              >
-                {c.firstName} {c.lastName}
-              </button>
-            </td>
-            <td className="p-2">
-              {c.phone}
-            </td>
-            <td className="p-2">
-              {c.area}
-            </td>
-            <td className="p-2">
-              {c.group}
-            </td>
-            <td className="p-2">
-              <span
-                className={`px-2 py-1 rounded-full text-xs ${
-                  c.payStatus === "действует"
-                    ? "bg-emerald-100 text-emerald-700"
-                    : c.payStatus === "задолженность"
-                    ? "bg-rose-100 text-rose-700"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                {c.payStatus}
-              </span>
-            </td>
-            <td className="p-2">
-              {c.payAmount != null ? fmtMoney(c.payAmount, currency) : "—"}
-            </td>
-            <td className="p-2 text-center">
-              <input
-                type="checkbox"
-                aria-label={`Факт оплаты ${c.firstName}${c.lastName ? ` ${c.lastName}` : ""}`.trim()}
-                checked={Boolean(c.payConfirmed)}
-                onChange={e => onTogglePayFact(c.id, e.target.checked)}
-              />
-            </td>
-            <td className="p-2">
-              {c.payDate ? fmtDate(c.payDate) : "—"}
-            </td>
-            <td className="p-2 flex justify-end gap-1">
-              <button
-                onClick={() => onCreateTask(c)}
-                className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
-              >
-                Создать задачу
-              </button>
-              <button
-                onClick={() => onEdit(c)}
-                className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
-              >
-                Редактировать
-              </button>
-              <button
-                onClick={() => onRemove(c.id)}
-                className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
-              >
-                Удалить
-              </button>
-            </td>
+            {activeColumns.map(column => (
+              <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
+                {column.renderCell(c)}
+              </td>
+            ))}
           </tr>
         )}
       />
@@ -159,8 +266,10 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onToggle
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          schedule={schedule}
+          attendance={attendance}
+          performance={performance}
           onEdit={onEdit}
-          onRemove={onRemove}
           onClose={() => setSelected(null)}
         />
       )}

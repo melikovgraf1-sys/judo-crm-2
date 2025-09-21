@@ -4,6 +4,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
 import { fmtDate, uid, todayISO } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import { applyPaymentStatusRules } from "../state/payments";
 import type { DB, TaskItem } from "../types";
 
 export default function TasksTab({
@@ -15,9 +16,11 @@ export default function TasksTab({
 }) {
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const toggle = async (id: string) => {
+    const nextTasks = db.tasks.map<TaskItem>(t => (t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t));
     const next: DB = {
       ...db,
-      tasks: db.tasks.map<TaskItem>(t => (t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t)),
+      tasks: nextTasks,
+      clients: applyPaymentStatusRules(db.clients, nextTasks),
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -26,7 +29,8 @@ export default function TasksTab({
   };
   const save = async () => {
     if (!edit) return;
-    const next: DB = { ...db, tasks: db.tasks.map<TaskItem>(t => (t.id === edit.id ? edit : t)) };
+    const nextTasks = db.tasks.map<TaskItem>(t => (t.id === edit.id ? edit : t));
+    const next: DB = { ...db, tasks: nextTasks, clients: applyPaymentStatusRules(db.clients, nextTasks) };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
       window.alert("Не удалось сохранить задачу. Проверьте доступ к базе данных.");
@@ -36,7 +40,8 @@ export default function TasksTab({
   };
   const add = async () => {
     const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
-    const next: DB = { ...db, tasks: [t, ...db.tasks] };
+    const nextTasks = [t, ...db.tasks];
+    const next: DB = { ...db, tasks: nextTasks, clients: applyPaymentStatusRules(db.clients, nextTasks) };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
       window.alert("Не удалось добавить задачу. Проверьте доступ к базе данных.");
@@ -44,7 +49,8 @@ export default function TasksTab({
   };
   const remove = async (id: string) => {
     if (!window.confirm("Удалить задачу?")) return;
-    const next: DB = { ...db, tasks: db.tasks.filter(t => t.id !== id) };
+    const nextTasks = db.tasks.filter(t => t.id !== id);
+    const next: DB = { ...db, tasks: nextTasks, clients: applyPaymentStatusRules(db.clients, nextTasks) };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
       window.alert("Не удалось удалить задачу. Проверьте доступ к базе данных.");

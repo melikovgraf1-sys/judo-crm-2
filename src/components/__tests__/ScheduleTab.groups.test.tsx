@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from "react";
-import { render, screen, within, cleanup } from "@testing-library/react";
+import { render, screen, within, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 
@@ -86,7 +86,10 @@ describe("ScheduleTab groups", () => {
     await userEvent.click(screen.getByText("+ группа"));
     const ui = { role: "Администратор", activeTab: "clients", breadcrumbs: [], currency: "EUR", search: "", theme: "light" };
     render(<ClientsTab db={getDb()} setDB={() => {}} ui={ui} />);
-    expect(screen.getByRole("option", { name: "Alpha" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "A1" }));
+    await waitFor(() => expect(screen.getByLabelText("Фильтр по группе")).not.toBeDisabled());
+    const groupSelect = screen.getByLabelText("Фильтр по группе");
+    expect(within(groupSelect).getByRole("option", { name: "Alpha" })).toBeInTheDocument();
   });
 
   test("Update: editing slot changes group and updates settings", async () => {
