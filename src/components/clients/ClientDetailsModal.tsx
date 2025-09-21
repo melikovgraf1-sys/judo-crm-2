@@ -84,6 +84,7 @@ export default function ClientDetailsModal({
             )}
           </div>
         </div>
+
         <div className="flex flex-wrap gap-2">
           {[
             { id: "info", label: "Информация" },

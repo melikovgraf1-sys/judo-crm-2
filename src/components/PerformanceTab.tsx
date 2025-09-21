@@ -58,6 +58,17 @@ export default function PerformanceTab({
     return db.clients.filter(client => client.area === area && client.group === group);
   }, [area, group, db.clients]);
 
+  type ColumnConfig = {
+    id: string;
+    label: string;
+    width: string;
+    headerClassName?: string;
+    cellClassName?: string;
+    renderCell: (client: Client) => React.ReactNode;
+    sortValue?: (client: Client) => unknown;
+    headerAlign?: "left" | "center" | "right";
+  };
+
   const todayMarks = useMemo(() => {
     const map: Map<string, PerformanceEntry> = new Map();
     db.performance.forEach(entry => {
@@ -95,7 +106,7 @@ export default function PerformanceTab({
     }
   };
 
-  const columns = useMemo(() => {
+  const columns: ColumnConfig[] = useMemo(() => {
     return [
       {
         id: "name",

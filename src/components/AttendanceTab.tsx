@@ -34,6 +34,7 @@ export default function AttendanceTab({
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["name", "area", "group", "mark"]);
+  const [month, setMonth] = useState(() => todayISO().slice(0, 7));
   const [sort, setSort] = useState<SortState | null>(null);
 
   const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
@@ -50,6 +51,20 @@ export default function AttendanceTab({
   }, [area, availableGroups, group]);
 
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
+  const selectedMonthDate = useMemo(() => {
+    if (!month) return null;
+    const [yearStr, monthStr] = month.split("-");
+    const year = Number.parseInt(yearStr, 10);
+    const monthIndex = Number.parseInt(monthStr, 10) - 1;
+    if (Number.isNaN(year) || Number.isNaN(monthIndex)) {
+      return null;
+    }
+    const base = new Date(year, monthIndex, 1);
+    if (Number.isNaN(base.getTime())) {
+      return null;
+    }
+    return base;
+  }, [month]);
 
   const list = useMemo(() => {
     if (!area || !group) {
@@ -57,6 +72,59 @@ export default function AttendanceTab({
     }
     return db.clients.filter(client => client.area === area && client.group === group);
   }, [area, group, db.clients]);
+
+  type ColumnConfig = {
+    id: string;
+    label: string;
+    width: string;
+    headerClassName?: string;
+    cellClassName?: string;
+    renderCell: (client: Client) => React.ReactNode;
+    sortValue?: (client: Client) => unknown;
+    headerAlign?: "left" | "center" | "right";
+  };
+
+  const isoWeekday = (date: Date) => {
+    const day = date.getDay();
+    return day === 0 ? 7 : day;
+  };
+
+  const monthLabel = useMemo(() => {
+    if (!selectedMonthDate) return "";
+    return selectedMonthDate.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  }, [selectedMonthDate]);
+
+  const scheduleDays = useMemo(() => {
+    if (!area || !group || !selectedMonthDate) return [];
+    const relevant = db.schedule.filter(slot => slot.area === area && slot.group === group);
+    if (!relevant.length) return [];
+
+    const timesByWeekday = new Map<number, string[]>();
+    for (const slot of relevant) {
+      const times = timesByWeekday.get(slot.weekday) ?? [];
+      times.push(slot.time);
+      timesByWeekday.set(slot.weekday, times);
+    }
+    for (const times of timesByWeekday.values()) {
+      times.sort((a, b) => a.localeCompare(b));
+    }
+
+    const result: { date: string; label: string; times: string[]; isToday: boolean }[] = [];
+    const cursor = new Date(selectedMonthDate);
+    const monthIndex = cursor.getMonth();
+    while (cursor.getMonth() === monthIndex) {
+      const weekday = isoWeekday(cursor);
+      const times = timesByWeekday.get(weekday);
+      if (times?.length) {
+        const iso = cursor.toISOString().slice(0, 10);
+        const label = cursor.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", weekday: "short" });
+        result.push({ date: iso, label, times, isToday: iso === todayStr });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return result;
+  }, [area, db.schedule, group, selectedMonthDate, todayStr]);
 
   const todayMarks = useMemo(() => {
     const map: Map<string, AttendanceEntry> = new Map();
@@ -117,7 +185,7 @@ export default function AttendanceTab({
     }
   };
 
-  const columns = useMemo(() => {
+  const columns: ColumnConfig[] = useMemo(() => {
     return [
       {
         id: "name",
@@ -217,7 +285,6 @@ export default function AttendanceTab({
     setSelected(updated);
   };
 
-
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Посещаемость"]} />
@@ -247,6 +314,13 @@ export default function AttendanceTab({
             </option>
           ))}
         </select>
+        <input
+          type="month"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={month}
+          onChange={event => setMonth(event.target.value || todayISO().slice(0, 7))}
+          disabled={!group}
+        />
         <div className="text-xs text-slate-500">Сегодня: {fmtDate(new Date().toISOString())}</div>
         <div className="grow" />
         <ColumnSettings
@@ -255,6 +329,35 @@ export default function AttendanceTab({
           onChange={setVisibleColumns}
         />
       </div>
+      {area && group && (
+        <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <span>Расписание на {monthLabel || "выбранный месяц"}</span>
+            <span className="text-slate-400">{scheduleDays.length} тренировок</span>
+          </div>
+          <div className="flex flex-wrap gap-2 p-3">
+            {scheduleDays.length ? (
+              scheduleDays.map(day => (
+                <div
+                  key={day.date}
+                  className={`min-w-[120px] rounded-lg border px-3 py-2 text-xs shadow-sm transition ${
+                    day.isToday
+                      ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-200"
+                      : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  }`}
+                >
+                  <div className="font-semibold text-sm">{day.label}</div>
+                  <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {day.times.join(", ")}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-slate-500">В выбранном месяце нет тренировок для этой группы.</div>
+            )}
+          </div>
+        </div>
+      )}
       <div className="text-xs text-slate-500">
         {area && group ? `Найдено: ${list.length}` : "Выберите район и группу"}
       </div>

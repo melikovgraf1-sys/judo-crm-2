@@ -58,16 +58,9 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
       label: "Имя",
       width: "minmax(160px, max-content)",
       renderCell: client => (
-        <button
-          type="button"
-          onClick={event => {
-            event.stopPropagation();
-            onEdit(client);
-          }}
-          className="text-left text-sky-600 hover:underline focus:outline-none dark:text-sky-400"
-        >
+        <span className="font-medium text-slate-800 dark:text-slate-100">
           {client.firstName} {client.lastName}
-        </button>
+        </span>
       ),
       sortValue: client => `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase(),
     },
@@ -277,7 +270,6 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
           attendance={attendance}
           performance={performance}
           onEdit={onEdit}
-          onRemove={onRemove}
           onClose={() => setSelected(null)}
         />
       )}

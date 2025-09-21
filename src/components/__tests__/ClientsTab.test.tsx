@@ -4,11 +4,19 @@ import { render, screen, waitFor, fireEvent, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
-jest.mock('react-window', () => ({
-  FixedSizeList: ({ itemCount, children }) => (
-    <div>{Array.from({ length: itemCount }).map((_, i) => children({ index: i, style: {} }))}</div>
-  ),
-}), { virtual: true });
+jest.mock('react-window', () => {
+  const React = require('react');
+  return {
+    FixedSizeList: ({ itemCount, children, outerElementType: Outer = 'div', innerElementType: Inner = 'div' }) => {
+      const items = Array.from({ length: itemCount }).map((_, i) => children({ index: i, style: {} }));
+      return React.createElement(
+        Outer,
+        { style: {} },
+        React.createElement(Inner, { style: {} }, items),
+      );
+    },
+  };
+}, { virtual: true });
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
@@ -22,11 +30,13 @@ jest.mock('../../state/utils', () => ({
   parseDateInput: jest.fn(),
   fmtMoney: jest.fn(),
   fmtDate: jest.fn(),
+  calcAgeYears: jest.fn(),
+  calcExperience: jest.fn(),
 }));
 
 import ClientsTab from '../ClientsTab';
 import { commitDBUpdate } from '../../state/appState';
-import { uid, todayISO, parseDateInput, fmtMoney, fmtDate } from '../../state/utils';
+import { uid, todayISO, parseDateInput, fmtMoney, fmtDate, calcAgeYears, calcExperience } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -40,6 +50,8 @@ beforeEach(() => {
   parseDateInput.mockImplementation((v) => (v ? v + 'T00:00:00.000Z' : ''));
   fmtMoney.mockImplementation((v, c) => v + ' ' + c);
   fmtDate.mockImplementation((iso) => iso);
+  calcAgeYears.mockReturnValue(10);
+  calcExperience.mockReturnValue('1 год');
   global.confirm = jest.fn(() => true);
   window.alert = jest.fn();
 });
@@ -170,8 +182,10 @@ test('update: edits client name', async () => {
     makeClient({ id: 'c1', firstName: 'Old', phone: '123' }),
   ];
   const { getDB } = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
-  await waitFor(() => expect(screen.getByRole('button', { name: /Old/ })).toBeInTheDocument());
-  await userEvent.click(screen.getByRole('button', { name: /Old/ }));
+  await waitFor(() => expect(screen.getByText(/^Old/)).toBeInTheDocument());
+  await userEvent.click(screen.getByText(/^Old/));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Редактировать' })).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
   const modal = screen.getByText('Редактирование клиента').parentElement;
   const input = within(modal).getByText('Имя').parentElement.querySelector('input');
   const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');
