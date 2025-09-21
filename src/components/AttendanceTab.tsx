@@ -73,7 +73,6 @@ export default function AttendanceTab({
     const client = db.clients.find(c => c.id === clientId);
     if (!client) return;
     const manual = requiresManualRemainingLessons(client.group);
-
     if (mark) {
       const updated = { ...mark, came: !mark.came };
       const nextClients = !manual
@@ -197,7 +196,6 @@ export default function AttendanceTab({
   }, [columns, list, sort]);
 
   const columnTemplate = activeColumns.length ? activeColumns.map(column => column.width).join(" ") : "1fr";
-
   const startEdit = (client: Client) => {
     setEditing(client);
   };
@@ -218,6 +216,7 @@ export default function AttendanceTab({
     setEditing(null);
     setSelected(updated);
   };
+
 
   return (
     <div className="space-y-3">

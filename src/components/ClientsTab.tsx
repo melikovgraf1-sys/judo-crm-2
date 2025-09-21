@@ -85,6 +85,24 @@ export default function ClientsTab({
     setModalOpen(true);
   };
 
+  const resolvePayAmount = (rawValue: string, group: Group, previous?: number): number | undefined => {
+    const defaultAmount = getDefaultPayAmount(group);
+    if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    const parsed = Number.parseFloat(rawValue);
+    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+      return parsed;
+    }
+
+    if (defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    return previous;
+  };
+
   const saveClient = async (data: ClientFormValues) => {
     const prepared = transformClientFormValues(data, editing);
     if (editing) {
