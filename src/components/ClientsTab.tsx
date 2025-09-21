@@ -4,10 +4,12 @@ import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { uid, todayISO, parseDateInput, fmtMoney } from "../state/utils";
+import { uid, todayISO, fmtMoney } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import { applyPaymentStatusRules, getDefaultPayAmount, shouldAllowCustomPayAmount } from "../state/payments";
-import { requiresManualRemainingLessons, buildGroupsByArea } from "../state/lessons";
+import { applyPaymentStatusRules } from "../state/payments";
+import { buildGroupsByArea } from "../state/lessons";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
+import { transformClientFormValues } from "./clients/clientMutations";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
 
 
@@ -26,8 +28,9 @@ export default function ClientsTab({
   initialGroup?: Group | null;
   initialPay?: PaymentStatus | "all";
 }) {
-  const [area, setArea] = useState<Area | null>(initialArea);
-  const [group, setGroup] = useState<Group | null>(initialGroup);
+  const storedFilters = useMemo(() => readDailySelection("clients"), []);
+  const [area, setArea] = useState<Area | null>(initialArea ?? storedFilters.area);
+  const [group, setGroup] = useState<Group | null>(initialGroup ?? storedFilters.group);
   const [pay, setPay] = useState<PaymentStatus | "all">(initialPay);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
@@ -38,6 +41,14 @@ export default function ClientsTab({
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("clients", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("clients");
+    }
+  }, [area, group]);
 
   useEffect(() => {
     if (!area) {
@@ -93,24 +104,7 @@ export default function ClientsTab({
   };
 
   const saveClient = async (data: ClientFormValues) => {
-    const { payAmount: payAmountRaw, remainingLessons: remainingLessonsRaw, ...rest } = data;
-    const resolvedPayAmount = resolvePayAmount(payAmountRaw, rest.group, editing?.payAmount);
-    let resolvedRemaining: number | undefined;
-    if (requiresManualRemainingLessons(rest.group)) {
-      const parsedRemaining = Number.parseInt(remainingLessonsRaw, 10);
-      if (!Number.isNaN(parsedRemaining)) {
-        resolvedRemaining = parsedRemaining;
-      }
-    }
-
-    const prepared = {
-      ...rest,
-      payAmount: resolvedPayAmount,
-      remainingLessons: resolvedRemaining,
-      birthDate: parseDateInput(data.birthDate),
-      startDate: parseDateInput(data.startDate),
-      payDate: parseDateInput(data.payDate),
-    };
+    const prepared = transformClientFormValues(data, editing);
     if (editing) {
       const updated: Client = { ...editing, ...prepared };
       const next = {
@@ -214,6 +208,8 @@ export default function ClientsTab({
         onRemove={removeClient}
         onCreateTask={createPaymentTask}
         schedule={db.schedule}
+        attendance={db.attendance}
+        performance={db.performance}
       />
       {modalOpen && (
         <ClientForm

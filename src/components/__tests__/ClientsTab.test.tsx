@@ -30,6 +30,7 @@ import { uid, todayISO, parseDateInput, fmtMoney, fmtDate } from '../../state/ut
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.localStorage.clear();
   commitDBUpdate.mockImplementation(async (next, setDB) => {
     setDB(next);
     return true;
@@ -46,6 +47,7 @@ beforeEach(() => {
 const makeDB = () => ({
   clients: [],
   attendance: [],
+  performance: [],
   schedule: [
     { id: 'slot-1', area: 'Area1', group: 'Group1', coachId: 's1', weekday: 1, time: '10:00', location: '' },
     { id: 'slot-2', area: 'Area1', group: 'Group2', coachId: 's1', weekday: 2, time: '11:00', location: '' },
@@ -243,7 +245,6 @@ test('individual group allows custom payment amount', async () => {
   const db = makeDB();
   db.settings.groups = ['Group1', 'индивидуальные'];
   db.schedule.push({ id: 'slot-ind', area: 'Area1', group: 'индивидуальные', coachId: 's1', weekday: 4, time: '13:00', location: '' });
-
   const { getDB } = renderClients(db);
 
   await userEvent.click(screen.getByText('+ Добавить клиента'));

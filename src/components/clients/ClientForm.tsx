@@ -97,7 +97,6 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         parentName: editing.parentName ?? "",
         payAmount: editing.payAmount != null ? String(editing.payAmount) : String(getDefaultPayAmount(editing.group) ?? ""),
         remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
-
       };
       reset(values);
     } else {
@@ -158,16 +157,16 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
       return;
     }
 
-    const available = groupsByArea.get(selectedArea) ?? [];
-    if (!available.length) {
+    if (!areaGroups.length) {
       return;
     }
 
-    if (!selectedGroup || !available.includes(selectedGroup)) {
-      setValue("group", available[0], { shouldDirty: previousArea !== null && previousArea !== selectedArea });
+    if (!selectedGroup || !areaGroups.includes(selectedGroup)) {
+      setValue("group", areaGroups[0], {
+        shouldDirty: previousArea !== null && previousArea !== selectedArea,
+      });
     }
-  }, [groupsByArea, selectedArea, selectedGroup, setValue]);
-
+  }, [areaGroups, selectedArea, selectedGroup, setValue]);
 
   return (
     <Modal size="xl" onClose={onClose}>
@@ -255,7 +254,6 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-
             <label className="text-xs text-slate-500">Дата оплаты</label>
             <input type="date" className="px-3 py-2 rounded-md border border-slate-300" {...register("payDate")} />
           </div>
@@ -295,7 +293,6 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               <span className="text-xs text-slate-500">Значение рассчитывается автоматически от даты оплаты</span>
             )}
           </div>
-
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">

@@ -5,7 +5,7 @@ import ColumnSettings from "../ColumnSettings";
 import { compareValues, toggleSort, type SortState } from "../tableUtils";
 import { fmtMoney, fmtDate } from "../../state/utils";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { Client, Currency, ScheduleSlot } from "../../types";
+import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
 
 type Props = {
   list: Client[];
@@ -14,6 +14,8 @@ type Props = {
   onRemove: (id: string) => void;
   onCreateTask: (client: Client) => void;
   schedule: ScheduleSlot[];
+  attendance: AttendanceEntry[];
+  performance: PerformanceEntry[];
 };
 
 type ColumnConfig = {
@@ -27,8 +29,7 @@ type ColumnConfig = {
   headerAlign?: "left" | "center" | "right";
 };
 
-export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask, schedule }: Props) {
-
+export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask, schedule, attendance, performance }: Props) {
   const [selected, setSelected] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
     "name",
@@ -50,7 +51,6 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
     });
     return map;
   }, [list, schedule]);
-
 
   const columns: ColumnConfig[] = useMemo(() => [
     {
@@ -274,6 +274,8 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
           client={selected}
           currency={currency}
           schedule={schedule}
+          attendance={attendance}
+          performance={performance}
           onEdit={onEdit}
           onRemove={onRemove}
           onClose={() => setSelected(null)}
