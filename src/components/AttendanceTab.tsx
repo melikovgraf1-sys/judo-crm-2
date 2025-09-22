@@ -257,8 +257,8 @@ export default function AttendanceTab({
         id: "mark",
         label: selectedDateLabel ? `Отметка за ${selectedDateLabel}` : "Отметка",
         width: "minmax(180px, 1fr)",
-        headerAlign: "right" as const,
-        cellClassName: "text-right",
+        headerAlign: "center" as const,
+        cellClassName: "",
         renderCell: (client: Client) => {
           const mark = marksForSelectedDate.get(client.id);
           const label = mark?.came ? "пришёл" : mark ? "не пришёл" : "не отмечен";
@@ -268,16 +268,18 @@ export default function AttendanceTab({
             ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
             : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
           return (
-            <button
-              type="button"
-              onClick={event => {
-                event.stopPropagation();
-                toggle(client.id);
-              }}
-              className={`inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-semibold ${tone}`}
-            >
-              {label}
-            </button>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={event => {
+                  event.stopPropagation();
+                  toggle(client.id);
+                }}
+                className={`inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-semibold ${tone}`}
+              >
+                {label}
+              </button>
+            </div>
           );
         },
         sortValue: (client: Client) => {

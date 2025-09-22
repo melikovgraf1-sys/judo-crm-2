@@ -161,6 +161,7 @@ export default function ClientsTab({
     const next = {
       ...db,
       tasks: nextTasks,
+      tasksArchive: db.tasksArchive,
       clients: nextClients,
       changelog: [
         ...db.changelog,

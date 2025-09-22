@@ -94,6 +94,7 @@ function normalizeDB(value: unknown): DB | null {
     schedule: ensureObjectArray<ScheduleSlot>(raw.schedule),
     leads: ensureObjectArray<Lead>(raw.leads),
     tasks: ensureObjectArray<TaskItem>(raw.tasks),
+    tasksArchive: ensureObjectArray<TaskItem>(raw.tasksArchive),
     staff: ensureObjectArray<StaffMember>(raw.staff),
     settings: normalizeSettings(raw.settings),
     changelog: ensureObjectArray<{ id: string; who: string; what: string; when: string }>(raw.changelog),
@@ -183,12 +184,13 @@ export function can(
     | "schedule"
     | "leads"
     | "tasks"
+    | "analytics"
     | "appeals"
     | "settings",
 ) {
   if (role === "Администратор") return true;
   if (role === "Менеджер") {
-    return ["manage_clients", "leads", "tasks", "attendance", "performance", "schedule", "appeals"].includes(
+    return ["manage_clients", "leads", "tasks", "attendance", "performance", "schedule", "appeals", "analytics"].includes(
       feature,
     );
   }
@@ -479,7 +481,7 @@ export function useAppState(): AppState {
       area: db.settings.areas[0],
       group: db.settings.groups[0],
     } as TaskItem;
-    const next = { ...db, tasks: [t, ...db.tasks] };
+    const next = { ...db, tasks: [t, ...db.tasks], tasksArchive: db.tasksArchive };
     if (await commitDBUpdate(next, setDB)) {
       setQuickOpen(false);
       push("Задача создана", "success");

@@ -44,8 +44,9 @@ function makeDb() {
     clients: [],
     attendance: [],
     schedule: [],
-    leads: [],
-    tasks: [],
+  leads: [],
+  tasks: [],
+  tasksArchive: [],
     staff: [],
     settings: {
       areas: ["A1"],

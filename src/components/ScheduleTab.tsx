@@ -147,7 +147,7 @@ export default function ScheduleTab({
       <div>
         <button onClick={addArea} className="mb-3 px-3 py-1 text-sm rounded-md border border-slate-300">+ район</button>
       </div>
-      <div className="grid lg:grid-cols-3 gap-3">
+      <div className="grid lg:grid-cols-3 gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
         {Object.entries(byArea).map(([area, list]) => (
           <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-2">
             <div className="flex justify-between items-center font-semibold">
@@ -177,7 +177,7 @@ export default function ScheduleTab({
                 return (
                   <div
                     className="grid gap-3"
-                    style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(160px, 1fr))` }}
+                    style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(200px, 1fr))` }}
                   >
                     {columns.map(column => (
                       <div key={column.weekday} className="space-y-1">
@@ -187,7 +187,7 @@ export default function ScheduleTab({
                         <ul className="space-y-1 text-sm">
                           {column.slots.map(slot => (
                             <li key={slot.id} className="flex items-center justify-between gap-2">
-                              <span className="truncate">{slot.time} · {slot.group}</span>
+                              <span className="min-w-0">{slot.time} · {slot.group}</span>
                               <span className="flex gap-1 text-xs">
                                 <button onClick={() => editSlot(slot.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✎</button>
                                 <button onClick={() => deleteSlot(slot.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✕</button>

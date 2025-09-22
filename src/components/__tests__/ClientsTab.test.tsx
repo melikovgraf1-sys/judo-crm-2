@@ -67,6 +67,7 @@ const makeDB = () => ({
   ],
   leads: [],
   tasks: [],
+  tasksArchive: [],
   staff: [{ id: 's1', role: 'Тренер', name: 'Coach1' }],
   settings: {
     areas: ['Area1', 'Area2'],

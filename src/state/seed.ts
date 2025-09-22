@@ -186,6 +186,7 @@ export function makeSeedDB(): DB {
     schedule,
     leads,
     tasks,
+    tasksArchive: [],
     staff,
     settings,
     changelog: [

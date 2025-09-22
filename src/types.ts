@@ -146,6 +146,7 @@ export interface DB {
   schedule: ScheduleSlot[];
   leads: Lead[];
   tasks: TaskItem[];
+  tasksArchive: TaskItem[];
   staff: StaffMember[];
   settings: Settings;
   changelog: { id: string; who: string; what: string; when: string }[];
@@ -162,6 +163,7 @@ export interface UIState {
 
 export type TabKey =
   | "dashboard"
+  | "analytics"
   | "clients"
   | "attendance"
   | "performance"
