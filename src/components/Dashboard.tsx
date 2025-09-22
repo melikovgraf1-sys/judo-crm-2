@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtMoney, fmtDate } from "../state/utils";
+import { buildFavoriteSummaries } from "../state/analytics";
 import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
 
 type MetricCardProps = {
@@ -63,10 +64,18 @@ export default function Dashboard({ db, ui }: DashboardProps) {
 
   const totalLimit = Object.values(db.settings.limits).reduce((a, b) => a + b, 0);
   const fillPct = totalLimit ? Math.round((activeClients / totalLimit) * 100) : 0;
+  const favoriteCards = useMemo(() => buildFavoriteSummaries(db, currency), [db, currency]);
 
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Дашборд"]} />
+      {favoriteCards.length > 0 && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {favoriteCards.map(card => (
+            <MetricCard key={card.id} title={card.title} value={card.value} accent={card.accent} />
+          ))}
+        </div>
+      )}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Ученики всего" value={String(totalClients)} accent="sky" />
         <MetricCard title="Активные (действует)" value={String(activeClients)} accent="green" />

@@ -177,6 +177,7 @@ export function makeSeedDB(): DB {
     rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
     currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
     coachPayFormula: "фикс 100€ + 5€ за ученика",
+    analyticsFavorites: [],
   };
 
   return {

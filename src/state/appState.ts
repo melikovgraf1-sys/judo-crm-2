@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: Settings = {
   rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
   currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
   coachPayFormula: "фикс 100€ + 5€ за ученика",
+  analyticsFavorites: [],
 };
 
 function ensureArray<T>(value: unknown): T[] {
@@ -77,6 +78,7 @@ function normalizeSettings(value: unknown): Settings {
       : DEFAULT_SETTINGS.currencyRates,
     coachPayFormula:
       typeof raw.coachPayFormula === "string" ? raw.coachPayFormula : DEFAULT_SETTINGS.coachPayFormula,
+    analyticsFavorites: ensureArray<string>(raw.analyticsFavorites),
   };
 }
 

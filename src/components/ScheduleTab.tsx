@@ -147,9 +147,12 @@ export default function ScheduleTab({
       <div>
         <button onClick={addArea} className="mb-3 px-3 py-1 text-sm rounded-md border border-slate-300">+ район</button>
       </div>
-      <div className="grid lg:grid-cols-3 gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
+      <div className="flex flex-col gap-3">
         {Object.entries(byArea).map(([area, list]) => (
-          <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-2">
+          <div
+            key={area}
+            className="w-full p-5 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3"
+          >
             <div className="flex justify-between items-center font-semibold">
               <span>{area}</span>
               <span className="flex gap-1 text-xs">
@@ -176,8 +179,8 @@ export default function ScheduleTab({
                 const columnCount = Math.max(1, columns.length);
                 return (
                   <div
-                    className="grid gap-3"
-                    style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(200px, 1fr))` }}
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(240px, 1fr))` }}
                   >
                     {columns.map(column => (
                       <div key={column.weekday} className="space-y-1">

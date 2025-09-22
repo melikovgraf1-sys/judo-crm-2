@@ -137,6 +137,7 @@ export interface Settings {
   rentByAreaEUR: Partial<Record<Area, number>>; // аренда в евро для простоты
   currencyRates: { EUR: number; TRY: number; RUB: number }; // к базовой валюте EUR (1.0)
   coachPayFormula: string; // просто строка, которая описывает формулу (демо)
+  analyticsFavorites: string[];
 }
 
 export interface DB {

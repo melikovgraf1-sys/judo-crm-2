@@ -35,7 +35,8 @@ export default function TasksTab({
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось обновить задачу. Проверьте доступ к базе данных.");
+      window.alert("Не удалось обновить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
     }
   };
   const save = async () => {
@@ -49,7 +50,8 @@ export default function TasksTab({
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось сохранить задачу. Проверьте доступ к базе данных.");
+      window.alert("Не удалось сохранить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
       return;
     }
     setEdit(null);
@@ -65,7 +67,8 @@ export default function TasksTab({
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось добавить задачу. Проверьте доступ к базе данных.");
+      window.alert("Не удалось добавить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
     }
   };
   const remove = async (id: string) => {
@@ -81,7 +84,8 @@ export default function TasksTab({
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось удалить задачу. Проверьте доступ к базе данных.");
+      window.alert("Не удалось удалить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
     }
   };
 
@@ -98,7 +102,8 @@ export default function TasksTab({
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось восстановить задачу. Проверьте доступ к базе данных.");
+      window.alert("Не удалось восстановить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
     }
   };
 

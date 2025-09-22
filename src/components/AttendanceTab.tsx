@@ -173,8 +173,7 @@ export default function AttendanceTab({
 
   const selectedDateISO = useMemo(() => toMiddayISO(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => (selectedDateISO ? fmtDate(selectedDateISO) : ""), [selectedDateISO]);
-
-  const toggle = async (clientId: string) => {
+  const cycleMark = async (clientId: string) => {
     if (!selectedDate) {
       window.alert("Выберите дату для отметки посещаемости.");
       return;
@@ -183,15 +182,28 @@ export default function AttendanceTab({
     const client = db.clients.find(c => c.id === clientId);
     if (!client) return;
     const manual = requiresManualRemainingLessons(client.group);
-    if (mark) {
-      const updated = { ...mark, came: !mark.came };
+
+    if (mark && mark.came === false) {
+      const next = {
+        ...db,
+        attendance: db.attendance.filter(entry => entry.id !== mark.id),
+        clients: db.clients,
+      };
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert(
+          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
+        setDB(next);
+      }
+    } else if (mark) {
+      const updated = { ...mark, came: false };
       const nextClients = !manual
         ? db.clients
         : db.clients.map(c => {
             if (c.id !== clientId) return c;
-            const delta = updated.came ? -1 : 1;
             const current = c.remainingLessons ?? 0;
-            const nextRemaining = Math.max(0, current + delta);
+            const nextRemaining = Math.max(0, current + 1);
             if (nextRemaining === current) {
               return c;
             }
@@ -204,7 +216,10 @@ export default function AttendanceTab({
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
-        window.alert("Не удалось обновить отметку посещаемости. Проверьте доступ к базе данных.");
+        window.alert(
+          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
+        setDB(next);
       }
     } else {
       const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
@@ -223,7 +238,10 @@ export default function AttendanceTab({
       const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
-        window.alert("Не удалось сохранить отметку посещаемости. Проверьте доступ к базе данных.");
+        window.alert(
+          "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
+        setDB(next);
       }
     }
   };
@@ -256,24 +274,24 @@ export default function AttendanceTab({
       {
         id: "mark",
         label: selectedDateLabel ? `Отметка за ${selectedDateLabel}` : "Отметка",
-        width: "minmax(180px, 1fr)",
+        width: "minmax(160px, max-content)",
         headerAlign: "center" as const,
         cellClassName: "",
         renderCell: (client: Client) => {
           const mark = marksForSelectedDate.get(client.id);
-          const label = mark?.came ? "пришёл" : mark ? "не пришёл" : "не отмечен";
+          const label = mark?.came ? "пришёл" : mark ? "не пришёл" : "не отмечено";
           const tone = mark?.came
             ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
             : mark
             ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
             : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
           return (
-            <div className="flex justify-center">
+            <div className="flex justify-start">
               <button
                 type="button"
                 onClick={event => {
                   event.stopPropagation();
-                  toggle(client.id);
+                  cycleMark(client.id);
                 }}
                 className={`inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-semibold ${tone}`}
               >

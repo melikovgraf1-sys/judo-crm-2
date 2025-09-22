@@ -58,7 +58,7 @@ export default function App() {
               path="/analytics"
               element={
                 can(ui.role, "analytics") ? (
-                  <AnalyticsTab db={db} currency={ui.currency} />
+                  <AnalyticsTab db={db} setDB={setDB} currency={ui.currency} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
