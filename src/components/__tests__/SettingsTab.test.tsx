@@ -23,6 +23,7 @@ const createDB = (): DB => ({
     groups: [],
     limits: {},
     rentByAreaEUR: {},
+    coachSalaryByAreaEUR: {},
     currencyRates: { EUR: 1, TRY: 35, RUB: 100 },
     coachPayFormula: "",
     analyticsFavorites: [],
