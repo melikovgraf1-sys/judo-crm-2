@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { commitDBUpdate } from "../state/appState";
 import type { DB } from "../types";
@@ -10,14 +10,48 @@ export default function SettingsTab({
   db: DB;
   setDB: React.Dispatch<React.SetStateAction<DB>>;
 }) {
+  const eurTryRate = db.settings.currencyRates.TRY;
+  const eurRubRate = db.settings.currencyRates.RUB;
+  const tryRubRateFromDB = eurTryRate ? eurRubRate / eurTryRate : 0;
+
   const [rates, setRates] = useState({
-    eurTry: db.settings.currencyRates.TRY,
-    eurRub: db.settings.currencyRates.RUB,
-    tryRub: db.settings.currencyRates.RUB / db.settings.currencyRates.TRY,
+    eurTry: eurTryRate,
+    eurRub: eurRubRate,
+    tryRub: tryRubRateFromDB,
   });
+
+  const fetchInProgressRef = useRef(false);
+  const lastSavedRatesRef = useRef({ eurTry: eurTryRate, eurRub: eurRubRate });
+  const latestDBRef = useRef(db);
+
+  useEffect(() => {
+    latestDBRef.current = db;
+  }, [db]);
+
+  useEffect(() => {
+    lastSavedRatesRef.current = { eurTry: eurTryRate, eurRub: eurRubRate };
+  }, [eurTryRate, eurRubRate]);
+
+  useEffect(() => {
+    setRates(prev => {
+      if (
+        prev.eurTry === eurTryRate &&
+        prev.eurRub === eurRubRate &&
+        prev.tryRub === tryRubRateFromDB
+      ) {
+        return prev;
+      }
+      return { eurTry: eurTryRate, eurRub: eurRubRate, tryRub: tryRubRateFromDB };
+    });
+  }, [eurTryRate, eurRubRate, tryRubRateFromDB]);
 
   useEffect(() => {
     async function fetchRates() {
+      if (fetchInProgressRef.current) {
+        return;
+      }
+
+      fetchInProgressRef.current = true;
       try {
         const fetchRate = async (pair: string) => {
           const res = await fetch(`https://cors.isomorphic-git.org/https://www.google.com/finance/quote/${pair}?hl=en`);
@@ -31,9 +65,9 @@ export default function SettingsTab({
           fetchRate('TRY-RUB'),
         ]);
         const nextRates = {
-          eurTry: eurTry ?? db.settings.currencyRates.TRY,
-          eurRub: eurRub ?? db.settings.currencyRates.RUB,
-          tryRub: tryRub ?? db.settings.currencyRates.RUB / db.settings.currencyRates.TRY,
+          eurTry: eurTry ?? eurTryRate,
+          eurRub: eurRub ?? eurRubRate,
+          tryRub: tryRub ?? tryRubRateFromDB,
         };
 
         setRates(prevRates => {
@@ -47,29 +81,35 @@ export default function SettingsTab({
           return nextRates;
         });
 
-        const hasChanged =
-          db.settings.currencyRates.TRY !== nextRates.eurTry ||
-          db.settings.currencyRates.RUB !== nextRates.eurRub;
+        const hasChanged = eurTryRate !== nextRates.eurTry || eurRubRate !== nextRates.eurRub;
+        const matchesLastSaved =
+          lastSavedRatesRef.current.eurTry === nextRates.eurTry &&
+          lastSavedRatesRef.current.eurRub === nextRates.eurRub;
 
-        if (hasChanged) {
+        if (hasChanged && !matchesLastSaved) {
+          const currentDB = latestDBRef.current;
           const updated = {
-            ...db,
+            ...currentDB,
             settings: {
-              ...db.settings,
+              ...currentDB.settings,
               currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
             },
           };
           const ok = await commitDBUpdate(updated, setDB);
           if (!ok) {
             console.error("Failed to update currency rates in Firestore");
+          } else {
+            lastSavedRatesRef.current = { eurTry: nextRates.eurTry, eurRub: nextRates.eurRub };
           }
         }
       } catch (e) {
         console.error(e);
+      } finally {
+        fetchInProgressRef.current = false;
       }
     }
     fetchRates();
-  }, [db, setDB]);
+  }, [eurTryRate, eurRubRate, tryRubRateFromDB, setDB]);
 
   return (
     <div className="space-y-3">
