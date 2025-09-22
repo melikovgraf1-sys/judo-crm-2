@@ -111,6 +111,12 @@ export default function ClientsTab({
     const prepared = transformClientFormValues(data, editing);
     if (editing) {
       const updated: Client = { ...editing, ...prepared };
+      if (!Object.prototype.hasOwnProperty.call(prepared, "payAmount")) {
+        delete updated.payAmount;
+      }
+      if (!Object.prototype.hasOwnProperty.call(prepared, "remainingLessons")) {
+        delete updated.remainingLessons;
+      }
       const next = {
         ...db,
         clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),

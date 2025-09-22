@@ -206,6 +206,46 @@ test('update: edits client name', async () => {
   await waitFor(() => expect(screen.getByText(/^New/)).toBeInTheDocument());
 });
 
+test('update: moving client between groups clears manual-only fields', async () => {
+  const db = makeDB();
+  db.settings.groups.push('индивидуальные');
+  db.schedule.push({ id: 'slot-ind', area: 'Area1', group: 'индивидуальные', coachId: 's1', weekday: 4, time: '13:00', location: '' });
+  db.clients = [
+    makeClient({
+      id: 'c-manual',
+      firstName: 'Manual',
+      group: 'индивидуальные',
+      phone: '123',
+      remainingLessons: 7,
+      payAmount: 200,
+    }),
+  ];
+
+  const { getDB } = renderClients(db, makeUI(), { initialArea: 'Area1', initialGroup: 'индивидуальные' });
+
+  await waitFor(() => expect(screen.getByText(/^Manual/)).toBeInTheDocument());
+  await userEvent.click(screen.getByText(/^Manual/));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Редактировать' })).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
+
+  const modal = screen.getByText('Редактирование клиента').parentElement;
+  const groupSelect = within(modal).getByText('Группа').parentElement.querySelector('select');
+  await userEvent.selectOptions(groupSelect, 'Group1');
+
+  const save = within(modal).getByRole('button', { name: 'Сохранить' });
+  await waitFor(() => expect(save).toBeEnabled());
+  await userEvent.click(save);
+
+  await waitFor(() => {
+    const updated = getDB().clients.find(c => c.id === 'c-manual');
+    return updated?.group === 'Group1';
+  });
+
+  const updated = getDB().clients.find(c => c.id === 'c-manual');
+  expect(updated?.remainingLessons).toBeUndefined();
+  expect(updated?.payAmount).toBe(55);
+});
+
 test('delete: removes client after confirmation', async () => {
   const db = makeDB();
   db.clients = [makeClient({ id: 'c1', firstName: 'Del' })];
