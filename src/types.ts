@@ -135,6 +135,7 @@ export interface Settings {
   groups: Group[];
   limits: Record<string, number>; // key: `${area}|${group}` => лимит мест
   rentByAreaEUR: Partial<Record<Area, number>>; // аренда в евро для простоты
+  coachSalaryByAreaEUR: Partial<Record<Area, number>>; // выплаты тренерам в евро
   currencyRates: { EUR: number; TRY: number; RUB: number }; // к базовой валюте EUR (1.0)
   coachPayFormula: string; // просто строка, которая описывает формулу (демо)
   analyticsFavorites: string[];
