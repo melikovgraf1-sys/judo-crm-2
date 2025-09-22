@@ -3,10 +3,11 @@ import type { DB, Area, Group, PaymentStatus } from "../../types";
 
 type Props = {
   db: DB,
-  area: Area | "all",
-  setArea: (a: Area | "all") => void,
-  group: Group | "all",
-  setGroup: (g: Group | "all") => void,
+  area: Area | null,
+  setArea: (a: Area | null) => void,
+  group: Group | null,
+  setGroup: (g: Group | null) => void,
+  groups: Group[],
   pay: PaymentStatus | "all",
   setPay: (p: PaymentStatus | "all") => void,
   listLength: number,
@@ -34,6 +35,7 @@ export default function ClientFilters({
   setArea,
   group,
   setGroup,
+  groups,
   pay,
   setPay,
   listLength,
@@ -42,9 +44,9 @@ export default function ClientFilters({
   return (
     <>
       <div className="flex flex-wrap gap-2 items-center">
-        <Chip active={area === "all"} onClick={() => setArea("all")}>Все районы</Chip>
+        <Chip active={area === null} onClick={() => { setArea(null); setGroup(null); }}>Сбросить район</Chip>
         {db.settings.areas.map(a => (
-          <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>
+          <Chip key={a} active={area === a} onClick={() => { setArea(a); setGroup(null); }}>{a}</Chip>
         ))}
         <div className="flex-1" />
         <button
@@ -58,11 +60,13 @@ export default function ClientFilters({
       <div className="flex flex-wrap gap-2 items-center">
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
-          value={group}
-          onChange={e => setGroup(e.target.value)}
+          value={group ?? ""}
+          onChange={e => setGroup(e.target.value ? (e.target.value as Group) : null)}
+          disabled={!area}
+          aria-label="Фильтр по группе"
         >
-          <option value="all">Все группы</option>
-          {db.settings.groups.map(g => (
+          <option value="">Выберите группу</option>
+          {groups.map(g => (
             <option key={g} value={g}>{g}</option>
           ))}
         </select>
@@ -70,13 +74,16 @@ export default function ClientFilters({
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={pay}
           onChange={e => setPay(e.target.value as PaymentStatus | "all")}
+          aria-label="Фильтр по статусу оплаты"
         >
           <option value="all">Все статусы оплаты</option>
           <option value="ожидание">ожидание</option>
           <option value="действует">действует</option>
           <option value="задолженность">задолженность</option>
         </select>
-        <div className="text-xs text-slate-500">Найдено: {listLength}</div>
+        <div className="text-xs text-slate-500">
+          {area && group ? `Найдено: ${listLength}` : "Выберите район и группу"}
+        </div>
       </div>
     </>
   );
