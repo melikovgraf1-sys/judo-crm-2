@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: Settings = {
   rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
   currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
   coachPayFormula: "фикс 100€ + 5€ за ученика",
+  analyticsFavorites: [],
 };
 
 function ensureArray<T>(value: unknown): T[] {
@@ -77,6 +78,7 @@ function normalizeSettings(value: unknown): Settings {
       : DEFAULT_SETTINGS.currencyRates,
     coachPayFormula:
       typeof raw.coachPayFormula === "string" ? raw.coachPayFormula : DEFAULT_SETTINGS.coachPayFormula,
+    analyticsFavorites: ensureArray<string>(raw.analyticsFavorites),
   };
 }
 
@@ -94,6 +96,7 @@ function normalizeDB(value: unknown): DB | null {
     schedule: ensureObjectArray<ScheduleSlot>(raw.schedule),
     leads: ensureObjectArray<Lead>(raw.leads),
     tasks: ensureObjectArray<TaskItem>(raw.tasks),
+    tasksArchive: ensureObjectArray<TaskItem>(raw.tasksArchive),
     staff: ensureObjectArray<StaffMember>(raw.staff),
     settings: normalizeSettings(raw.settings),
     changelog: ensureObjectArray<{ id: string; who: string; what: string; when: string }>(raw.changelog),
@@ -183,12 +186,13 @@ export function can(
     | "schedule"
     | "leads"
     | "tasks"
+    | "analytics"
     | "appeals"
     | "settings",
 ) {
   if (role === "Администратор") return true;
   if (role === "Менеджер") {
-    return ["manage_clients", "leads", "tasks", "attendance", "performance", "schedule", "appeals"].includes(
+    return ["manage_clients", "leads", "tasks", "attendance", "performance", "schedule", "appeals", "analytics"].includes(
       feature,
     );
   }
@@ -432,6 +436,7 @@ export function useAppState(): AppState {
       startDate: todayISO(),
       payMethod: "перевод",
       payStatus: "ожидание",
+      status: "новый",
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
     if (await commitDBUpdate(next, setDB)) {
@@ -478,7 +483,7 @@ export function useAppState(): AppState {
       area: db.settings.areas[0],
       group: db.settings.groups[0],
     } as TaskItem;
-    const next = { ...db, tasks: [t, ...db.tasks] };
+    const next = { ...db, tasks: [t, ...db.tasks], tasksArchive: db.tasksArchive };
     if (await commitDBUpdate(next, setDB)) {
       setQuickOpen(false);
       push("Задача создана", "success");

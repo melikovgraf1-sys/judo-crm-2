@@ -12,6 +12,7 @@ export default function ScheduleTab({
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
 }) {
+  const weekdayNames = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   const byArea = useMemo(() => {
     const m: Record<string, ScheduleSlot[]> = {};
     for (const a of db.settings.areas) m[a] = [];
@@ -146,9 +147,12 @@ export default function ScheduleTab({
       <div>
         <button onClick={addArea} className="mb-3 px-3 py-1 text-sm rounded-md border border-slate-300">+ район</button>
       </div>
-      <div className="grid lg:grid-cols-3 gap-3">
+      <div className="flex flex-col gap-3">
         {Object.entries(byArea).map(([area, list]) => (
-          <div key={area} className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-2">
+          <div
+            key={area}
+            className="w-full p-5 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3"
+          >
             <div className="flex justify-between items-center font-semibold">
               <span>{area}</span>
               <span className="flex gap-1 text-xs">
@@ -156,19 +160,52 @@ export default function ScheduleTab({
                 <button onClick={() => deleteArea(area)} className="px-2 py-1 rounded-md border border-slate-300">✕</button>
               </span>
             </div>
-            <ul className="space-y-1 text-sm">
-              {list
-                .sort((a, b) => a.weekday - b.weekday || a.time.localeCompare(b.time))
-                .map(s => (
-                  <li key={s.id} className="truncate flex justify-between">
-                    <span>{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][s.weekday - 1]} {s.time} · {s.group}</span>
-                    <span className="flex gap-1 text-xs">
-                      <button onClick={() => editSlot(s.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✎</button>
-                      <button onClick={() => deleteSlot(s.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✕</button>
-                    </span>
-                  </li>
-                ))}
-            </ul>
+            {list.length ? (
+              (() => {
+                const grouped = new Map<number, ScheduleSlot[]>();
+                for (const slot of list) {
+                  const slots = grouped.get(slot.weekday) ?? [];
+                  slots.push(slot);
+                  grouped.set(slot.weekday, slots);
+                }
+                const columns = [1, 2, 3, 4, 5, 6, 7]
+                  .filter(day => grouped.has(day))
+                  .map(day => ({
+                    weekday: day,
+                    slots: [...(grouped.get(day) ?? [])].sort(
+                      (a, b) => a.time.localeCompare(b.time) || a.group.localeCompare(b.group),
+                    ),
+                  }));
+                const columnCount = Math.max(1, columns.length);
+                return (
+                  <div
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(240px, 1fr))` }}
+                  >
+                    {columns.map(column => (
+                      <div key={column.weekday} className="space-y-1">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {weekdayNames[column.weekday - 1]}
+                        </div>
+                        <ul className="space-y-1 text-sm">
+                          {column.slots.map(slot => (
+                            <li key={slot.id} className="flex items-center justify-between gap-2">
+                              <span className="min-w-0">{slot.time} · {slot.group}</span>
+                              <span className="flex gap-1 text-xs">
+                                <button onClick={() => editSlot(slot.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✎</button>
+                                <button onClick={() => deleteSlot(slot.id)} className="px-2 py-0.5 rounded-md border border-slate-300">✕</button>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="text-sm text-slate-500">Тренировки не запланированы.</div>
+            )}
             <button onClick={() => addSlot(area)} className="mt-2 px-2 py-1 text-xs rounded-md border border-slate-300">+ группа</button>
           </div>
         ))}

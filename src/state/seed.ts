@@ -13,6 +13,7 @@ import type {
   AttendanceEntry,
   PerformanceEntry,
 } from "../types";
+import { requiresManualRemainingLessons } from "./lessons";
 
 export function makeSeedDB(): DB {
   const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
@@ -97,6 +98,7 @@ export function makeSeedDB(): DB {
     const gender: Gender = Math.random() < 0.5 ? "м" : "ж";
     const area = areas[rnd(0, areas.length - 1)];
     const group = groups[rnd(0, groups.length - 1)];
+    const manual = requiresManualRemainingLessons(group);
     const start = new Date();
     start.setMonth(start.getMonth() - rnd(0, 6));
     return {
@@ -113,9 +115,10 @@ export function makeSeedDB(): DB {
       startDate: start.toISOString(),
       payMethod: "перевод",
       payStatus: "действует",
+      status: "действующий",
       payDate: start.toISOString(),
       payAmount: rnd(50, 100),
-      payConfirmed: Math.random() < 0.7,
+      remainingLessons: manual ? rnd(4, 12) : undefined,
     } as Client;
   });
 
@@ -174,6 +177,7 @@ export function makeSeedDB(): DB {
     rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
     currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
     coachPayFormula: "фикс 100€ + 5€ за ученика",
+    analyticsFavorites: [],
   };
 
   return {
@@ -183,6 +187,7 @@ export function makeSeedDB(): DB {
     schedule,
     leads,
     tasks,
+    tasksArchive: [],
     staff,
     settings,
     changelog: [
