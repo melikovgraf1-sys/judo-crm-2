@@ -6,7 +6,11 @@ import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { uid, todayISO, fmtMoney } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import { applyPaymentStatusRules } from "../state/payments";
+import {
+  applyPaymentStatusRules,
+  getDefaultPayAmount,
+  shouldAllowCustomPayAmount,
+} from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
