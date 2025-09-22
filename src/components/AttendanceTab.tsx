@@ -173,7 +173,6 @@ export default function AttendanceTab({
 
   const selectedDateISO = useMemo(() => toMiddayISO(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => (selectedDateISO ? fmtDate(selectedDateISO) : ""), [selectedDateISO]);
-
   const cycleMark = async (clientId: string) => {
     if (!selectedDate) {
       window.alert("Выберите дату для отметки посещаемости.");
@@ -328,7 +327,6 @@ export default function AttendanceTab({
   }, [columns, list, sort]);
 
   const columnTemplate = activeColumns.length ? activeColumns.map(column => column.width).join(" ") : "1fr";
-
   const startEdit = (client: Client) => {
     setEditing(client);
   };
