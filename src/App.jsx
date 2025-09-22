@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Topbar from "./components/Topbar";
 import Tabs from "./components/Tabs";
 import Dashboard from "./components/Dashboard";
+import AnalyticsTab from "./components/AnalyticsTab";
 import ClientsTab from "./components/ClientsTab";
 import AttendanceTab from "./components/AttendanceTab";
 import PerformanceTab from "./components/PerformanceTab";
@@ -53,6 +54,16 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard db={db} ui={ui} />} />
+            <Route
+              path="/analytics"
+              element={
+                can(ui.role, "analytics") ? (
+                  <AnalyticsTab db={db} currency={ui.currency} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
             <Route
               path="/clients"
               element={

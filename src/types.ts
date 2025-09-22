@@ -12,6 +12,8 @@ export type PaymentMethod = "наличные" | "перевод";
 
 export type PaymentStatus = "ожидание" | "действует" | "задолженность";
 
+export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
+
 export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты" | "Оплаченный абонемент" | "Отмена";
 
 export type Currency = "EUR" | "TRY" | "RUB";
@@ -31,9 +33,10 @@ export interface Client {
   startDate: string; // ISO
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
+  status: ClientStatus;
   payDate?: string; // ISO
   payAmount?: number;
-  payConfirmed?: boolean;
+  remainingLessons?: number;
   // Автополя (рассчитываются на лету)
 }
 
@@ -50,7 +53,10 @@ export interface ClientFormValues {
   startDate: string;
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
+  status: ClientStatus;
   payDate: string;
+  payAmount: string;
+  remainingLessons: string;
 }
 
 export interface AttendanceEntry {
@@ -140,6 +146,7 @@ export interface DB {
   schedule: ScheduleSlot[];
   leads: Lead[];
   tasks: TaskItem[];
+  tasksArchive: TaskItem[];
   staff: StaffMember[];
   settings: Settings;
   changelog: { id: string; who: string; what: string; when: string }[];
@@ -156,6 +163,7 @@ export interface UIState {
 
 export type TabKey =
   | "dashboard"
+  | "analytics"
   | "clients"
   | "attendance"
   | "performance"

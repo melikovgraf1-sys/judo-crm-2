@@ -77,6 +77,7 @@ const makeDB = () => ({
     },
   ],
   tasks: [],
+  tasksArchive: [],
   staff: [],
   settings: {
     areas: ['Area1'],

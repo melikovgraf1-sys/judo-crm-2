@@ -3,19 +3,6 @@ import Breadcrumbs from "./Breadcrumbs";
 import { fmtMoney, fmtDate } from "../state/utils";
 import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
 
-function OfflineTip() {
-  return (
-    <div className="m-3 p-3 rounded-xl bg-blue-50 border border-blue-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
-      <div className="font-medium mb-1">Как сохранить и работать офлайн</div>
-      <ul className="list-disc pl-5 text-sm space-y-1">
-        <li>В браузере откройте эту страницу, оставьте её открытой один раз (кешируется автоматически).</li>
-        <li>Добавить на главный экран: в мобильном браузере «Поделиться» → «На экран домой».</li>
-        <li>Отметки посещаемости и данные сохраняются локально. Позже можно синхронизировать (функция будет добавлена).</li>
-      </ul>
-    </div>
-  );
-}
-
 type MetricCardProps = {
   title: string;
   value: string;
@@ -80,7 +67,6 @@ export default function Dashboard({ db, ui }: DashboardProps) {
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Дашборд"]} />
-      <OfflineTip />
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricCard title="Ученики всего" value={String(totalClients)} accent="sky" />
         <MetricCard title="Активные (действует)" value={String(activeClients)} accent="green" />
