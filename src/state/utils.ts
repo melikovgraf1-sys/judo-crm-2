@@ -6,7 +6,11 @@ export const rnd = (min: number, max: number) =>
 export const uid = () =>
   Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 
-export const todayISO = () => new Date().toISOString();
+export const todayISO = () => {
+  const now = new Date();
+  const normalized = new Date(now.getTime() - now.getTimezoneOffset() * 60 * 1000);
+  return normalized.toISOString();
+};
 
 export const fmtDate = (iso: string) =>
   new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
