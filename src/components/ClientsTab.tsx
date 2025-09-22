@@ -114,8 +114,8 @@ export default function ClientsTab({
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
-        window.alert("Не удалось сохранить изменения клиента. Проверьте доступ к базе данных.");
-        return;
+        window.alert("Не удалось синхронизировать изменения клиента. Они сохранены локально, проверьте доступ к базе данных.");
+        setDB(next);
       }
     } else {
       const c: Client = {
@@ -130,8 +130,8 @@ export default function ClientsTab({
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
-        window.alert("Не удалось сохранить нового клиента. Проверьте доступ к базе данных.");
-        return;
+        window.alert("Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.");
+        setDB(next);
       }
     }
     setModalOpen(false);

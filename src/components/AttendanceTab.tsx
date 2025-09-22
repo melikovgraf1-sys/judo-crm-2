@@ -20,6 +20,22 @@ import type {
   Group,
 } from "../types";
 
+const toMiddayISO = (value: string): string | null => {
+  if (!value) return null;
+  const [yearStr, monthStr, dayStr] = value.split("-");
+  const year = Number.parseInt(yearStr, 10);
+  const month = Number.parseInt(monthStr, 10) - 1;
+  const day = Number.parseInt(dayStr, 10);
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+    return null;
+  }
+  const date = new Date(Date.UTC(year, month, day, 12, 0, 0));
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString();
+};
+
 export default function AttendanceTab({
   db,
   setDB,
@@ -35,6 +51,7 @@ export default function AttendanceTab({
   const [editing, setEditing] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["name", "area", "group", "mark"]);
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
+  const [selectedDate, setSelectedDate] = useState(() => todayISO().slice(0, 10));
   const [sort, setSort] = useState<SortState | null>(null);
 
   const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
@@ -65,6 +82,22 @@ export default function AttendanceTab({
     }
     return base;
   }, [month]);
+
+  useEffect(() => {
+    if (!selectedMonthDate) return;
+    const prefix = `${selectedMonthDate.getFullYear()}-${String(selectedMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    if (selectedDate.slice(0, 7) !== prefix) {
+      const normalized = new Date(Date.UTC(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth(), 1, 12, 0, 0));
+      setSelectedDate(normalized.toISOString().slice(0, 10));
+    }
+  }, [selectedDate, selectedMonthDate]);
+
+  useEffect(() => {
+    const prefix = selectedDate.slice(0, 7);
+    if (prefix && prefix !== month) {
+      setMonth(prefix);
+    }
+  }, [month, selectedDate]);
 
   const list = useMemo(() => {
     if (!area || !group) {
@@ -123,21 +156,30 @@ export default function AttendanceTab({
       cursor.setDate(cursor.getDate() + 1);
     }
 
+    result.sort((a, b) => a.date.localeCompare(b.date));
+
     return result;
   }, [area, db.schedule, group, selectedMonthDate, todayStr]);
 
-  const todayMarks = useMemo(() => {
+  const marksForSelectedDate = useMemo(() => {
     const map: Map<string, AttendanceEntry> = new Map();
     db.attendance.forEach(entry => {
-      if (entry.date.slice(0, 10) === todayStr) {
+      if (entry.date.slice(0, 10) === selectedDate) {
         map.set(entry.clientId, entry);
       }
     });
     return map;
-  }, [db.attendance, todayStr]);
+  }, [db.attendance, selectedDate]);
+
+  const selectedDateISO = useMemo(() => toMiddayISO(selectedDate), [selectedDate]);
+  const selectedDateLabel = useMemo(() => (selectedDateISO ? fmtDate(selectedDateISO) : ""), [selectedDateISO]);
 
   const toggle = async (clientId: string) => {
-    const mark = todayMarks.get(clientId);
+    if (!selectedDate) {
+      window.alert("Выберите дату для отметки посещаемости.");
+      return;
+    }
+    const mark = marksForSelectedDate.get(clientId);
     const client = db.clients.find(c => c.id === clientId);
     if (!client) return;
     const manual = requiresManualRemainingLessons(client.group);
@@ -165,7 +207,8 @@ export default function AttendanceTab({
         window.alert("Не удалось обновить отметку посещаемости. Проверьте доступ к базе данных.");
       }
     } else {
-      const entry: AttendanceEntry = { id: uid(), clientId, date: new Date().toISOString(), came: true };
+      const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
+      const entry: AttendanceEntry = { id: uid(), clientId, date: desiredDate, came: true };
       const nextClients = !manual
         ? db.clients
         : db.clients.map(c => {
@@ -212,12 +255,12 @@ export default function AttendanceTab({
       },
       {
         id: "mark",
-        label: "Отметка",
+        label: selectedDateLabel ? `Отметка за ${selectedDateLabel}` : "Отметка",
         width: "minmax(180px, 1fr)",
         headerAlign: "right" as const,
         cellClassName: "text-right",
         renderCell: (client: Client) => {
-          const mark = todayMarks.get(client.id);
+          const mark = marksForSelectedDate.get(client.id);
           const label = mark?.came ? "пришёл" : mark ? "не пришёл" : "не отмечен";
           const tone = mark?.came
             ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
@@ -238,13 +281,13 @@ export default function AttendanceTab({
           );
         },
         sortValue: (client: Client) => {
-          const mark = todayMarks.get(client.id);
+          const mark = marksForSelectedDate.get(client.id);
           if (!mark) return 0;
           return mark.came ? 2 : 1;
         },
       },
     ];
-  }, [todayMarks]);
+  }, [marksForSelectedDate, selectedDateLabel]);
 
   const activeColumns = useMemo(
     () => columns.filter(column => visibleColumns.includes(column.id)),
@@ -321,7 +364,15 @@ export default function AttendanceTab({
           onChange={event => setMonth(event.target.value || todayISO().slice(0, 7))}
           disabled={!group}
         />
+        <input
+          type="date"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={selectedDate}
+          onChange={event => setSelectedDate(event.target.value || todayStr)}
+          disabled={!group}
+        />
         <div className="text-xs text-slate-500">Сегодня: {fmtDate(new Date().toISOString())}</div>
+        <div className="text-xs text-slate-500">Отмечаем: {selectedDateLabel || "—"}</div>
         <div className="grow" />
         <ColumnSettings
           options={columns.map(column => ({ id: column.id, label: column.label }))}
@@ -337,21 +388,27 @@ export default function AttendanceTab({
           </div>
           <div className="flex flex-wrap gap-2 p-3">
             {scheduleDays.length ? (
-              scheduleDays.map(day => (
-                <div
-                  key={day.date}
-                  className={`min-w-[120px] rounded-lg border px-3 py-2 text-xs shadow-sm transition ${
-                    day.isToday
-                      ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-200"
-                      : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                  }`}
-                >
-                  <div className="font-semibold text-sm">{day.label}</div>
-                  <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    {day.times.join(", ")}
-                  </div>
-                </div>
-              ))
+              scheduleDays.map(day => {
+                const isSelected = day.date === selectedDate;
+                const baseTone = day.isToday
+                  ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-200"
+                  : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
+                const selectionRing = isSelected ? "ring-2 ring-sky-400 dark:ring-sky-300" : "";
+                return (
+                  <button
+                    key={day.date}
+                    type="button"
+                    className={`min-w-[120px] rounded-lg border px-3 py-2 text-left text-xs shadow-sm transition ${baseTone} ${selectionRing}`}
+                    onClick={() => setSelectedDate(day.date)}
+                    aria-pressed={isSelected}
+                  >
+                    <div className="font-semibold text-sm">{day.label}</div>
+                    <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {day.times.join(", ")}
+                    </div>
+                  </button>
+                );
+              })
             ) : (
               <div className="text-xs text-slate-500">В выбранном месяце нет тренировок для этой группы.</div>
             )}
