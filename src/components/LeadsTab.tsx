@@ -32,7 +32,7 @@ export default function LeadsTab({
     const nextStage = stages[Math.min(stages.length - 1, Math.max(0, idx + dir))];
     const updatedLead: Lead = { ...current, stage: nextStage, updatedAt: todayISO() };
 
-    if (nextStage === "Оплаченный абонемент") {
+    if (isPaidStage(nextStage)) {
       const newClient = convertLeadToClient(updatedLead, db);
       const next = {
         ...db,
@@ -103,6 +103,8 @@ export default function LeadsTab({
     </div>
   );
 }
+
+const isPaidStage = (stage: LeadStage): boolean => stage.toLowerCase().includes("оплач");
 
 function convertLeadToClient(lead: Lead, db: DB): Client {
   const fallbackDate = lead.updatedAt ?? todayISO();
@@ -242,42 +244,127 @@ function LeadModal(
 
   return (
     <Modal size="lg" onClose={onClose}>
-      <div className="font-semibold text-slate-800">{lead.name}</div>
-      <div className="grid gap-1 text-sm">
-        <div><span className="text-slate-500">Родитель:</span> {lead.parentName || "—"}</div>
-        <div><span className="text-slate-500">Имя ребёнка:</span> {lead.firstName ?? "—"}</div>
-        <div><span className="text-slate-500">Фамилия:</span> {lead.lastName ?? "—"}</div>
-        <div><span className="text-slate-500">Дата рождения:</span> {lead.birthDate ? fmtDate(lead.birthDate) : "—"}</div>
-        <div><span className="text-slate-500">Старт:</span> {lead.startDate ? fmtDate(lead.startDate) : "—"}</div>
-        <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
-        <div><span className="text-slate-500">Телефон:</span> {lead.phone || "—"}</div>
-        <div><span className="text-slate-500">WhatsApp:</span> {lead.whatsApp || "—"}</div>
-        <div><span className="text-slate-500">Telegram:</span> {lead.telegram || "—"}</div>
-        <div><span className="text-slate-500">Instagram:</span> {lead.instagram || "—"}</div>
-        <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>
-        <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
-      </div>
-      <div className="flex justify-end gap-2">
-        {!edit && <button onClick={() => setEdit(true)} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Редактировать</button>}
-        <button onClick={remove} className="px-3 py-2 rounded-md border border-rose-200 text-rose-600 dark:border-rose-700 dark:bg-rose-900/20">Удалить</button>
-        <button onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Закрыть</button>
-      </div>
-      {edit && (
-        <form onSubmit={handleSubmit(save)} className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("name")} placeholder="Имя" />
-          {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("parentName")} placeholder="Родитель" />
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("phone")} placeholder="Телефон" />
-          {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("whatsApp")} placeholder="WhatsApp" />
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("telegram")} placeholder="Telegram" />
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("instagram")} placeholder="Instagram" />
-          <div className="flex justify-end gap-2">
-            <button type="submit" disabled={!isValid} className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400">Сохранить</button>
-            <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Отмена</button>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{lead.name}</div>
+            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{lead.stage}</div>
           </div>
-        </form>
-      )}
+          <div className="flex flex-wrap justify-end gap-2">
+            {!edit && (
+              <button
+                onClick={() => setEdit(true)}
+                className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+              >
+                Редактировать
+              </button>
+            )}
+            <button
+              onClick={remove}
+              className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
+            >
+              Удалить
+            </button>
+            <button
+              onClick={onClose}
+              className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <InfoRow label="Имя ребёнка" value={lead.firstName ?? "—"} />
+          <InfoRow label="Фамилия" value={lead.lastName ?? "—"} />
+          <InfoRow label="Родитель" value={lead.parentName || "—"} />
+          <InfoRow label="Источник" value={lead.source} />
+          <InfoRow label="Телефон" value={lead.phone || "—"} />
+          <InfoRow label="WhatsApp" value={lead.whatsApp || "—"} />
+          <InfoRow label="Telegram" value={lead.telegram || "—"} />
+          <InfoRow label="Instagram" value={lead.instagram || "—"} />
+          <InfoRow label="Дата рождения" value={lead.birthDate ? fmtDate(lead.birthDate) : "—"} />
+          <InfoRow label="Старт" value={lead.startDate ? fmtDate(lead.startDate) : "—"} />
+          <InfoRow label="Создан" value={fmtDate(lead.createdAt)} />
+          <InfoRow label="Обновлён" value={fmtDate(lead.updatedAt)} />
+        </div>
+
+        <InfoRow
+          label="Заметки"
+          value={lead.notes ? <span className="whitespace-pre-line">{lead.notes}</span> : "—"}
+        />
+
+        {edit && (
+          <form
+            onSubmit={handleSubmit(save)}
+            className="space-y-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("name")}
+                  placeholder="Имя"
+                />
+                {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
+              </div>
+              <div className="sm:col-span-2">
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("parentName")}
+                  placeholder="Родитель"
+                />
+              </div>
+              <input
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                {...register("phone")}
+                placeholder="Телефон"
+              />
+              <input
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                {...register("whatsApp")}
+                placeholder="WhatsApp"
+              />
+              <input
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                {...register("telegram")}
+                placeholder="Telegram"
+              />
+              <input
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                {...register("instagram")}
+                placeholder="Instagram"
+              />
+            </div>
+            {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
+            <div className="flex justify-end gap-2">
+              <button
+                type="submit"
+                disabled={!isValid}
+                className="rounded-md bg-sky-600 px-3 py-2 text-sm text-white disabled:bg-slate-400"
+              >
+                Сохранить
+              </button>
+              <button
+                type="button"
+                onClick={() => setEdit(false)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+              >
+                Отмена
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </Modal>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-slate-700 dark:text-slate-100">{value}</span>
+    </div>
   );
 }
