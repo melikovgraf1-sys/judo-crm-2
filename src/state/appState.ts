@@ -41,6 +41,7 @@ const DEFAULT_SETTINGS: Settings = {
     ),
   ) as Settings["limits"],
   rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
+  coachSalaryByAreaEUR: { Махмутлар: 0, Центр: 0, Джикджилли: 0 },
   currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
   coachPayFormula: "фикс 100€ + 5€ за ученика",
   analyticsFavorites: [],
@@ -73,6 +74,10 @@ function normalizeSettings(value: unknown): Settings {
       raw.rentByAreaEUR && typeof raw.rentByAreaEUR === "object"
         ? (raw.rentByAreaEUR as Settings["rentByAreaEUR"])
         : DEFAULT_SETTINGS.rentByAreaEUR,
+    coachSalaryByAreaEUR:
+      raw.coachSalaryByAreaEUR && typeof raw.coachSalaryByAreaEUR === "object"
+        ? (raw.coachSalaryByAreaEUR as Settings["coachSalaryByAreaEUR"])
+        : DEFAULT_SETTINGS.coachSalaryByAreaEUR,
     currencyRates: raw.currencyRates
       ? { ...DEFAULT_SETTINGS.currencyRates, ...raw.currencyRates }
       : DEFAULT_SETTINGS.currencyRates,

@@ -27,6 +27,8 @@ const METRIC_ORDER: MetricKey[] = ["revenue", "profit", "fill", "athletes"];
 export default function AnalyticsTab({ db, setDB, currency }: Props) {
   const areas = useMemo(() => getAnalyticsAreas(db), [db]);
   const [area, setArea] = useState<AreaScope>(areas[0] ?? "all");
+  const [rentInput, setRentInput] = useState("0");
+  const [coachSalaryInput, setCoachSalaryInput] = useState("0");
 
   useEffect(() => {
     if (!areas.includes(area)) {
@@ -34,8 +36,80 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     }
   }, [area, areas]);
 
+  useEffect(() => {
+    if (area === "all") {
+      setRentInput("0");
+      setCoachSalaryInput("0");
+      return;
+    }
+    const rentValue = db.settings.rentByAreaEUR?.[area];
+    setRentInput(typeof rentValue === "number" && Number.isFinite(rentValue) ? String(rentValue) : "0");
+    const salaryValue = db.settings.coachSalaryByAreaEUR?.[area];
+    setCoachSalaryInput(typeof salaryValue === "number" && Number.isFinite(salaryValue) ? String(salaryValue) : "0");
+  }, [area, db]);
+
   const favorites = db.settings.analyticsFavorites ?? [];
   const snapshot = useMemo(() => computeAnalyticsSnapshot(db, area), [db, area]);
+
+  const parseInputValue = useCallback((raw: string): number => {
+    if (!raw.trim()) {
+      return 0;
+    }
+    const normalized = raw.replace(/,/g, ".");
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }, []);
+
+  const persistAreaValue = useCallback(
+    async (field: "rentByAreaEUR" | "coachSalaryByAreaEUR", value: number) => {
+      if (area === "all") {
+        return;
+      }
+      const currentMap = field === "rentByAreaEUR" ? db.settings.rentByAreaEUR : db.settings.coachSalaryByAreaEUR;
+      const rawCurrent = currentMap?.[area];
+      const currentValue = typeof rawCurrent === "number" && Number.isFinite(rawCurrent) ? rawCurrent : 0;
+      if (currentValue === value) {
+        return;
+      }
+      const nextSettings: DB["settings"] = {
+        ...db.settings,
+        [field]: { ...(currentMap ?? {}), [area]: value },
+      } as DB["settings"];
+      const next = { ...db, settings: nextSettings };
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert(
+          "Не удалось сохранить значение. Изменение сохранено локально, проверьте подключение к базе данных.",
+        );
+        setDB(next);
+      }
+    },
+    [area, db, setDB],
+  );
+
+  const handleRentCommit = useCallback(
+    (value?: string) => {
+      if (area === "all") {
+        return;
+      }
+      const parsed = parseInputValue(value ?? rentInput);
+      setRentInput(String(parsed));
+      void persistAreaValue("rentByAreaEUR", parsed);
+    },
+    [area, parseInputValue, persistAreaValue, rentInput],
+  );
+
+  const handleCoachSalaryCommit = useCallback(
+    (value?: string) => {
+      if (area === "all") {
+        return;
+      }
+      const parsed = parseInputValue(value ?? coachSalaryInput);
+      setCoachSalaryInput(String(parsed));
+      void persistAreaValue("coachSalaryByAreaEUR", parsed);
+    },
+    [area, coachSalaryInput, parseInputValue, persistAreaValue],
+  );
 
   const toggleFavorite = useCallback(
     async (metric: MetricKey, projection: ProjectionKey) => {
@@ -72,6 +146,49 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
       return formatMetricValue(entry.values[projection], entry.unit, currency);
     },
     [currency, snapshot.metrics],
+  );
+
+  const athleteMetrics = useMemo(
+    () => [
+      {
+        key: "total",
+        label: "Кол-во спортсменов",
+        value: snapshot.athleteStats.total.toLocaleString("ru-RU"),
+      },
+      {
+        key: "new",
+        label: "Кол-во новых спортсменов",
+        value: snapshot.athleteStats.new.toLocaleString("ru-RU"),
+      },
+      {
+        key: "firstRenewals",
+        label: "Кол-во первых продлений",
+        value: snapshot.athleteStats.firstRenewals.toLocaleString("ru-RU"),
+      },
+      {
+        key: "canceled",
+        label: "Кол-во отмененных клиентов",
+        value: snapshot.athleteStats.canceled.toLocaleString("ru-RU"),
+      },
+      {
+        key: "returned",
+        label: "Кол-во возвращенных клиентов",
+        value: snapshot.athleteStats.returned.toLocaleString("ru-RU"),
+      },
+      {
+        key: "dropIns",
+        label: "Кол-во разовых",
+        value: snapshot.athleteStats.dropIns.toLocaleString("ru-RU"),
+      },
+      {
+        key: "attendanceRate",
+        label: "Посещаемость",
+        value: `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(
+          snapshot.athleteStats.attendanceRate,
+        )}%`,
+      },
+    ],
+    [snapshot.athleteStats],
   );
 
   return (
@@ -155,14 +272,79 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
-        <span>
-          Вместимость выбранного направления: <strong>{snapshot.capacity || "—"}</strong>
-        </span>
-        <span>
-          Аренда (EUR): <strong>{snapshot.rent.toLocaleString("ru-RU", { maximumFractionDigits: 0 })}</strong>
-        </span>
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
+          <span>
+            Вместимость выбранного направления: <strong>{snapshot.capacity || "—"}</strong>
+          </span>
+          <span>
+            Аренда (EUR): <strong>{snapshot.rent.toLocaleString("ru-RU", { maximumFractionDigits: 0 })}</strong>
+          </span>
+          <span>
+            Зарплата тренера (EUR):{' '}
+            <strong>{snapshot.coachSalary.toLocaleString("ru-RU", { maximumFractionDigits: 0 })}</strong>
+          </span>
+        </div>
+        {area !== "all" && (
+          <div className="flex flex-wrap items-end gap-4">
+            <label className="flex flex-col text-sm font-medium text-slate-600 dark:text-slate-300">
+              <span className="mb-1">Аренда (EUR)</span>
+              <input
+                type="number"
+                className="w-40 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/40"
+                value={rentInput}
+                onChange={event => setRentInput(event.target.value)}
+                onBlur={() => handleRentCommit()}
+                onKeyDown={event => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleRentCommit();
+                  }
+                }}
+                inputMode="decimal"
+                min="0"
+              />
+            </label>
+            <label className="flex flex-col text-sm font-medium text-slate-600 dark:text-slate-300">
+              <span className="mb-1">Зарплата тренера (EUR)</span>
+              <input
+                type="number"
+                className="w-40 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-500/40"
+                value={coachSalaryInput}
+                onChange={event => setCoachSalaryInput(event.target.value)}
+                onBlur={() => handleCoachSalaryCommit()}
+                onKeyDown={event => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleCoachSalaryCommit();
+                  }
+                }}
+                inputMode="decimal"
+                min="0"
+              />
+            </label>
+          </div>
+        )}
       </div>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+          <h2 className="text-base font-semibold text-slate-700 dark:text-slate-100">Спортсмены</h2>
+        </div>
+        <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {athleteMetrics.map(item => (
+            <div
+              key={item.key}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {item.label}
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

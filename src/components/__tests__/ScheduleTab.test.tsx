@@ -52,6 +52,7 @@ function makeDb() {
       groups: ['G1'],
       limits: {},
       rentByAreaEUR: {},
+      coachSalaryByAreaEUR: {},
       currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
       coachPayFormula: '',
     },
