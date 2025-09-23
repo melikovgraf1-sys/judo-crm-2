@@ -86,9 +86,15 @@ function collectActiveAreas(db: DB): Area[] {
   for (const slot of db.schedule) {
     scheduled.add(slot.area);
   }
+
+  const clientAreas = new Set<Area>();
+  for (const client of db.clients) {
+    clientAreas.add(client.area);
+  }
+
   const result: Area[] = [];
   for (const area of db.settings.areas) {
-    if (scheduled.has(area)) {
+    if (scheduled.has(area) || clientAreas.has(area)) {
       result.push(area);
     }
   }
