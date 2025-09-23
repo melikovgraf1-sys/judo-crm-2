@@ -5,6 +5,7 @@ import Tabs from "./components/Tabs";
 import Dashboard from "./components/Dashboard";
 import AnalyticsTab from "./components/AnalyticsTab";
 import ClientsTab from "./components/ClientsTab";
+import GroupsTab from "./components/GroupsTab";
 import AttendanceTab from "./components/AttendanceTab";
 import PerformanceTab from "./components/PerformanceTab";
 import TasksTab from "./components/TasksTab";
@@ -59,6 +60,16 @@ export default function App() {
               element={
                 can(ui.role, "analytics") ? (
                   <AnalyticsTab db={db} setDB={setDB} currency={ui.currency} />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              }
+            />
+            <Route
+              path="/groups"
+              element={
+                can(ui.role, "manage_clients") ? (
+                  <GroupsTab db={db} setDB={setDB} ui={ui} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )
