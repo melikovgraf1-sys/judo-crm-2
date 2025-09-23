@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { commitDBUpdate } from "../state/appState";
 import type { DB } from "../types";
@@ -34,6 +34,56 @@ export default function SettingsTab({
   useEffect(() => {
     latestDBRef.current = db;
   }, [db]);
+
+  const areasWithSchedule = useMemo(() => {
+    const scheduledAreas = new Set(db.schedule.map(slot => slot.area));
+    const ordered: string[] = [];
+
+    for (const area of db.settings.areas) {
+      if (scheduledAreas.has(area)) {
+        ordered.push(area);
+        scheduledAreas.delete(area);
+      }
+    }
+
+    for (const slot of db.schedule) {
+      if (scheduledAreas.has(slot.area)) {
+        ordered.push(slot.area);
+        scheduledAreas.delete(slot.area);
+      }
+    }
+
+    return ordered;
+  }, [db.schedule, db.settings.areas]);
+
+  const groupsByArea = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const seenGroups = new Map<string, Set<string>>();
+
+    for (const slot of db.schedule) {
+      const area = slot.area;
+      const group = slot.group;
+
+      if (!map.has(area)) {
+        map.set(area, []);
+        seenGroups.set(area, new Set());
+      }
+
+      const areaSeen = seenGroups.get(area)!;
+      if (!areaSeen.has(group)) {
+        areaSeen.add(group);
+        map.get(area)!.push(group);
+      }
+    }
+
+    for (const area of areasWithSchedule) {
+      if (!map.has(area)) {
+        map.set(area, []);
+      }
+    }
+
+    return map;
+  }, [areasWithSchedule, db.schedule]);
 
   useEffect(() => {
     lastSavedRatesRef.current = { eurTry: eurTryRate, eurRub: eurRubRate };
@@ -254,32 +304,51 @@ export default function SettingsTab({
       <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3">
         <div className="font-semibold">Лимиты мест</div>
         <div className="grid md:grid-cols-3 gap-4">
-          {db.settings.areas.map(area => (
-            <div key={area} className="space-y-2">
-              <div className="font-medium">{area}</div>
-              {db.settings.groups.map(group => {
-                const key = `${area}|${group}`;
-                return (
-                  <div key={key} className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2 dark:border-slate-700 dark:bg-slate-800">
-                    <div className="truncate">{group}</div>
-                    <input
-                      type="number"
-                      min={0}
-                      className="w-24 px-2 py-1 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                      value={db.settings.limits[key] ?? 0}
-                      onChange={async e => {
-                        const next = { ...db, settings: { ...db.settings, limits: { ...db.settings.limits, [key]: Number(e.target.value) } } };
-                        const ok = await commitDBUpdate(next, setDB);
-                        if (!ok) {
-                          window.alert("Не удалось сохранить лимит. Проверьте доступ к базе данных.");
-                        }
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+          {areasWithSchedule.map(area => {
+            const groups = groupsByArea.get(area) ?? [];
+            return (
+              <div key={area} className="space-y-2">
+                <div className="font-medium">{area}</div>
+                {groups.length ? (
+                  groups.map(group => {
+                    const key = `${area}|${group}`;
+                    return (
+                      <div
+                        key={key}
+                        className="text-sm flex items-center justify-between gap-2 border border-slate-200 rounded-xl p-2 dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        <div className="truncate">{group}</div>
+                        <input
+                          type="number"
+                          min={0}
+                          className="w-24 px-2 py-1 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                          value={db.settings.limits[key] ?? 0}
+                          onChange={async e => {
+                            const next = {
+                              ...db,
+                              settings: {
+                                ...db.settings,
+                                limits: { ...db.settings.limits, [key]: Number(e.target.value) },
+                              },
+                            };
+                            const ok = await commitDBUpdate(next, setDB);
+                            if (!ok) {
+                              window.alert("Не удалось сохранить лимит. Проверьте доступ к базе данных.");
+                            }
+                          }}
+                        />
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-slate-500">Нет групп в расписании.</div>
+                )}
+              </div>
+            );
+          })}
+          {areasWithSchedule.length === 0 && (
+            <div className="text-sm text-slate-500 col-span-full">Добавьте тренировки в расписании, чтобы указать лимиты.</div>
+          )}
         </div>
       </div>
     </div>
