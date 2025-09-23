@@ -12,9 +12,16 @@ import {
   shouldAllowCustomPayAmount,
 } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
-import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
+import { readDailyPeriod, readDailySelection, writeDailyPeriod, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
+import {
+  collectAvailableYears,
+  formatMonthInput,
+  getDefaultPeriod,
+  isClientInPeriod,
+  type PeriodFilter,
+} from "../state/period";
 
 
 export default function GroupsTab({
@@ -38,6 +45,14 @@ export default function GroupsTab({
   const [pay, setPay] = useState<PaymentStatus | "all">(initialPay);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
+  const persistedPeriod = useMemo(() => readDailyPeriod("groups"), []);
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const fallback = getDefaultPeriod();
+    return {
+      year: persistedPeriod.year ?? fallback.year,
+      month: persistedPeriod.month ?? fallback.month,
+    };
+  });
 
   const search = ui.search.toLowerCase();
   const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
@@ -45,6 +60,10 @@ export default function GroupsTab({
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
+
+  useEffect(() => {
+    writeDailyPeriod("groups", period.month, period.year);
+  }, [period]);
 
   useEffect(() => {
     if (area || group) {
@@ -74,9 +93,37 @@ export default function GroupsTab({
       c.area === area &&
       c.group === group &&
       (pay === "all" || c.payStatus === pay) &&
+      isClientInPeriod(c, period) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
-  }, [db.clients, area, group, pay, ui.search, search]);
+  }, [db.clients, area, group, pay, ui.search, search, period]);
+
+  const monthValue = formatMonthInput(period);
+  const baseYears = useMemo(() => collectAvailableYears(db), [db]);
+  const yearOptions = useMemo(() => {
+    if (baseYears.includes(period.year)) {
+      return baseYears;
+    }
+    return [...baseYears, period.year].sort((a, b) => b - a);
+  }, [baseYears, period.year]);
+
+  const handleMonthChange = (value: string) => {
+    if (!value) {
+      setPeriod(prev => ({ ...prev, month: null }));
+      return;
+    }
+    const [yearPart, monthPart] = value.split("-");
+    const nextYear = Number.parseInt(yearPart, 10);
+    const nextMonth = Number.parseInt(monthPart, 10);
+    if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
+      return;
+    }
+    setPeriod({ year: nextYear, month: nextMonth });
+  };
+
+  const handleYearChange = (value: number) => {
+    setPeriod(prev => ({ year: value, month: prev.month }));
+  };
 
 
   const openAddModal = () => {
@@ -211,6 +258,11 @@ export default function GroupsTab({
         groups={availableGroups}
         listLength={list.length}
         onAddClient={openAddModal}
+        monthValue={monthValue}
+        onMonthChange={handleMonthChange}
+        year={period.year}
+        onYearChange={handleYearChange}
+        yearOptions={yearOptions}
       />
       <ClientTable
         list={list}

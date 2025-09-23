@@ -12,6 +12,11 @@ type Props = {
   setPay: (p: PaymentStatus | "all") => void,
   listLength: number,
   onAddClient: () => void,
+  monthValue: string,
+  onMonthChange: (value: string) => void,
+  year: number,
+  onYearChange: (value: number) => void,
+  yearOptions: number[],
 };
 
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
@@ -40,6 +45,11 @@ export default function ClientFilters({
   setPay,
   listLength,
   onAddClient,
+  monthValue,
+  onMonthChange,
+  year,
+  onYearChange,
+  yearOptions,
 }: Props) {
   return (
     <>
@@ -58,6 +68,28 @@ export default function ClientFilters({
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
+        <input
+          type="month"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={monthValue}
+          onChange={event => onMonthChange(event.target.value)}
+          aria-label="Фильтр по месяцу"
+        />
+        <select
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={year}
+          onChange={event => {
+            const nextYear = Number.parseInt(event.target.value, 10);
+            if (Number.isFinite(nextYear)) {
+              onYearChange(nextYear);
+            }
+          }}
+          aria-label="Фильтр по году"
+        >
+          {yearOptions.map(option => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={group ?? ""}
