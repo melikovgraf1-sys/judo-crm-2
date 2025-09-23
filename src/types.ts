@@ -166,6 +166,7 @@ export interface UIState {
 export type TabKey =
   | "dashboard"
   | "analytics"
+  | "groups"
   | "clients"
   | "attendance"
   | "performance"

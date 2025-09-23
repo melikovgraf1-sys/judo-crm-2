@@ -11,6 +11,7 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   { key: "dashboard", title: "Дашборд" },
   { key: "analytics", title: "Аналитика", need: r => can(r, "analytics") },
+  { key: "groups", title: "Группы", need: r => can(r, "manage_clients") },
   { key: "clients", title: "Клиенты", need: r => can(r, "manage_clients") },
   { key: "attendance", title: "Посещаемость", need: r => can(r, "attendance") },
   { key: "performance", title: "Успеваемость", need: r => can(r, "performance") },

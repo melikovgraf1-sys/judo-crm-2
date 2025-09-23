@@ -37,8 +37,8 @@ export function transformClientFormValues(
 
   return {
     ...rest,
-    payAmount: resolvedPayAmount,
-    remainingLessons: resolvedRemaining,
+    ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
+    ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
     birthDate: parseDateInput(data.birthDate),
     startDate: parseDateInput(data.startDate),
     payDate: parseDateInput(data.payDate),
