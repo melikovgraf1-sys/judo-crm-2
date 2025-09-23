@@ -203,5 +203,6 @@ test('move: converts paid lead into client', async () => {
   const created = getDB().clients[0];
   expect(created.firstName).toBe('Иван');
   expect(created.group).toBe('Group1');
-  expect(created.payStatus).toBe('действует');
+  expect(created.status).toBe('новый');
+  expect(created.payStatus).toBe('ожидание');
 });
