@@ -102,19 +102,20 @@ const makeClient = (overrides = {}) => ({
   ...overrides,
 });
 
-test('search filters clients by full name', () => {
+test('search filters clients by full name', async () => {
   const db = makeDB();
   db.clients = [
     makeClient({ id: 'c1', firstName: 'Иван', lastName: 'Иванов' }),
     makeClient({ id: 'c2', firstName: 'Пётр', lastName: 'Сидоров' }),
   ];
 
-  const { rerender } = render(<ClientsTab db={db} setDB={() => {}} ui={makeUI()} />);
+  render(<ClientsTab db={db} setDB={() => {}} ui={makeUI()} />);
   expect(screen.getByText('Всего клиентов: 2')).toBeInTheDocument();
   expect(screen.getByText('Иван Иванов')).toBeInTheDocument();
   expect(screen.getByText('Пётр Сидоров')).toBeInTheDocument();
 
-  rerender(<ClientsTab db={db} setDB={() => {}} ui={makeUI({ search: 'пётр' })} />);
+  const searchInput = screen.getByPlaceholderText('Поиск клиента…');
+  await userEvent.type(searchInput, 'пётр');
   expect(screen.getByText('Найдено: 1 из 2')).toBeInTheDocument();
   expect(screen.getByText('Пётр Сидоров')).toBeInTheDocument();
   expect(screen.queryByText('Иван Иванов')).not.toBeInTheDocument();

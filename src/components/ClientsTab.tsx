@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import ClientTable from "./clients/ClientTable";
@@ -18,8 +18,13 @@ type ClientsTabProps = {
 export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
+  const [query, setQuery] = useState(ui.search);
 
-  const search = ui.search.trim().toLowerCase();
+  useEffect(() => {
+    setQuery(ui.search);
+  }, [ui.search]);
+
+  const search = query.trim().toLowerCase();
   const list = useMemo(() => {
     if (!search) {
       return db.clients;
@@ -132,7 +137,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
 
   const total = db.clients.length;
   const visibleCount = list.length;
-  const counterText = ui.search
+  const counterText = search
     ? `Найдено: ${visibleCount} из ${total}`
     : `Всего клиентов: ${total}`;
 
@@ -140,7 +145,15 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     <div className="space-y-3">
       <Breadcrumbs items={["Клиенты"]} />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs text-slate-500">{counterText}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Поиск клиента…"
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+          />
+          <div className="text-xs text-slate-500">{counterText}</div>
+        </div>
         <button
           onClick={openAddModal}
           className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
