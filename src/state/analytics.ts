@@ -86,9 +86,15 @@ function collectActiveAreas(db: DB): Area[] {
   for (const slot of db.schedule) {
     scheduled.add(slot.area);
   }
+
+  const clientAreas = new Set<Area>();
+  for (const client of db.clients) {
+    clientAreas.add(client.area);
+  }
+
   const result: Area[] = [];
   for (const area of db.settings.areas) {
-    if (scheduled.has(area)) {
+    if (scheduled.has(area) || clientAreas.has(area)) {
       result.push(area);
     }
   }
@@ -171,7 +177,8 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnap
   }
 
   const relevantAreaSet = new Set(relevantAreas);
-  const clients = db.clients.filter(client => area === "all" ? relevantAreaSet.has(client.area) : client.area === area);
+  const clients = db.clients.filter(client => (area === "all" ? relevantAreaSet.has(client.area) : client.area === area));
+  const rosterClients = clients.filter(client => client.status !== "отмена");
   const actualClients = clients.filter(client => client.payStatus === "действует");
 
   const capacity = relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
@@ -237,7 +244,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnap
   const attendanceRate = attendanceTotal ? (attendanceCame / attendanceTotal) * 100 : 0;
 
   const athleteStats: AthleteStats = {
-    total: actualClients.length,
+    total: rosterClients.length,
     new: clients.filter(client => client.status === "новый").length,
     firstRenewals: clients.filter(client => client.status === "продлившийся").length,
     canceled: clients.filter(client => client.status === "отмена").length,
