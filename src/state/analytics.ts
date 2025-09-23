@@ -42,11 +42,23 @@ export type MetricSnapshot = {
   values: Record<ProjectionKey, number>;
 };
 
+export type AthleteStats = {
+  total: number;
+  new: number;
+  firstRenewals: number;
+  canceled: number;
+  returned: number;
+  dropIns: number;
+  attendanceRate: number;
+};
+
 export type AnalyticsSnapshot = {
   area: AreaScope;
   metrics: Record<MetricKey, MetricSnapshot>;
   capacity: number;
   rent: number;
+  coachSalary: number;
+  athleteStats: AthleteStats;
 };
 
 export function encodeFavorite(favorite: AnalyticsFavorite): string {
@@ -74,9 +86,15 @@ function collectActiveAreas(db: DB): Area[] {
   for (const slot of db.schedule) {
     scheduled.add(slot.area);
   }
+
+  const clientAreas = new Set<Area>();
+  for (const client of db.clients) {
+    clientAreas.add(client.area);
+  }
+
   const result: Area[] = [];
   for (const area of db.settings.areas) {
-    if (scheduled.has(area)) {
+    if (scheduled.has(area) || clientAreas.has(area)) {
       result.push(area);
     }
   }
@@ -140,6 +158,10 @@ function rentForAreas(db: DB, areas: Area[]): number {
   return areas.reduce((sum, area) => sum + ensureNumber(db.settings.rentByAreaEUR?.[area] ?? 0), 0);
 }
 
+function coachSalaryForAreas(db: DB, areas: Area[]): number {
+  return areas.reduce((sum, area) => sum + ensureNumber(db.settings.coachSalaryByAreaEUR?.[area] ?? 0), 0);
+}
+
 export function getAnalyticsAreas(db: DB): AreaScope[] {
   const active = collectActiveAreas(db);
   const unique = new Set<Area>();
@@ -160,14 +182,17 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnap
 
   const capacity = relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
   const rent = rentForAreas(db, relevantAreas);
+  const coachSalary = coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce((sum, client) => sum + getClientAmount(client), 0);
   const forecastRevenue = clients.reduce((sum, client) => sum + getClientAmount(client), 0);
   const maxRevenue = relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
 
-  const actualProfit = actualRevenue - rent;
-  const forecastProfit = forecastRevenue - rent;
-  const maxProfit = maxRevenue - rent;
+  const totalExpenses = rent + coachSalary;
+
+  const actualProfit = actualRevenue - totalExpenses;
+  const forecastProfit = forecastRevenue - totalExpenses;
+  const maxProfit = maxRevenue - totalExpenses;
 
   const actualFill = capacity ? (actualClients.length / capacity) * 100 : 0;
   const forecastFill = capacity ? (clients.length / capacity) * 100 : 0;
@@ -211,7 +236,23 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnap
     },
   };
 
-  return { area, metrics, capacity, rent };
+  const clientIds = new Set(clients.map(client => client.id));
+  const attendanceEntries = db.attendance.filter(entry => clientIds.has(entry.clientId));
+  const attendanceTotal = attendanceEntries.length;
+  const attendanceCame = attendanceEntries.filter(entry => entry.came).length;
+  const attendanceRate = attendanceTotal ? (attendanceCame / attendanceTotal) * 100 : 0;
+
+  const athleteStats: AthleteStats = {
+    total: actualClients.length,
+    new: clients.filter(client => client.status === "новый").length,
+    firstRenewals: clients.filter(client => client.status === "продлившийся").length,
+    canceled: clients.filter(client => client.status === "отмена").length,
+    returned: clients.filter(client => client.status === "вернувшийся").length,
+    dropIns: clients.filter(client => (client.remainingLessons ?? 0) > 0).length,
+    attendanceRate: ensureNumber(attendanceRate),
+  };
+
+  return { area, metrics, capacity, rent, coachSalary, athleteStats };
 }
 
 export type FavoriteSummary = {
