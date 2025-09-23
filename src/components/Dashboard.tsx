@@ -1,8 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { fmtMoney, fmtDate } from "../state/utils";
 import { buildFavoriteSummaries } from "../state/analytics";
 import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
+import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
+import {
+  collectAvailableYears,
+  filterLeadsByPeriod,
+  formatMonthInput,
+  getDefaultPeriod,
+  isClientInPeriod,
+  type PeriodFilter,
+} from "../state/period";
 
 type MetricCardProps = {
   title: string;
@@ -30,11 +39,34 @@ type DashboardProps = {
 };
 
 export default function Dashboard({ db, ui }: DashboardProps) {
+  const persistedPeriod = useMemo(() => readDailyPeriod("dashboard"), []);
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const fallback = getDefaultPeriod();
+    return {
+      year: persistedPeriod.year ?? fallback.year,
+      month: persistedPeriod.month ?? fallback.month,
+    };
+  });
+
+  useEffect(() => {
+    writeDailyPeriod("dashboard", period.month, period.year);
+  }, [period]);
+
+  const monthValue = formatMonthInput(period);
+  const availableYears = useMemo(() => collectAvailableYears(db), [db]);
+  const years = useMemo(() => {
+    if (availableYears.includes(period.year)) {
+      return availableYears;
+    }
+    return [...availableYears, period.year].sort((a, b) => b - a);
+  }, [availableYears, period.year]);
+
   const currency = ui.currency;
-  const totalClients = db.clients.length;
+  const periodClients = useMemo(() => db.clients.filter(client => isClientInPeriod(client, period)), [db.clients, period]);
+  const totalClients = periodClients.length;
   const activeClients = useMemo(
-    () => db.clients.filter(c => c.payStatus === "действует").length,
-    [db.clients]
+    () => periodClients.filter(c => c.payStatus === "действует").length,
+    [periodClients],
   );
   const leadStages: LeadStage[] = [
     "Очередь",
@@ -44,13 +76,14 @@ export default function Dashboard({ db, ui }: DashboardProps) {
     "Оплаченный абонемент",
     "Отмена",
   ];
+  const leads = useMemo(() => filterLeadsByPeriod(db.leads, period), [db.leads, period]);
   const leadsDistribution = useMemo(
     () =>
-      db.leads.reduce((acc, l) => {
+      leads.reduce((acc, l) => {
         acc[l.stage] = (acc[l.stage] || 0) + 1;
         return acc;
       }, {} as Record<LeadStage, number>),
-    [db.leads]
+    [leads],
   );
 
   const sortedTasks = useMemo(
@@ -64,11 +97,60 @@ export default function Dashboard({ db, ui }: DashboardProps) {
 
   const totalLimit = Object.values(db.settings.limits).reduce((a, b) => a + b, 0);
   const fillPct = totalLimit ? Math.round((activeClients / totalLimit) * 100) : 0;
-  const favoriteCards = useMemo(() => buildFavoriteSummaries(db, currency), [db, currency]);
+  const favoriteCards = useMemo(() => buildFavoriteSummaries(db, currency, period), [db, currency, period]);
+
+  const handleMonthChange = (value: string) => {
+    if (!value) {
+      setPeriod(prev => ({ ...prev, month: null }));
+      return;
+    }
+    const [yearPart, monthPart] = value.split("-");
+    const nextYear = Number.parseInt(yearPart, 10);
+    const nextMonth = Number.parseInt(monthPart, 10);
+    if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
+      return;
+    }
+    setPeriod({ year: nextYear, month: nextMonth });
+  };
+
+  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextYear = Number.parseInt(event.target.value, 10);
+    if (!Number.isFinite(nextYear)) {
+      return;
+    }
+    setPeriod(prev => ({ year: nextYear, month: prev.month }));
+  };
 
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Дашборд"]} />
+      <div className="flex flex-wrap items-center gap-3">
+        <label htmlFor="dashboard-month" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          Месяц
+        </label>
+        <input
+          id="dashboard-month"
+          type="month"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={monthValue}
+          onChange={event => handleMonthChange(event.target.value)}
+        />
+        <label htmlFor="dashboard-year" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          Год
+        </label>
+        <select
+          id="dashboard-year"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={period.year}
+          onChange={handleYearChange}
+        >
+          {years.map(year => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </div>
       {favoriteCards.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {favoriteCards.map(card => (

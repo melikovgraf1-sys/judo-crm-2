@@ -1,4 +1,5 @@
 import { getDefaultPayAmount } from "./payments";
+import { isAttendanceInPeriod, isClientInPeriod, type PeriodFilter } from "./period";
 import type { Area, Client, Currency, DB } from "../types";
 
 export type AreaScope = Area | "all";
@@ -169,7 +170,7 @@ export function getAnalyticsAreas(db: DB): AreaScope[] {
   return ["all", ...Array.from(unique)];
 }
 
-export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnapshot {
+export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: PeriodFilter): AnalyticsSnapshot {
   const activeAreas = collectActiveAreas(db);
   const relevantAreas = area === "all" ? activeAreas : activeAreas.includes(area) ? [area] : [];
   if (!relevantAreas.length && area !== "all") {
@@ -177,7 +178,16 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnap
   }
 
   const relevantAreaSet = new Set(relevantAreas);
-  const clients = db.clients.filter(client => (area === "all" ? relevantAreaSet.has(client.area) : client.area === area));
+  const clients = db.clients.filter(client => {
+    const inScope = area === "all" ? relevantAreaSet.has(client.area) : client.area === area;
+    if (!inScope) {
+      return false;
+    }
+    if (!period) {
+      return true;
+    }
+    return isClientInPeriod(client, period);
+  });
   const rosterClients = clients.filter(client => client.status !== "отмена");
   const actualClients = clients.filter(client => client.payStatus === "действует");
 
@@ -238,7 +248,15 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope): AnalyticsSnap
   };
 
   const clientIds = new Set(clients.map(client => client.id));
-  const attendanceEntries = db.attendance.filter(entry => clientIds.has(entry.clientId));
+  const attendanceEntries = db.attendance.filter(entry => {
+    if (!clientIds.has(entry.clientId)) {
+      return false;
+    }
+    if (!period) {
+      return true;
+    }
+    return isAttendanceInPeriod(entry, period);
+  });
   const attendanceTotal = attendanceEntries.length;
   const attendanceCame = attendanceEntries.filter(entry => entry.came).length;
   const attendanceRate = attendanceTotal ? (attendanceCame / attendanceTotal) * 100 : 0;
@@ -296,7 +314,7 @@ const METRIC_ACCENTS: Record<MetricKey, FavoriteSummary["accent"]> = {
   athletes: "sky",
 };
 
-export function buildFavoriteSummaries(db: DB, currency: Currency): FavoriteSummary[] {
+export function buildFavoriteSummaries(db: DB, currency: Currency, period?: PeriodFilter): FavoriteSummary[] {
   const favorites = db.settings.analyticsFavorites ?? [];
   if (!favorites.length) {
     return [];
@@ -307,7 +325,7 @@ export function buildFavoriteSummaries(db: DB, currency: Currency): FavoriteSumm
     if (!decoded) {
       continue;
     }
-    const snapshot = computeAnalyticsSnapshot(db, decoded.area);
+    const snapshot = computeAnalyticsSnapshot(db, decoded.area, period);
     const metric = snapshot.metrics[decoded.metric];
     if (!metric) {
       continue;

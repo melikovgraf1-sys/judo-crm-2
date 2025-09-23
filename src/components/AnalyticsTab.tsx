@@ -14,6 +14,8 @@ import {
   type MetricKey,
   type ProjectionKey,
 } from "../state/analytics";
+import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
+import { collectAvailableYears, formatMonthInput, getDefaultPeriod, type PeriodFilter } from "../state/period";
 
 type Props = {
   db: DB;
@@ -29,6 +31,27 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   const [area, setArea] = useState<AreaScope>(areas[0] ?? "all");
   const [rentInput, setRentInput] = useState("0");
   const [coachSalaryInput, setCoachSalaryInput] = useState("0");
+  const persistedPeriod = useMemo(() => readDailyPeriod("analytics"), []);
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const fallback = getDefaultPeriod();
+    return {
+      year: persistedPeriod.year ?? fallback.year,
+      month: persistedPeriod.month ?? fallback.month,
+    };
+  });
+
+  useEffect(() => {
+    writeDailyPeriod("analytics", period.month, period.year);
+  }, [period]);
+
+  const monthValue = formatMonthInput(period);
+  const baseYears = useMemo(() => collectAvailableYears(db), [db]);
+  const years = useMemo(() => {
+    if (baseYears.includes(period.year)) {
+      return baseYears;
+    }
+    return [...baseYears, period.year].sort((a, b) => b - a);
+  }, [baseYears, period.year]);
 
   useEffect(() => {
     if (!areas.includes(area)) {
@@ -49,7 +72,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   }, [area, db]);
 
   const favorites = db.settings.analyticsFavorites ?? [];
-  const snapshot = useMemo(() => computeAnalyticsSnapshot(db, area), [db, area]);
+  const snapshot = useMemo(() => computeAnalyticsSnapshot(db, area, period), [db, area, period]);
 
   const parseInputValue = useCallback((raw: string): number => {
     if (!raw.trim()) {
@@ -213,6 +236,51 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         <span className="text-xs text-slate-500 dark:text-slate-400">
           Добавьте до четырёх показателей в избранное, чтобы видеть их на дашборде.
         </span>
+        <div className="grow" />
+        <label htmlFor="analytics-month" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          Месяц
+        </label>
+        <input
+          id="analytics-month"
+          type="month"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={monthValue}
+          onChange={event => {
+            const value = event.target.value;
+            if (!value) {
+              setPeriod(prev => ({ ...prev, month: null }));
+              return;
+            }
+            const [yearPart, monthPart] = value.split("-");
+            const nextYear = Number.parseInt(yearPart, 10);
+            const nextMonth = Number.parseInt(monthPart, 10);
+            if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
+              return;
+            }
+            setPeriod({ year: nextYear, month: nextMonth });
+          }}
+        />
+        <label htmlFor="analytics-year" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          Год
+        </label>
+        <select
+          id="analytics-year"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={period.year}
+          onChange={event => {
+            const nextYear = Number.parseInt(event.target.value, 10);
+            if (!Number.isFinite(nextYear)) {
+              return;
+            }
+            setPeriod(prev => ({ year: nextYear, month: prev.month }));
+          }}
+        >
+          {years.map(year => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/40">

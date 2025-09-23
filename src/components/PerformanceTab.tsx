@@ -19,6 +19,15 @@ import type {
   Group,
   PerformanceEntry,
 } from "../types";
+import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
+import {
+  collectAvailableYears,
+  formatMonthInput,
+  getDefaultPeriod,
+  isClientInPeriod,
+  isPerformanceInPeriod,
+  type PeriodFilter,
+} from "../state/period";
 
 export default function PerformanceTab({
   db,
@@ -35,6 +44,14 @@ export default function PerformanceTab({
   const [editing, setEditing] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(["name", "area", "group", "mark"]);
   const [sort, setSort] = useState<SortState | null>(null);
+  const persistedPeriod = useMemo(() => readDailyPeriod("performance"), []);
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const fallback = getDefaultPeriod();
+    return {
+      year: persistedPeriod.year ?? fallback.year,
+      month: persistedPeriod.month ?? fallback.month,
+    };
+  });
 
   const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
   const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
@@ -49,14 +66,20 @@ export default function PerformanceTab({
     }
   }, [area, availableGroups, group]);
 
+  useEffect(() => {
+    writeDailyPeriod("performance", period.month, period.year);
+  }, [period]);
+
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
 
   const list = useMemo(() => {
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(client => client.area === area && client.group === group);
-  }, [area, group, db.clients]);
+    return db.clients.filter(
+      client => client.area === area && client.group === group && isClientInPeriod(client, period),
+    );
+  }, [area, group, db.clients, period]);
 
   type ColumnConfig = {
     id: string;
@@ -72,12 +95,43 @@ export default function PerformanceTab({
   const todayMarks = useMemo(() => {
     const map: Map<string, PerformanceEntry> = new Map();
     db.performance.forEach(entry => {
-      if (entry.date.slice(0, 10) === todayStr) {
+      if (entry.date.slice(0, 10) === todayStr && isPerformanceInPeriod(entry, period)) {
         map.set(entry.clientId, entry);
       }
     });
     return map;
-  }, [db.performance, todayStr]);
+  }, [db.performance, todayStr, period]);
+
+  const monthValue = formatMonthInput(period);
+  const baseYears = useMemo(() => collectAvailableYears(db), [db]);
+  const yearOptions = useMemo(() => {
+    if (baseYears.includes(period.year)) {
+      return baseYears;
+    }
+    return [...baseYears, period.year].sort((a, b) => b - a);
+  }, [baseYears, period.year]);
+
+  const handleMonthChange = (value: string) => {
+    if (!value) {
+      setPeriod(prev => ({ ...prev, month: null }));
+      return;
+    }
+    const [yearPart, monthPart] = value.split("-");
+    const nextYear = Number.parseInt(yearPart, 10);
+    const nextMonth = Number.parseInt(monthPart, 10);
+    if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
+      return;
+    }
+    setPeriod({ year: nextYear, month: nextMonth });
+  };
+
+  const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextYear = Number.parseInt(event.target.value, 10);
+    if (!Number.isFinite(nextYear)) {
+      return;
+    }
+    setPeriod(prev => ({ year: nextYear, month: prev.month }));
+  };
 
   const toggle = async (clientId: string) => {
     const mark = todayMarks.get(clientId);
@@ -231,6 +285,23 @@ export default function PerformanceTab({
         >
           <option value="">Выберите группу</option>
           {availableGroups.map(option => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <input
+          type="month"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={monthValue}
+          onChange={event => handleMonthChange(event.target.value)}
+        />
+        <select
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={period.year}
+          onChange={handleYearChange}
+        >
+          {yearOptions.map(option => (
             <option key={option} value={option}>
               {option}
             </option>
