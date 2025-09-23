@@ -109,6 +109,9 @@ export default function ClientDetailsModal({
         {section === "info" && (
           <div className="grid gap-2 text-sm sm:grid-cols-2">
             <InfoRow label="Телефон" value={client.phone || "—"} />
+            <InfoRow label="WhatsApp" value={client.whatsApp || "—"} />
+            <InfoRow label="Telegram" value={client.telegram || "—"} />
+            <InfoRow label="Instagram" value={client.instagram || "—"} />
             <InfoRow label="Канал" value={client.channel} />
             <InfoRow label="Родитель" value={client.parentName || "—"} />
             <InfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />

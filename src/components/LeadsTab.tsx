@@ -78,7 +78,7 @@ export default function LeadsTab({
                   return (
                     <div key={l.id} style={style} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
                       <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
-                      <div className="text-xs text-slate-500">{l.source}{l.contact ? " · " + l.contact : ""}</div>
+                      <div className="text-xs text-slate-500">{l.source}{formatLeadContactSummary(l)}</div>
                       <div className="flex gap-1 mt-2">
                         <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">◀</button>
                         <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">▶</button>
@@ -121,10 +121,13 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     id: uid(),
     firstName,
     lastName,
-    phone: lead.contact,
+    parentName: lead.parentName,
+    phone: lead.phone,
+    whatsApp: lead.whatsApp,
+    telegram: lead.telegram,
+    instagram: lead.instagram,
     channel: lead.source,
     birthDate: lead.birthDate ?? fallbackDate,
-    parentName: lead.parentName,
     gender: "м",
     area,
     group,
@@ -139,10 +142,18 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
   return client;
 }
 
+function formatLeadContactSummary(lead: Lead): string {
+  const contact = [lead.phone, lead.whatsApp, lead.telegram, lead.instagram].find(value => value?.trim().length);
+  return contact ? ` · ${contact}` : "";
+}
+
 const toLeadFormValues = (current: Lead): LeadFormValues => ({
   name: current.name,
-  contact: current.contact ?? "",
   parentName: current.parentName ?? "",
+  phone: current.phone ?? "",
+  whatsApp: current.whatsApp ?? "",
+  telegram: current.telegram ?? "",
+  instagram: current.instagram ?? "",
 });
 
 function LeadModal(
@@ -162,11 +173,23 @@ function LeadModal(
 ) {
   const [edit, setEdit] = useState(false);
 
-  const schema = yup.object({
-    name: yup.string().required("Имя обязательно"),
-    contact: yup.string().required("Контакт обязателен"),
-    parentName: yup.string().nullable(),
-  });
+  const schema = yup
+    .object({
+      name: yup.string().required("Имя обязательно"),
+      parentName: yup.string().nullable(),
+      phone: yup.string().trim(),
+      whatsApp: yup.string().trim(),
+      telegram: yup.string().trim(),
+      instagram: yup.string().trim(),
+    })
+    .test("contact-required", "Укажите хотя бы один контакт", function (value) {
+      if (!value) return false;
+      const { phone, whatsApp, telegram, instagram } = value as LeadFormValues;
+      if ([phone, whatsApp, telegram, instagram].some(field => field?.trim().length)) {
+        return true;
+      }
+      return this.createError({ path: "phone", message: "Укажите хотя бы один контакт" });
+    });
 
   const resolver = yupResolver(schema) as unknown as Resolver<LeadFormValues>;
 
@@ -182,7 +205,11 @@ function LeadModal(
     const nextLead: Lead = {
       ...lead,
       ...data,
-      parentName: data.parentName || undefined,
+      parentName: data.parentName?.trim() || undefined,
+      phone: data.phone?.trim() || undefined,
+      whatsApp: data.whatsApp?.trim() || undefined,
+      telegram: data.telegram?.trim() || undefined,
+      instagram: data.instagram?.trim() || undefined,
       updatedAt: todayISO(),
     };
     const next = {
@@ -223,7 +250,10 @@ function LeadModal(
         <div><span className="text-slate-500">Дата рождения:</span> {lead.birthDate ? fmtDate(lead.birthDate) : "—"}</div>
         <div><span className="text-slate-500">Старт:</span> {lead.startDate ? fmtDate(lead.startDate) : "—"}</div>
         <div><span className="text-slate-500">Источник:</span> {lead.source}</div>
-        <div><span className="text-slate-500">Контакт:</span> {lead.contact || "—"}</div>
+        <div><span className="text-slate-500">Телефон:</span> {lead.phone || "—"}</div>
+        <div><span className="text-slate-500">WhatsApp:</span> {lead.whatsApp || "—"}</div>
+        <div><span className="text-slate-500">Telegram:</span> {lead.telegram || "—"}</div>
+        <div><span className="text-slate-500">Instagram:</span> {lead.instagram || "—"}</div>
         <div><span className="text-slate-500">Создан:</span> {fmtDate(lead.createdAt)}</div>
         <div><span className="text-slate-500">Обновлён:</span> {fmtDate(lead.updatedAt)}</div>
       </div>
@@ -237,8 +267,11 @@ function LeadModal(
           <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("name")} placeholder="Имя" />
           {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
           <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("parentName")} placeholder="Родитель" />
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("contact")} placeholder="Контакт" />
-          {errors.contact && <span className="text-xs text-rose-600">{errors.contact.message}</span>}
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("phone")} placeholder="Телефон" />
+          {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("whatsApp")} placeholder="WhatsApp" />
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("telegram")} placeholder="Telegram" />
+          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" {...register("instagram")} placeholder="Instagram" />
           <div className="flex justify-end gap-2">
             <button type="submit" disabled={!isValid} className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400">Сохранить</button>
             <button type="button" onClick={() => setEdit(false)} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Отмена</button>

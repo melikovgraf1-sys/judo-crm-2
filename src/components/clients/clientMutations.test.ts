@@ -7,6 +7,9 @@ describe("transformClientFormValues", () => {
     firstName: "Имя",
     lastName: "",
     phone: "",
+    whatsApp: "",
+    telegram: "",
+    instagram: "",
     channel: "Telegram",
     birthDate: "2010-01-01",
     parentName: "",
@@ -28,6 +31,7 @@ describe("transformClientFormValues", () => {
       group: "взрослые",
       payAmount: "",
       remainingLessons: "",
+      whatsApp: "",
     };
 
     const result = transformClientFormValues(data);
@@ -42,6 +46,7 @@ describe("transformClientFormValues", () => {
       group: "индивидуальные",
       payAmount: "150",
       remainingLessons: "8",
+      telegram: "@client",
     };
 
     const result = transformClientFormValues(data);
@@ -49,6 +54,7 @@ describe("transformClientFormValues", () => {
     expect(result).toMatchObject({
       payAmount: 150,
       remainingLessons: 8,
+      telegram: "@client",
     });
   });
 
