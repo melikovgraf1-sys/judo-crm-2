@@ -176,7 +176,7 @@ export function makeSeedDB(): DB {
     limits: Object.fromEntries(areas.flatMap(a => groups.map(g => [`${a}|${g}`, 20]))),
     rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
     coachSalaryByAreaEUR: { Махмутлар: 0, Центр: 0, Джикджилли: 0 },
-    currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
+    currencyRates: { EUR: 1, TRY: 48.78, RUB: 103.25 },
     coachPayFormula: "фикс 100€ + 5€ за ученика",
     analyticsFavorites: [],
   };
