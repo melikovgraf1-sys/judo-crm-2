@@ -22,7 +22,7 @@ jest.mock("../../state/utils", () => ({
 jest.mock("../VirtualizedTable", () => (props) => <table>{props.children}</table>);
 
 import ScheduleTab from "../ScheduleTab";
-import ClientsTab from "../ClientsTab";
+import GroupsTab from "../GroupsTab";
 import { commitDBUpdate } from "../../state/appState";
 
 beforeEach(() => {
@@ -86,8 +86,8 @@ describe("ScheduleTab groups", () => {
     const prompts = ["1", "10:00", "Alpha"];
     jest.spyOn(window, "prompt").mockImplementation(() => prompts.shift());
     await userEvent.click(screen.getByText("+ группа"));
-    const ui = { role: "Администратор", activeTab: "clients", breadcrumbs: [], currency: "EUR", search: "", theme: "light" };
-    render(<ClientsTab db={getDb()} setDB={() => {}} ui={ui} />);
+    const ui = { role: "Администратор", activeTab: "groups", breadcrumbs: [], currency: "EUR", search: "", theme: "light" };
+    render(<GroupsTab db={getDb()} setDB={() => {}} ui={ui} />);
     await userEvent.click(screen.getByRole("button", { name: "A1" }));
     await waitFor(() => expect(screen.getByLabelText("Фильтр по группе")).not.toBeDisabled());
     const groupSelect = screen.getByLabelText("Фильтр по группе");

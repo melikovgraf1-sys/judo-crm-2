@@ -9,7 +9,7 @@ import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import type { DB, Lead, LeadStage, StaffMember, LeadFormValues } from "../types";
+import type { DB, Lead, LeadStage, StaffMember, LeadFormValues, Client } from "../types";
 
 export default function LeadsTab({
   db,
@@ -26,10 +26,31 @@ export default function LeadsTab({
       return acc;
     }, {} as Record<LeadStage, Lead[]>), [db.leads]);
   const move = async (id: string, dir: 1 | -1) => {
-    const l = db.leads.find(x => x.id === id); if (!l) return;
-    const idx = stages.indexOf(l.stage);
+    const current = db.leads.find(x => x.id === id);
+    if (!current) return;
+    const idx = stages.indexOf(current.stage);
     const nextStage = stages[Math.min(stages.length - 1, Math.max(0, idx + dir))];
-    const next = { ...db, leads: db.leads.map(x => x.id === id ? { ...x, stage: nextStage, updatedAt: todayISO() } : x) };
+    const updatedLead: Lead = { ...current, stage: nextStage, updatedAt: todayISO() };
+
+    if (nextStage === "Оплаченный абонемент") {
+      const newClient = convertLeadToClient(updatedLead, db);
+      const next = {
+        ...db,
+        leads: db.leads.filter(lead => lead.id !== id),
+        clients: [newClient, ...db.clients],
+        changelog: [
+          ...db.changelog,
+          { id: uid(), who: "UI", what: `Лид ${current.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
+        ],
+      };
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert("Не удалось обновить статус лида. Проверьте доступ к базе данных.");
+      }
+      return;
+    }
+
+    const next = { ...db, leads: db.leads.map(x => (x.id === id ? updatedLead : x)) };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
       window.alert("Не удалось обновить статус лида. Проверьте доступ к базе данных.");
@@ -81,6 +102,41 @@ export default function LeadsTab({
       )}
     </div>
   );
+}
+
+function convertLeadToClient(lead: Lead, db: DB): Client {
+  const fallbackDate = lead.updatedAt ?? todayISO();
+  const area = lead.area ?? db.settings.areas[0];
+  const group = lead.group ?? db.settings.groups[0];
+  const coach =
+    db.staff.find(member => member.role === "Тренер" && member.areas.includes(area) && member.groups.includes(group)) ??
+    db.staff.find(member => member.role === "Тренер");
+
+  const rawName = (lead.firstName ?? lead.name ?? "Новый клиент").trim();
+  const nameParts = rawName.split(/\s+/).filter(Boolean);
+  const firstName = lead.firstName ?? nameParts[0] ?? "Новый";
+  const lastName = lead.lastName ?? (nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined);
+
+  const client: Client = {
+    id: uid(),
+    firstName,
+    lastName,
+    phone: lead.contact,
+    channel: lead.source,
+    birthDate: lead.birthDate ?? fallbackDate,
+    parentName: lead.parentName,
+    gender: "м",
+    area,
+    group,
+    coachId: coach?.id,
+    startDate: lead.startDate ?? fallbackDate,
+    payMethod: "перевод",
+    payStatus: "действует",
+    status: "действующий",
+    payDate: fallbackDate,
+  };
+
+  return client;
 }
 
 const toLeadFormValues = (current: Lead): LeadFormValues => ({
