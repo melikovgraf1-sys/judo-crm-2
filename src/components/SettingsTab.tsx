@@ -46,6 +46,30 @@ export default function SettingsTab({
   }, [eurTryRate, eurRubRate, tryRubRateFromDB]);
 
   useEffect(() => {
+    const RATE_API_URL = "https://api.exchangerate.host/latest?base=EUR&symbols=TRY,RUB";
+
+    const parseRate = (value: unknown): number | undefined => {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string") {
+        const normalized = value.replace(/\s+/g, "").replace(",", ".");
+        const parsed = Number(normalized);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+      return undefined;
+    };
+
+    const computeTryRub = (eurTry?: number, eurRub?: number): number | undefined => {
+      if (eurTry == null || eurRub == null || eurTry === 0) {
+        return undefined;
+      }
+      const derived = eurRub / eurTry;
+      return Number.isFinite(derived) ? derived : undefined;
+    };
+
     async function fetchRates() {
       if (fetchInProgressRef.current) {
         return;
@@ -53,21 +77,35 @@ export default function SettingsTab({
 
       fetchInProgressRef.current = true;
       try {
-        const fetchRate = async (pair: string) => {
-          const res = await fetch(`https://cors.isomorphic-git.org/https://www.google.com/finance/quote/${pair}?hl=en`);
-          const html = await res.text();
-          const m = html.match(/class="YMlKec fxKbKc">([0-9.,]+)/);
-          return m ? Number(m[1].replace(',', '')) : undefined;
-        };
-        const [eurTry, eurRub, tryRub] = await Promise.all([
-          fetchRate('EUR-TRY'),
-          fetchRate('EUR-RUB'),
-          fetchRate('TRY-RUB'),
-        ]);
+        const response = await fetch(RATE_API_URL);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch currency rates: ${response.status}`);
+        }
+
+        const data: unknown = await response.json();
+        const ratesData = (() => {
+          if (!data || typeof data !== "object" || !("rates" in data)) {
+            return {} as Record<string, unknown>;
+          }
+          const maybeRates = (data as { rates?: unknown }).rates;
+          if (!maybeRates || typeof maybeRates !== "object") {
+            return {} as Record<string, unknown>;
+          }
+          return maybeRates as Record<string, unknown>;
+        })();
+
+        const eurTryFromAPI = parseRate(ratesData["TRY"]);
+        const eurRubFromAPI = parseRate(ratesData["RUB"]);
+
+        const nextEurTry = eurTryFromAPI ?? eurTryRate;
+        const nextEurRub = eurRubFromAPI ?? eurRubRate;
+        const nextTryRub =
+          computeTryRub(eurTryFromAPI, eurRubFromAPI) ?? computeTryRub(nextEurTry, nextEurRub) ?? tryRubRateFromDB;
+
         const nextRates = {
-          eurTry: eurTry ?? eurTryRate,
-          eurRub: eurRub ?? eurRubRate,
-          tryRub: tryRub ?? tryRubRateFromDB,
+          eurTry: nextEurTry,
+          eurRub: nextEurRub,
+          tryRub: nextTryRub,
         };
 
         setRates(prevRates => {
@@ -103,11 +141,17 @@ export default function SettingsTab({
           }
         }
       } catch (e) {
-        console.error(e);
+        console.error("Failed to refresh currency rates", e);
+        setRates(prevRates => ({
+          eurTry: prevRates.eurTry ?? eurTryRate,
+          eurRub: prevRates.eurRub ?? eurRubRate,
+          tryRub: prevRates.tryRub ?? tryRubRateFromDB,
+        }));
       } finally {
         fetchInProgressRef.current = false;
       }
     }
+
     fetchRates();
   }, [eurTryRate, eurRubRate, tryRubRateFromDB, setDB]);
 
