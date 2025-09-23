@@ -34,6 +34,9 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
     "name",
     "phone",
+    "whatsApp",
+    "telegram",
+    "instagram",
     "area",
     "group",
     "status",
@@ -70,6 +73,27 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
       width: "minmax(140px, max-content)",
       renderCell: client => client.phone ?? "—",
       sortValue: client => client.phone ?? "",
+    },
+    {
+      id: "whatsApp",
+      label: "WhatsApp",
+      width: "minmax(140px, max-content)",
+      renderCell: client => client.whatsApp ?? "—",
+      sortValue: client => client.whatsApp ?? "",
+    },
+    {
+      id: "telegram",
+      label: "Telegram",
+      width: "minmax(140px, max-content)",
+      renderCell: client => client.telegram ?? "—",
+      sortValue: client => client.telegram ?? "",
+    },
+    {
+      id: "instagram",
+      label: "Instagram",
+      width: "minmax(160px, max-content)",
+      renderCell: client => client.instagram ?? "—",
+      sortValue: client => client.instagram ?? "",
     },
     {
       id: "area",

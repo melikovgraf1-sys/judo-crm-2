@@ -31,7 +31,12 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     }
     return db.clients.filter(client => {
       const fullName = `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase();
-      return fullName.includes(search);
+      if (fullName.includes(search)) {
+        return true;
+      }
+      const contacts = `${client.phone ?? ""} ${client.whatsApp ?? ""} ${client.telegram ?? ""} ${client.instagram ?? ""}`
+        .toLowerCase();
+      return contacts.includes(search);
     });
   }, [db.clients, search]);
 

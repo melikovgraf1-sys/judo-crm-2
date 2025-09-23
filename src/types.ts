@@ -22,10 +22,13 @@ export interface Client {
   id: string;
   firstName: string;
   lastName?: string;
+  parentName?: string;
   phone?: string;
+  whatsApp?: string;
+  telegram?: string;
+  instagram?: string;
   channel: ContactChannel;
   birthDate: string; // ISO
-  parentName?: string;
   gender: Gender;
   area: Area;
   group: Group;
@@ -44,6 +47,9 @@ export interface ClientFormValues {
   firstName: string;
   lastName: string;
   phone: string;
+  whatsApp: string;
+  telegram: string;
+  instagram: string;
   channel: ContactChannel;
   birthDate: string;
   parentName: string;
@@ -95,7 +101,10 @@ export interface Lead {
   startDate?: string; // ISO
   area?: Area;
   group?: Group;
-  contact?: string;
+  phone?: string;
+  whatsApp?: string;
+  telegram?: string;
+  instagram?: string;
   source: ContactChannel;
   stage: LeadStage;
   notes?: string;
@@ -107,7 +116,10 @@ export interface Lead {
 export interface LeadFormValues {
   name: string;
   parentName: string;
-  contact: string;
+  phone: string;
+  whatsApp: string;
+  telegram: string;
+  instagram: string;
 }
 
 export interface TaskItem {

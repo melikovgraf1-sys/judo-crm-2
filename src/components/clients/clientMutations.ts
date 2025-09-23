@@ -26,6 +26,7 @@ export function transformClientFormValues(
   editing?: Client | null,
 ): Omit<Client, "id"> {
   const { payAmount: payAmountRaw, remainingLessons: remainingLessonsRaw, ...rest } = data;
+  const { lastName, parentName, phone, whatsApp, telegram, instagram, ...base } = rest;
   const resolvedPayAmount = resolvePayAmount(payAmountRaw, rest.group, editing?.payAmount);
   let resolvedRemaining: number | undefined;
   if (requiresManualRemainingLessons(rest.group)) {
@@ -36,7 +37,13 @@ export function transformClientFormValues(
   }
 
   return {
-    ...rest,
+    ...base,
+    ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
+    ...(parentName.trim() ? { parentName: parentName.trim() } : {}),
+    ...(phone.trim() ? { phone: phone.trim() } : {}),
+    ...(whatsApp.trim() ? { whatsApp: whatsApp.trim() } : {}),
+    ...(telegram.trim() ? { telegram: telegram.trim() } : {}),
+    ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
     ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
     ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
     birthDate: parseDateInput(data.birthDate),

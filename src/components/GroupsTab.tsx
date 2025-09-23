@@ -70,12 +70,14 @@ export default function GroupsTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(c =>
-      c.area === area &&
-      c.group === group &&
-      (pay === "all" || c.payStatus === pay) &&
-      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
-    );
+    return db.clients.filter(c => {
+      if (c.area !== area || c.group !== group) return false;
+      if (pay !== "all" && c.payStatus !== pay) return false;
+      if (!ui.search) return true;
+      const haystack = `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""} ${c.whatsApp ?? ""} ${c.telegram ?? ""} ${c.instagram ?? ""}`
+        .toLowerCase();
+      return haystack.includes(search);
+    });
   }, [db.clients, area, group, pay, ui.search, search]);
 
 
