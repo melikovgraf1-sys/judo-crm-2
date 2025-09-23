@@ -131,8 +131,8 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     coachId: coach?.id,
     startDate: lead.startDate ?? fallbackDate,
     payMethod: "перевод",
-    payStatus: "действует",
-    status: "действующий",
+    payStatus: "ожидание",
+    status: "новый",
     payDate: fallbackDate,
   };
 
