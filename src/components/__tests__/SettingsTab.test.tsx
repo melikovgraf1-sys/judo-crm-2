@@ -1,4 +1,4 @@
-import { render, waitFor, act } from "@testing-library/react";
+import { render, waitFor, act, screen } from "@testing-library/react";
 import SettingsTab from "../SettingsTab";
 import type { DB } from "../../types";
 import { commitDBUpdate } from "../../state/appState";
@@ -51,22 +51,28 @@ describe("SettingsTab", () => {
     }
   });
 
-  it("does not refetch rates when db updates keep currency values unchanged", async () => {
-    const responses = ["35.50", "101.20", "2.85"];
-    fetchMock.mockImplementation(() => {
-      const value = responses.shift() ?? "0";
-      return Promise.resolve({
-        text: () => Promise.resolve(`<div class="YMlKec fxKbKc">${value}</div>`),
-      }) as Response;
-    });
+  it("loads currency rates from the official API and updates the DB once", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        rates: { TRY: 35.5, RUB: 101.2 },
+      }),
+    } as unknown as Response);
 
     const db = createDB();
     const setDB = jest.fn();
 
     const { rerender } = render(<SettingsTab db={db} setDB={setDB} />);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(commitDBUpdate).toHaveBeenCalledTimes(1));
+
+    const [updatedDBArg] = (commitDBUpdate as jest.Mock).mock.calls[0];
+    expect(updatedDBArg.settings.currencyRates).toEqual({ EUR: 1, TRY: 35.5, RUB: 101.2 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.exchangerate.host/latest?base=EUR&symbols=TRY,RUB",
+    );
 
     const updatedDB1: DB = {
       ...db,
@@ -88,7 +94,27 @@ describe("SettingsTab", () => {
 
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(commitDBUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to stored rates when API response is invalid", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ rates: { TRY: "invalid", RUB: null } }),
+    } as unknown as Response);
+
+    const db = createDB();
+    const setDB = jest.fn();
+
+    render(<SettingsTab db={db} setDB={setDB} />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(commitDBUpdate).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue("35.00")).toBeDefined();
+    expect(screen.getByDisplayValue("100.00")).toBeDefined();
+    expect(screen.getByDisplayValue("2.86")).toBeDefined();
   });
 });

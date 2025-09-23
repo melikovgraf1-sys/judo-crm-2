@@ -42,6 +42,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     firstName: "",
     lastName: "",
     phone: "",
+    whatsApp: "",
+    telegram: "",
+    instagram: "",
     gender: "м",
     area: firstAreaWithSchedule ?? db.settings.areas[0],
     group: firstGroupForArea(firstAreaWithSchedule ?? db.settings.areas[0]),
@@ -59,7 +62,10 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
 
   const schema = yup.object({
     firstName: yup.string().required("Имя обязательно"),
-    phone: yup.string().required("Телефон обязателен"),
+    phone: yup.string().trim(),
+    whatsApp: yup.string().trim(),
+    telegram: yup.string().trim(),
+    instagram: yup.string().trim(),
     birthDate: yup
       .string()
       .required("Дата рождения обязательна")
@@ -68,6 +74,13 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
       .string()
       .required("Дата начала обязательна")
       .matches(/\d{4}-\d{2}-\d{2}/, "Неверный формат даты"),
+  }).test("contact-required", "Укажите хотя бы один контакт", function (value) {
+    if (!value) return false;
+    const { phone, whatsApp, telegram, instagram } = value as ClientFormValues;
+    if ([phone, whatsApp, telegram, instagram].some(field => field?.trim().length)) {
+      return true;
+    }
+    return this.createError({ path: "phone", message: "Укажите хотя бы один контакт" });
   });
 
   const resolver = yupResolver(schema) as unknown as Resolver<ClientFormValues>;
@@ -84,6 +97,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         firstName: editing.firstName,
         lastName: editing.lastName ?? "",
         phone: editing.phone ?? "",
+        whatsApp: editing.whatsApp ?? "",
+        telegram: editing.telegram ?? "",
+        instagram: editing.instagram ?? "",
         gender: editing.gender,
         area: editing.area,
         group: editing.group,
@@ -186,6 +202,18 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             <label className="text-xs text-slate-500">Телефон</label>
             <input className="px-3 py-2 rounded-md border border-slate-300" {...register("phone")} />
             {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">WhatsApp</label>
+            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("whatsApp")} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">Telegram</label>
+            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("telegram")} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-500">Instagram</label>
+            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("instagram")} />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Канал</label>
