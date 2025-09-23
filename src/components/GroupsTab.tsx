@@ -1,48 +1,110 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
+import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { fmtMoney, todayISO, uid } from "../state/utils";
+import { uid, todayISO, fmtMoney } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import { applyPaymentStatusRules } from "../state/payments";
+import {
+  applyPaymentStatusRules,
+  getDefaultPayAmount,
+  shouldAllowCustomPayAmount,
+} from "../state/payments";
+import { buildGroupsByArea } from "../state/lessons";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
-import type { Client, ClientFormValues, DB, TaskItem, UIState } from "../types";
+import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
 
-type ClientsTabProps = {
+
+export default function GroupsTab({
+  db,
+  setDB,
+  ui,
+  initialArea = null,
+  initialGroup = null,
+  initialPay = "all",
+}: {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
   ui: UIState;
-};
-
-export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
+  initialArea?: Area | null;
+  initialGroup?: Group | null;
+  initialPay?: PaymentStatus | "all";
+}) {
+  const storedFilters = useMemo(() => readDailySelection("groups"), []);
+  const [area, setArea] = useState<Area | null>(initialArea ?? storedFilters.area);
+  const [group, setGroup] = useState<Group | null>(initialGroup ?? storedFilters.group);
+  const [pay, setPay] = useState<PaymentStatus | "all">(initialPay);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
-  const [query, setQuery] = useState(ui.search);
+
+  const search = ui.search.toLowerCase();
+  const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
+  const availableGroups = useMemo(() => {
+    if (!area) return [];
+    return groupsByArea.get(area) ?? [];
+  }, [area, groupsByArea]);
 
   useEffect(() => {
-    setQuery(ui.search);
-  }, [ui.search]);
-
-  const search = query.trim().toLowerCase();
-  const list = useMemo(() => {
-    if (!search) {
-      return db.clients;
+    if (area || group) {
+      writeDailySelection("groups", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("groups");
     }
-    return db.clients.filter(client => {
-      const fullName = `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase();
-      return fullName.includes(search);
-    });
-  }, [db.clients, search]);
+  }, [area, group]);
+
+  useEffect(() => {
+    if (!area) {
+      if (group !== null) {
+        setGroup(null);
+      }
+      return;
+    }
+    if (group && !availableGroups.includes(group)) {
+      setGroup(null);
+    }
+  }, [area, availableGroups, group]);
+
+  const list = useMemo(() => {
+    if (!area || !group) {
+      return [];
+    }
+    return db.clients.filter(c =>
+      c.area === area &&
+      c.group === group &&
+      (pay === "all" || c.payStatus === pay) &&
+      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
+    );
+  }, [db.clients, area, group, pay, ui.search, search]);
+
 
   const openAddModal = () => {
     setEditing(null);
     setModalOpen(true);
   };
 
-  const startEdit = (client: Client) => {
-    setEditing(client);
+  const startEdit = (c: Client) => {
+    setEditing(c);
     setModalOpen(true);
+  };
+
+  const resolvePayAmount = (rawValue: string, group: Group, previous?: number): number | undefined => {
+    const defaultAmount = getDefaultPayAmount(group);
+    if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    const parsed = Number.parseFloat(rawValue);
+    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
+      return parsed;
+    }
+
+    if (defaultAmount != null) {
+      return defaultAmount;
+    }
+
+    return previous;
   };
 
   const saveClient = async (data: ClientFormValues) => {
@@ -66,15 +128,15 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
         setDB(next);
       }
     } else {
-      const client: Client = {
+      const c: Client = {
         id: uid(),
         ...prepared,
-        coachId: db.staff.find(staffMember => staffMember.role === "Тренер")?.id,
+        coachId: db.staff.find(s => s.role === "Тренер")?.id,
       };
       const next = {
         ...db,
-        clients: [client, ...db.clients],
-        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${client.firstName}`, when: todayISO() }],
+        clients: [c, ...db.clients],
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
@@ -126,7 +188,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     if (!window.confirm("Удалить клиента?")) return;
     const next = {
       ...db,
-      clients: db.clients.filter(client => client.id !== id),
+      clients: db.clients.filter(c => c.id !== id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }],
     };
     const ok = await commitDBUpdate(next, setDB);
@@ -135,32 +197,21 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     }
   };
 
-  const total = db.clients.length;
-  const visibleCount = list.length;
-  const counterText = search
-    ? `Найдено: ${visibleCount} из ${total}`
-    : `Всего клиентов: ${total}`;
-
   return (
     <div className="space-y-3">
-      <Breadcrumbs items={["Клиенты"]} />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder="Поиск клиента…"
-            className="px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:ring focus:ring-sky-200 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-          />
-          <div className="text-xs text-slate-500">{counterText}</div>
-        </div>
-        <button
-          onClick={openAddModal}
-          className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
-        >
-          + Добавить клиента
-        </button>
-      </div>
+      <Breadcrumbs items={["Группы"]} />
+      <ClientFilters
+        db={db}
+        area={area}
+        setArea={setArea}
+        group={group}
+        setGroup={setGroup}
+        pay={pay}
+        setPay={setPay}
+        groups={availableGroups}
+        listLength={list.length}
+        onAddClient={openAddModal}
+      />
       <ClientTable
         list={list}
         currency={ui.currency}
@@ -176,10 +227,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           db={db}
           editing={editing}
           onSave={saveClient}
-          onClose={() => {
-            setModalOpen(false);
-            setEditing(null);
-          }}
+          onClose={() => { setModalOpen(false); setEditing(null); }}
         />
       )}
     </div>

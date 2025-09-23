@@ -182,3 +182,26 @@ test('move: changes stage with arrows', async () => {
   expect(within(delay).getByText('Лид1')).toBeInTheDocument();
   expect(getDB().leads.find(l => l.id === 'l1').stage).toBe('Задержка');
 });
+
+test('move: converts paid lead into client', async () => {
+  const base = makeDB();
+  const db = {
+    ...base,
+    leads: [
+      {
+        ...base.leads[0],
+        stage: 'Ожидание оплаты',
+      },
+    ],
+  };
+  const { getDB } = renderLeads(db);
+  const waiting = screen.getByText('Ожидание оплаты').parentElement;
+  const leadItem = within(waiting).getByRole('button', { name: 'Лид1' }).closest('div');
+  await userEvent.click(within(leadItem).getByText('▶'));
+  await waitFor(() => expect(getDB().leads).toHaveLength(0));
+  expect(getDB().clients).toHaveLength(1);
+  const created = getDB().clients[0];
+  expect(created.firstName).toBe('Иван');
+  expect(created.group).toBe('Group1');
+  expect(created.payStatus).toBe('действует');
+});
