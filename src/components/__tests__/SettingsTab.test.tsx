@@ -150,5 +150,6 @@ describe("SettingsTab", () => {
     await waitFor(() => expect(commitDBUpdate).toHaveBeenCalledTimes(1));
     const [payload] = (commitDBUpdate as jest.Mock).mock.calls[0];
     expect(payload.settings.currencyRates).toEqual({ EUR: 1, TRY: 48.9, RUB: 104.1 });
+
   });
 });
