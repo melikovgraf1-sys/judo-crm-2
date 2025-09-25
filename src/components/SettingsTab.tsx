@@ -3,6 +3,14 @@ import Breadcrumbs from "./Breadcrumbs";
 import { commitDBUpdate } from "../state/appState";
 import type { DB } from "../types";
 
+const formatRate = (value?: number) => (value != null ? value.toFixed(2) : "");
+const parseRateInputValue = (raw: string): number | undefined => {
+  const normalized = raw.trim().replace(/\s+/g, "").replace(",", ".");
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 export default function SettingsTab({
   db,
   setDB,
@@ -14,10 +22,9 @@ export default function SettingsTab({
   const eurRubRate = db.settings.currencyRates.RUB;
   const tryRubRateFromDB = eurTryRate ? eurRubRate / eurTryRate : 0;
 
-  const [rates, setRates] = useState({
-    eurTry: eurTryRate,
-    eurRub: eurRubRate,
-    tryRub: tryRubRateFromDB,
+  const [inputs, setInputs] = useState({
+    eurTry: formatRate(eurTryRate),
+    eurRub: formatRate(eurRubRate),
   });
 
   const fetchInProgressRef = useRef(false);
@@ -32,20 +39,67 @@ export default function SettingsTab({
     lastSavedRatesRef.current = { eurTry: eurTryRate, eurRub: eurRubRate };
   }, [eurTryRate, eurRubRate]);
 
-  useEffect(() => {
-    setRates(prev => {
-      if (
-        prev.eurTry === eurTryRate &&
-        prev.eurRub === eurRubRate &&
-        prev.tryRub === tryRubRateFromDB
-      ) {
-        return prev;
-      }
-      return { eurTry: eurTryRate, eurRub: eurRubRate, tryRub: tryRubRateFromDB };
-    });
-  }, [eurTryRate, eurRubRate, tryRubRateFromDB]);
+  const formattedEurTry = formatRate(eurTryRate);
+  const formattedEurRub = formatRate(eurRubRate);
+  const parsedEurTry = parseRateInputValue(inputs.eurTry);
+  const parsedEurRub = parseRateInputValue(inputs.eurRub);
+  const isDirty = inputs.eurTry !== formattedEurTry || inputs.eurRub !== formattedEurRub;
+  const canSave =
+    isDirty &&
+    parsedEurTry != null &&
+    parsedEurRub != null &&
+    parsedEurTry > 0 &&
+    parsedEurRub > 0;
+  const derivedTryRub = (() => {
+    if (parsedEurTry != null && parsedEurRub != null && parsedEurTry > 0) {
+      const value = parsedEurRub / parsedEurTry;
+      return Number.isFinite(value) ? value : undefined;
+    }
+    return tryRubRateFromDB || undefined;
+  })();
 
   useEffect(() => {
+    if (isDirty) {
+      return;
+    }
+    setInputs(prev => {
+      if (prev.eurTry === formattedEurTry && prev.eurRub === formattedEurRub) {
+        return prev;
+      }
+      return { eurTry: formattedEurTry, eurRub: formattedEurRub };
+    });
+  }, [formattedEurTry, formattedEurRub, isDirty]);
+
+  const saveRates = async () => {
+    if (!canSave) {
+      return;
+    }
+
+    const nextEurTry = parsedEurTry!;
+    const nextEurRub = parsedEurRub!;
+
+    const updated = {
+      ...db,
+      settings: {
+        ...db.settings,
+        currencyRates: { EUR: 1, TRY: nextEurTry, RUB: nextEurRub },
+      },
+    };
+
+    const ok = await commitDBUpdate(updated, setDB);
+    if (!ok) {
+      window.alert("Не удалось сохранить курсы валют. Проверьте доступ к базе данных.");
+      return;
+    }
+
+    lastSavedRatesRef.current = { eurTry: nextEurTry, eurRub: nextEurRub };
+  };
+
+  useEffect(() => {
+    if (isDirty) {
+      return;
+    }
+
     const RATE_API_URL = "https://api.exchangerate.host/latest?base=EUR&symbols=TRY,RUB";
 
     const parseRate = (value: unknown): number | undefined => {
@@ -108,15 +162,18 @@ export default function SettingsTab({
           tryRub: nextTryRub,
         };
 
-        setRates(prevRates => {
+        setInputs(prevInputs => {
+          const nextInputs = {
+            eurTry: formatRate(nextEurTry),
+            eurRub: formatRate(nextEurRub),
+          };
           if (
-            nextRates.eurTry === prevRates.eurTry &&
-            nextRates.eurRub === prevRates.eurRub &&
-            nextRates.tryRub === prevRates.tryRub
+            prevInputs.eurTry === nextInputs.eurTry &&
+            prevInputs.eurRub === nextInputs.eurRub
           ) {
-            return prevRates;
+            return prevInputs;
           }
-          return nextRates;
+          return nextInputs;
         });
 
         const hasChanged = eurTryRate !== nextRates.eurTry || eurRubRate !== nextRates.eurRub;
@@ -142,18 +199,14 @@ export default function SettingsTab({
         }
       } catch (e) {
         console.error("Failed to refresh currency rates", e);
-        setRates(prevRates => ({
-          eurTry: prevRates.eurTry ?? eurTryRate,
-          eurRub: prevRates.eurRub ?? eurRubRate,
-          tryRub: prevRates.tryRub ?? tryRubRateFromDB,
-        }));
+        setInputs({ eurTry: formattedEurTry, eurRub: formattedEurRub });
       } finally {
         fetchInProgressRef.current = false;
       }
     }
 
     fetchRates();
-  }, [eurTryRate, eurRubRate, tryRubRateFromDB, setDB]);
+  }, [eurTryRate, eurRubRate, tryRubRateFromDB, setDB, isDirty, formattedEurTry, formattedEurRub]);
 
   return (
     <div className="space-y-3">
@@ -163,28 +216,38 @@ export default function SettingsTab({
         <div className="grid sm:grid-cols-3 gap-2">
           <label className="text-sm">EUR → TRY
             <input
-              type="number"
-              readOnly
-              className="mt-1 w-full px-3 py-2 rounded-md border border-slate-300 bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
-              value={rates.eurTry ? rates.eurTry.toFixed(2) : ""}
+              type="text"
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              value={inputs.eurTry}
+              onChange={event => setInputs(prev => ({ ...prev, eurTry: event.target.value }))}
             />
           </label>
           <label className="text-sm">EUR → RUB
             <input
-              type="number"
-              readOnly
-              className="mt-1 w-full px-3 py-2 rounded-md border border-slate-300 bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
-              value={rates.eurRub ? rates.eurRub.toFixed(2) : ""}
+              type="text"
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              value={inputs.eurRub}
+              onChange={event => setInputs(prev => ({ ...prev, eurRub: event.target.value }))}
             />
           </label>
           <label className="text-sm">TRY → RUB
             <input
-              type="number"
+              type="text"
               readOnly
-              className="mt-1 w-full px-3 py-2 rounded-md border border-slate-300 bg-slate-100 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-100"
-              value={rates.tryRub ? rates.tryRub.toFixed(2) : ""}
+              className="mt-1 w-full rounded-md border border-slate-300 bg-slate-100 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+              value={derivedTryRub != null ? derivedTryRub.toFixed(2) : ""}
             />
           </label>
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={!canSave}
+            onClick={saveRates}
+            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            Сохранить курсы
+          </button>
         </div>
       </div>
 
