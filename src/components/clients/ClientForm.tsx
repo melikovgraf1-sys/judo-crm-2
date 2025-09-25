@@ -184,96 +184,103 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     }
   }, [areaGroups, selectedArea, selectedGroup, setValue]);
 
+  const labelClass = "text-xs text-slate-500 dark:text-slate-400";
+  const fieldClass =
+    "px-3 py-2 rounded-md border border-slate-300 bg-white placeholder:text-slate-400 " +
+    "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
+  const selectClass = `${fieldClass} appearance-none`; // prevent iOS default background from breaking dark theme
+  const subtleTextClass = "text-xs text-slate-500 dark:text-slate-400";
+
   return (
     <Modal size="xl" onClose={onClose}>
-      <div className="font-semibold text-slate-800">{editing ? "Редактирование клиента" : "Новый клиент"}</div>
+      <div className="font-semibold text-slate-800 dark:text-slate-100">{editing ? "Редактирование клиента" : "Новый клиент"}</div>
       <form onSubmit={handleSubmit(onSave)} className="space-y-3">
         <div className="grid sm:grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Имя</label>
-            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("firstName")} />
+            <label className={labelClass}>Имя</label>
+            <input className={fieldClass} {...register("firstName")} />
             {errors.firstName && <span className="text-xs text-rose-600">{errors.firstName.message}</span>}
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Фамилия</label>
-            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("lastName")} />
+            <label className={labelClass}>Фамилия</label>
+            <input className={fieldClass} {...register("lastName")} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Телефон</label>
-            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("phone")} />
+            <label className={labelClass}>Телефон</label>
+            <input className={fieldClass} {...register("phone")} />
             {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">WhatsApp</label>
-            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("whatsApp")} />
+            <label className={labelClass}>WhatsApp</label>
+            <input className={fieldClass} {...register("whatsApp")} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Telegram</label>
-            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("telegram")} />
+            <label className={labelClass}>Telegram</label>
+            <input className={fieldClass} {...register("telegram")} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Instagram</label>
-            <input className="px-3 py-2 rounded-md border border-slate-300" {...register("instagram")} />
+            <label className={labelClass}>Instagram</label>
+            <input className={fieldClass} {...register("instagram")} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Канал</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("channel")}>
+            <label className={labelClass}>Канал</label>
+            <select className={selectClass} {...register("channel")}>
               <option>Telegram</option>
               <option>WhatsApp</option>
               <option>Instagram</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Пол</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("gender")}>
+            <label className={labelClass}>Пол</label>
+            <select className={selectClass} {...register("gender")}>
               <option value="м">м</option>
               <option value="ж">ж</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Район</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("area")}>
+            <label className={labelClass}>Район</label>
+            <select className={selectClass} {...register("area")}>
               {db.settings.areas.map(a => (
                 <option key={a}>{a}</option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Группа</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("group")}>
+            <label className={labelClass}>Группа</label>
+            <select className={selectClass} {...register("group")}>
               {areaGroups.map(g => (
                 <option key={g} value={g}>{g}</option>
               ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Дата рождения</label>
-            <input type="date" className="px-3 py-2 rounded-md border border-slate-300" {...register("birthDate")} />
+            <label className={labelClass}>Дата рождения</label>
+            <input type="date" className={fieldClass} {...register("birthDate")} />
             {errors.birthDate && <span className="text-xs text-rose-600">{errors.birthDate.message}</span>}
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Дата начала</label>
-            <input type="date" className="px-3 py-2 rounded-md border border-slate-300" {...register("startDate")} />
+            <label className={labelClass}>Дата начала</label>
+            <input type="date" className={fieldClass} {...register("startDate")} />
             {errors.startDate && <span className="text-xs text-rose-600">{errors.startDate.message}</span>}
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Способ оплаты</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("payMethod")}>
+            <label className={labelClass}>Способ оплаты</label>
+            <select className={selectClass} {...register("payMethod")}>
               <option>перевод</option>
               <option>наличные</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Статус оплаты</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("payStatus")}>
+            <label className={labelClass}>Статус оплаты</label>
+            <select className={selectClass} {...register("payStatus")}>
               <option>ожидание</option>
               <option>действует</option>
               <option>задолженность</option>
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Статус</label>
-            <select className="px-3 py-2 rounded-md border border-slate-300" {...register("status")}>
+            <label className={labelClass}>Статус</label>
+            <select className={selectClass} {...register("status")}>
               <option value="действующий">действующий</option>
               <option value="отмена">отмена</option>
               <option value="новый">новый</option>
@@ -282,30 +289,30 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Дата оплаты</label>
-            <input type="date" className="px-3 py-2 rounded-md border border-slate-300" {...register("payDate")} />
+            <label className={labelClass}>Дата оплаты</label>
+            <input type="date" className={fieldClass} {...register("payDate")} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Сумма оплаты, €</label>
+            <label className={labelClass}>Сумма оплаты, €</label>
             <input
               type="number"
               inputMode="decimal"
-              className="px-3 py-2 rounded-md border border-slate-300"
+              className={fieldClass}
               {...register("payAmount")}
               disabled={!canEditPayAmount && defaultPayAmount != null}
               placeholder="Укажите сумму"
             />
             {!canEditPayAmount && defaultPayAmount != null && (
-              <span className="text-xs text-slate-500">Сумма фиксирована для этой группы</span>
+              <span className={subtleTextClass}>Сумма фиксирована для этой группы</span>
             )}
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-500">Остаток занятий</label>
+            <label className={labelClass}>Остаток занятий</label>
             {manualRemaining ? (
               <input
                 type="number"
                 inputMode="numeric"
-                className="px-3 py-2 rounded-md border border-slate-300"
+                className={fieldClass}
                 {...register("remainingLessons")}
                 placeholder="Укажите количество"
               />
@@ -314,22 +321,26 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
                 type="text"
                 value={computedRemaining != null ? String(computedRemaining) : "—"}
                 readOnly
-                className="px-3 py-2 rounded-md border border-slate-300 bg-slate-100 text-slate-600"
+                className="px-3 py-2 rounded-md border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
               />
             )}
             {!manualRemaining && (
-              <span className="text-xs text-slate-500">Значение рассчитывается автоматически от даты оплаты</span>
+              <span className={subtleTextClass}>Значение рассчитывается автоматически от даты оплаты</span>
             )}
           </div>
         </div>
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-3 py-2 rounded-md border border-slate-300">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-2 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
             Отмена
           </button>
           <button
             type="submit"
             disabled={!isValid}
-            className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400"
+            className="px-3 py-2 rounded-md bg-sky-600 text-white disabled:bg-slate-400 dark:disabled:bg-slate-600"
           >
             Сохранить
           </button>
