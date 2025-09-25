@@ -76,10 +76,8 @@ export default function PerformanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(
-      client => client.area === area && client.group === group && isClientInPeriod(client, period),
-    );
-  }, [area, group, db.clients, period]);
+    return db.clients.filter(client => client.area === area && client.group === group);
+  }, [area, group, db.clients]);
 
   type ColumnConfig = {
     id: string;
