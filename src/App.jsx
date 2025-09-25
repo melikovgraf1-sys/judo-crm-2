@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Topbar from "./components/Topbar";
 import Tabs from "./components/Tabs";
@@ -38,13 +38,28 @@ export default function App() {
     addQuickTask,
   } = appState;
 
+  const [hideLocalOnly, setHideLocalOnly] = useState(false);
+
+  useEffect(() => {
+    if (!isLocalOnly) {
+      setHideLocalOnly(false);
+    }
+  }, [isLocalOnly]);
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100">
       <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
-      {isLocalOnly ? (
+      {isLocalOnly && !hideLocalOnly ? (
         <div className="bg-amber-100 border-y border-amber-200 text-amber-900 dark:bg-amber-900/70 dark:border-amber-800 dark:text-amber-100">
-          <div className="max-w-7xl mx-auto px-3 py-2 text-sm font-medium" role="alert">
-            {LOCAL_ONLY_MESSAGE}
+          <div className="max-w-7xl mx-auto flex items-start gap-3 px-3 py-2 text-sm font-medium" role="alert">
+            <span className="grow">{LOCAL_ONLY_MESSAGE}</span>
+            <button
+              type="button"
+              className="rounded-md border border-amber-300 px-2 py-1 text-xs font-semibold uppercase tracking-wide hover:bg-amber-200/60 dark:border-amber-600 dark:hover:bg-amber-800/40"
+              onClick={() => setHideLocalOnly(true)}
+            >
+              Скрыть
+            </button>
           </div>
         </div>
       ) : null}

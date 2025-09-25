@@ -45,7 +45,8 @@ export default function LeadsTab({
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
-        window.alert("Не удалось обновить статус лида. Проверьте доступ к базе данных.");
+        window.alert("Не удалось обновить статус лида. Изменение сохранено локально, проверьте доступ к базе данных.");
+        setDB(next);
       }
       return;
     }
@@ -53,7 +54,8 @@ export default function LeadsTab({
     const next = { ...db, leads: db.leads.map(x => (x.id === id ? updatedLead : x)) };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось обновить статус лида. Проверьте доступ к базе данных.");
+      window.alert("Не удалось обновить статус лида. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
     }
   };
   return (

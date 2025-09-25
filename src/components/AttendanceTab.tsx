@@ -161,15 +161,31 @@ export default function AttendanceTab({
     return result;
   }, [area, db.schedule, group, selectedMonthDate, todayStr]);
 
+  const attendanceByDate = useMemo(() => {
+    const grouped = new Map<string, AttendanceEntry[]>();
+    for (const entry of db.attendance) {
+      const key = entry.date.slice(0, 10);
+      const list = grouped.get(key);
+      if (list) {
+        list.push(entry);
+      } else {
+        grouped.set(key, [entry]);
+      }
+    }
+    return grouped;
+  }, [db.attendance]);
+
   const marksForSelectedDate = useMemo(() => {
     const map: Map<string, AttendanceEntry> = new Map();
-    db.attendance.forEach(entry => {
-      if (entry.date.slice(0, 10) === selectedDate) {
-        map.set(entry.clientId, entry);
-      }
-    });
+    const entries = attendanceByDate.get(selectedDate);
+    if (!entries?.length) {
+      return map;
+    }
+    for (const entry of entries) {
+      map.set(entry.clientId, entry);
+    }
     return map;
-  }, [db.attendance, selectedDate]);
+  }, [attendanceByDate, selectedDate]);
 
   const selectedDateISO = useMemo(() => toMiddayISO(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => (selectedDateISO ? fmtDate(selectedDateISO) : ""), [selectedDateISO]);
