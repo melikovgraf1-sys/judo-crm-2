@@ -34,22 +34,25 @@ interface TabsProps {
 export default function Tabs({ role }: TabsProps) {
   const visible = TABS.filter(t => !t.need || t.need(role));
   return (
-    <div className="w-full overflow-x-auto border-b border-slate-200 bg-gradient-to-r from-sky-50 to-blue-50 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900">
-      <div className="flex gap-1 p-2">
-        {visible.map(t => (
-          <NavLink
-            key={t.key}
-            to={`/${t.key}`}
-            className={({ isActive }: { isActive: boolean }) =>
-              `px-3 py-2 rounded-md text-sm ${
-                isActive
-                  ? "bg-white text-sky-700 border border-sky-200 dark:bg-slate-800 dark:text-sky-400 dark:border-slate-700"
-                  : "text-slate-700 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-slate-800/80"
-              }`}
-          >
-            {t.title}
-          </NavLink>
-        ))}
+    <div className="border-b border-transparent bg-gradient-to-r from-white/70 via-slate-50/60 to-white/70 backdrop-blur-sm dark:from-slate-950/70 dark:via-slate-900/70 dark:to-slate-950/70">
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="relative flex overflow-x-auto rounded-full border border-slate-200/70 bg-white/80 p-1 shadow-inner shadow-slate-200/60 dark:border-slate-800/70 dark:bg-slate-950/70 dark:shadow-none">
+          {visible.map(t => (
+            <NavLink
+              key={t.key}
+              to={`/${t.key}`}
+              className={({ isActive }: { isActive: boolean }) =>
+                `whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/60 dark:focus-visible:ring-sky-500/40 ${
+                  isActive
+                    ? "bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-md shadow-sky-500/30"
+                    : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                }`
+              }
+            >
+              {t.title}
+            </NavLink>
+          ))}
+        </div>
       </div>
     </div>
   );

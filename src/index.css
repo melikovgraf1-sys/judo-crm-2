@@ -10,7 +10,11 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(to bottom, #ffffff, #f0f9ff);
+  background-color: #f1f5f9;
+  background-image:
+    radial-gradient(circle at 0% 0%, rgba(56, 189, 248, 0.18), transparent 45%),
+    radial-gradient(circle at 100% 0%, rgba(129, 140, 248, 0.18), transparent 50%),
+    linear-gradient(to bottom, #ffffff 0%, #f8fafc 45%, #e2e8f0 100%);
   color: #0f172a;
 }
 

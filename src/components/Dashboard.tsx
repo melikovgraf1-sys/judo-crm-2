@@ -20,15 +20,19 @@ type MetricCardProps = {
 };
 
 function MetricCard({ title, value, accent }: MetricCardProps) {
-  const cls = accent === "green"
-    ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-700"
-    : accent === "sky"
-      ? "bg-sky-50 border-sky-200 dark:bg-sky-900/30 dark:border-sky-700"
-      : "bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700";
+  const accentGlow =
+    accent === "green"
+      ? "from-emerald-400/40 via-emerald-500/30 to-emerald-600/40"
+      : accent === "sky"
+        ? "from-sky-400/40 via-cyan-400/30 to-blue-500/40"
+        : "from-slate-400/40 via-slate-500/30 to-slate-700/40";
   return (
-    <div className={`p-4 rounded-2xl border ${cls} min-w-[180px]`}>
-      <div className="text-xs text-slate-500 dark:text-slate-400">{title}</div>
-      <div className="text-xl font-semibold text-slate-800 dark:text-slate-200 mt-1">{value}</div>
+    <div className="relative min-w-[180px] overflow-hidden rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-sm transition hover:-translate-y-[2px] hover:shadow-lg dark:border-slate-800/60 dark:bg-slate-950/70">
+      <div className={`pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full bg-gradient-to-br ${accentGlow} blur-3xl`} aria-hidden="true" />
+      <div className="relative space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</div>
+        <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{value}</div>
+      </div>
     </div>
   );
 }
@@ -39,6 +43,8 @@ type DashboardProps = {
 };
 
 export default function Dashboard({ db, ui }: DashboardProps) {
+  const FIELD_CLASS =
+    "rounded-xl border border-slate-200/70 bg-white/70 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200/60 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-200 dark:focus:border-sky-500/60 dark:focus:ring-sky-500/30";
   const persistedPeriod = useMemo(() => readDailyPeriod("dashboard"), []);
   const [period, setPeriod] = useState<PeriodFilter>(() => {
     const fallback = getDefaultPeriod();
@@ -122,25 +128,25 @@ export default function Dashboard({ db, ui }: DashboardProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <Breadcrumbs items={["Дашборд"]} />
-      <div className="flex flex-wrap items-center gap-3">
-        <label htmlFor="dashboard-month" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/80 px-4 py-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/70">
+        <label htmlFor="dashboard-month" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Месяц
         </label>
         <input
           id="dashboard-month"
           type="month"
-          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          className={FIELD_CLASS}
           value={monthValue}
           onChange={event => handleMonthChange(event.target.value)}
         />
-        <label htmlFor="dashboard-year" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+        <label htmlFor="dashboard-year" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Год
         </label>
         <select
           id="dashboard-year"
-          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          className={FIELD_CLASS}
           value={period.year}
           onChange={handleYearChange}
         >
@@ -152,46 +158,60 @@ export default function Dashboard({ db, ui }: DashboardProps) {
         </select>
       </div>
       {favoriteCards.length > 0 && (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {favoriteCards.map(card => (
             <MetricCard key={card.id} title={card.title} value={card.value} accent={card.accent} />
           ))}
         </div>
       )}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Ученики всего" value={String(totalClients)} accent="sky" />
         <MetricCard title="Активные (действует)" value={String(activeClients)} accent="green" />
         <MetricCard title="Выручка (прибл.)" value={fmtMoney(revenue, currency)} accent="sky" />
         <MetricCard title="Заполняемость" value={`${fillPct}%`} accent={fillPct >= 80 ? "green" : "slate"} />
       </div>
-      <div className="grid lg:grid-cols-2 gap-3">
-        <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <div className="font-semibold mb-2 text-slate-800 dark:text-slate-200">Лиды по этапам</div>
-          <div className="flex flex-wrap gap-2">
-            {leadStages.map(s => (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/70">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Лиды по этапам</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Сфокусируйтесь на этапах, где нужны действия</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {leadStages.map(stage => (
               <div
-                key={s}
-                className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs dark:bg-slate-800 dark:border-slate-700"
+                key={stage}
+                className="relative min-w-[140px] flex-1 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80 px-4 py-3 text-xs shadow-sm transition hover:-translate-y-[2px] hover:shadow-md dark:border-slate-800/60 dark:bg-slate-900/60"
               >
-                <div className="text-slate-500 dark:text-slate-400">{s}</div>
-                <div className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                  {leadsDistribution[s] || 0}
-                </div>
+                <span className="text-slate-500 dark:text-slate-400">{stage}</span>
+                <span className="mt-2 block text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                  {leadsDistribution[stage] || 0}
+                </span>
+                <span
+                  className="pointer-events-none absolute -bottom-6 -right-6 h-24 w-24 rounded-full bg-gradient-to-br from-sky-200/60 via-indigo-200/40 to-transparent blur-2xl dark:from-sky-500/20 dark:via-indigo-500/10"
+                  aria-hidden="true"
+                />
               </div>
             ))}
           </div>
         </div>
-        <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <div className="font-semibold mb-2 text-slate-800 dark:text-slate-200">Предстоящие задачи</div>
-          <ul className="space-y-2">
-            {sortedTasks
-              .slice(0, 6)
-              .map(t => (
-                <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{t.title}</span>
-                  <span className="text-slate-500 dark:text-slate-400">{fmtDate(t.due)}</span>
-                </li>
-              ))}
+        <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/70">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Предстоящие задачи</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Первые шесть, чтобы держать фокус на важных делах</p>
+            </div>
+          </div>
+          <ul className="mt-4 divide-y divide-slate-200/70 dark:divide-slate-800/60">
+            {sortedTasks.slice(0, 6).map(task => (
+              <li key={task.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                <span className="flex-1 truncate font-medium text-slate-700 dark:text-slate-200">{task.title}</span>
+                <span className="whitespace-nowrap rounded-full bg-slate-100/80 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-800/70 dark:text-slate-300">
+                  {fmtDate(task.due)}
+                </span>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
