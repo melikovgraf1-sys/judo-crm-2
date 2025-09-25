@@ -107,7 +107,6 @@ export default function LeadsTab({
 const isPaidStage = (stage: LeadStage): boolean => stage.toLowerCase().includes("оплач");
 
 const CONTACT_CHANNELS: ContactChannel[] = ["Telegram", "WhatsApp", "Instagram"];
-
 function convertLeadToClient(lead: Lead, db: DB): Client {
   const fallbackDate = lead.updatedAt ?? todayISO();
   const area = lead.area ?? db.settings.areas[0];
