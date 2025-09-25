@@ -135,6 +135,15 @@ function writeLocalDB(dbData: DB) {
   }
 }
 
+function sanitizeForFirestore<T>(value: T): T {
+  try {
+    return JSON.parse(JSON.stringify(value)) as T;
+  } catch (err) {
+    console.error("Failed to sanitize data before saving to Firestore", err);
+    throw err;
+  }
+}
+
 export async function saveDB(dbData: DB): Promise<boolean> {
   if (!firestore) {
     console.warn("Firestore not initialized. Changes cannot be synchronized.");
@@ -151,7 +160,8 @@ export async function saveDB(dbData: DB): Promise<boolean> {
 
   const ref = doc(firestore, "app", "main");
   try {
-    await setDoc(ref, dbData);
+    const payload = sanitizeForFirestore(dbData);
+    await setDoc(ref, payload);
     if (!signedIn) {
       console.warn("Saved DB without confirmed Firebase authentication. Check security rules if data is missing remotely.");
     }
