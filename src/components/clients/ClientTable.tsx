@@ -294,6 +294,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
           attendance={attendance}
           performance={performance}
           onEdit={onEdit}
+          onRemove={onRemove}
           onClose={() => setSelected(null)}
         />
       )}
