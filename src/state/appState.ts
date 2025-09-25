@@ -29,6 +29,8 @@ export const LS_KEYS = {
   db: "judo_crm_db_v1",
 };
 
+export const LOCAL_ONLY_EVENT = "judo-crm/local-only";
+
 export const LOCAL_ONLY_MESSAGE =
   "Данные сейчас сохраняются только в этом браузере — синхронизация с Firebase отключена, поэтому содержимое может отличаться в других окнах.";
 
@@ -42,7 +44,7 @@ const DEFAULT_SETTINGS: Settings = {
   ) as Settings["limits"],
   rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
   coachSalaryByAreaEUR: { Махмутлар: 0, Центр: 0, Джикджилли: 0 },
-  currencyRates: { EUR: 1, TRY: 36, RUB: 100 },
+  currencyRates: { EUR: 1, TRY: 35.5, RUB: 101.2 },
   coachPayFormula: "фикс 100€ + 5€ за ученика",
   analyticsFavorites: [],
 };
@@ -133,6 +135,15 @@ function writeLocalDB(dbData: DB) {
   }
 }
 
+function sanitizeForFirestore<T>(value: T): T {
+  try {
+    return JSON.parse(JSON.stringify(value)) as T;
+  } catch (err) {
+    console.error("Failed to sanitize data before saving to Firestore", err);
+    throw err;
+  }
+}
+
 export async function saveDB(dbData: DB): Promise<boolean> {
   if (!firestore) {
     console.warn("Firestore not initialized. Changes cannot be synchronized.");
@@ -149,7 +160,8 @@ export async function saveDB(dbData: DB): Promise<boolean> {
 
   const ref = doc(firestore, "app", "main");
   try {
-    await setDoc(ref, dbData);
+    const payload = sanitizeForFirestore(dbData);
+    await setDoc(ref, payload);
     if (!signedIn) {
       console.warn("Saved DB without confirmed Firebase authentication. Check security rules if data is missing remotely.");
     }
@@ -157,6 +169,11 @@ export async function saveDB(dbData: DB): Promise<boolean> {
     return true;
   } catch (err) {
     console.error("Failed to save DB", err);
+    writeLocalDB(dbData);
+    if (typeof window !== "undefined" && "dispatchEvent" in window) {
+      window.dispatchEvent(new CustomEvent(LOCAL_ONLY_EVENT));
+    }
+    console.warn(LOCAL_ONLY_MESSAGE);
     return false;
   }
 }
@@ -281,6 +298,17 @@ export function useAppState(): AppState {
   const [isLocalOnly, setIsLocalOnly] = useState<boolean>(() => !firestore);
   const location = useLocation();
   const localOnlyToastShownRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return () => undefined;
+    }
+    const handler = () => setIsLocalOnly(true);
+    window.addEventListener(LOCAL_ONLY_EVENT, handler);
+    return () => {
+      window.removeEventListener(LOCAL_ONLY_EVENT, handler);
+    };
+  }, []);
 
   useEffect(() => {
     if (isLocalOnly) {
