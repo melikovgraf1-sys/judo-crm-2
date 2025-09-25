@@ -47,7 +47,7 @@ export default function App() {
   }, [isLocalOnly]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-sky-50 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-slate-100/60 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_55%)] pb-16 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.22),_transparent_60%)] dark:text-slate-100">
       <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
       {isLocalOnly && !hideLocalOnly ? (
         <div className="bg-amber-100 border-y border-amber-200 text-amber-900 dark:bg-amber-900/70 dark:border-amber-800 dark:text-amber-100">
@@ -65,7 +65,7 @@ export default function App() {
       ) : null}
       <Tabs role={ui.role} />
 
-      <main className="max-w-7xl mx-auto p-3 space-y-3">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -184,7 +184,7 @@ export default function App() {
       />
       <Toasts toasts={toasts} />
 
-      <footer className="text-xs text-slate-500 text-center py-6">
+      <footer className="mx-auto mt-12 max-w-7xl px-4 text-center text-xs font-medium text-slate-500/80">
         Каркас CRM · Следующие шаги: SW/Manifest/PWA, офлайн-синхронизация, push, CSV/печать
       </footer>
     </div>
