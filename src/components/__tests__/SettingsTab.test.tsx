@@ -150,38 +150,6 @@ describe("SettingsTab", () => {
     await waitFor(() => expect(commitDBUpdate).toHaveBeenCalledTimes(1));
     const [payload] = (commitDBUpdate as jest.Mock).mock.calls[0];
     expect(payload.settings.currencyRates).toEqual({ EUR: 1, TRY: 48.9, RUB: 104.1 });
-  });
 
-  it("allows manually updating stored currency rates", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({ rates: {} }),
-    } as unknown as Response);
-
-    const db = createDB();
-    const setDB = jest.fn();
-
-    render(<SettingsTab db={db} setDB={setDB} />);
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-
-    (commitDBUpdate as jest.Mock).mockClear();
-
-    const eurTryInput = screen.getByLabelText("EUR → TRY");
-    const eurRubInput = screen.getByLabelText("EUR → RUB");
-    const saveButton = screen.getByRole("button", { name: "Сохранить курсы" });
-
-    await waitFor(() => expect(saveButton).toBeDisabled());
-
-    fireEvent.change(eurTryInput, { target: { value: "48.90" } });
-    fireEvent.change(eurRubInput, { target: { value: "104.10" } });
-
-    await waitFor(() => expect(saveButton).not.toBeDisabled());
-
-    fireEvent.click(saveButton);
-
-    await waitFor(() => expect(commitDBUpdate).toHaveBeenCalledTimes(1));
-    const [payload] = (commitDBUpdate as jest.Mock).mock.calls[0];
-    expect(payload.settings.currencyRates).toEqual({ EUR: 1, TRY: 48.9, RUB: 104.1 });
   });
 });

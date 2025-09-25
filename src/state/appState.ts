@@ -164,7 +164,7 @@ export async function saveDB(dbData: DB): Promise<boolean> {
       window.dispatchEvent(new CustomEvent(LOCAL_ONLY_EVENT));
     }
     console.warn(LOCAL_ONLY_MESSAGE);
-    return true;
+    return false;
   }
 }
 

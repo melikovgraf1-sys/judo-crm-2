@@ -9,7 +9,7 @@ import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import type { DB, Lead, LeadStage, StaffMember, LeadFormValues, Client } from "../types";
+import type { ContactChannel, DB, Lead, LeadStage, LeadFormValues, Client } from "../types";
 
 export default function LeadsTab({
   db,
@@ -95,9 +95,9 @@ export default function LeadsTab({
         <LeadModal
           lead={open}
           onClose={() => setOpen(null)}
-          staff={db.staff}
           db={db}
           setDB={setDB}
+          stages={stages}
         />
       )}
     </div>
@@ -105,7 +105,7 @@ export default function LeadsTab({
 }
 
 const isPaidStage = (stage: LeadStage): boolean => stage.toLowerCase().includes("оплач");
-
+const CONTACT_CHANNELS: ContactChannel[] = ["Telegram", "WhatsApp", "Instagram"];
 function convertLeadToClient(lead: Lead, db: DB): Client {
   const fallbackDate = lead.updatedAt ?? todayISO();
   const area = lead.area ?? db.settings.areas[0];
@@ -149,40 +149,70 @@ function formatLeadContactSummary(lead: Lead): string {
   return contact ? ` · ${contact}` : "";
 }
 
-const toLeadFormValues = (current: Lead): LeadFormValues => ({
-  name: current.name,
-  parentName: current.parentName ?? "",
-  phone: current.phone ?? "",
-  whatsApp: current.whatsApp ?? "",
-  telegram: current.telegram ?? "",
-  instagram: current.instagram ?? "",
-});
+const toLeadFormValues = (
+  current: Lead,
+  defaults: { area: string; group: string },
+): LeadFormValues => {
+  const [firstName = "", ...restName] = (current.firstName ?? current.name ?? "").split(/\s+/).filter(Boolean);
+  return {
+    name: current.name,
+    firstName: current.firstName ?? firstName ?? "",
+    lastName: current.lastName ?? restName.join(" "),
+    parentName: current.parentName ?? "",
+    phone: current.phone ?? "",
+    whatsApp: current.whatsApp ?? "",
+    telegram: current.telegram ?? "",
+    instagram: current.instagram ?? "",
+    source: current.source,
+    area: current.area ?? defaults.area,
+    group: current.group ?? defaults.group,
+    stage: current.stage,
+    birthDate: current.birthDate ? current.birthDate.slice(0, 10) : "",
+    startDate: current.startDate ? current.startDate.slice(0, 10) : "",
+    notes: current.notes ?? "",
+  };
+};
 
 function LeadModal(
   {
     lead,
     onClose,
-    staff,
     db,
     setDB,
+    stages,
   }: {
     lead: Lead;
     onClose: () => void;
-    staff: StaffMember[];
     db: DB;
     setDB: Dispatch<SetStateAction<DB>>;
+    stages: LeadStage[];
   },
 ) {
   const [edit, setEdit] = useState(false);
 
   const schema = yup
     .object({
-      name: yup.string().required("Имя обязательно"),
-      parentName: yup.string().nullable(),
+      name: yup.string().trim().required("Имя обязательно"),
+      firstName: yup.string().trim().nullable(),
+      lastName: yup.string().trim().nullable(),
+      parentName: yup.string().trim().nullable(),
       phone: yup.string().trim(),
       whatsApp: yup.string().trim(),
       telegram: yup.string().trim(),
       instagram: yup.string().trim(),
+      source: yup
+        .string()
+        .oneOf(CONTACT_CHANNELS, "Выберите канал")
+        .required("Выберите канал"),
+      area: yup.string().trim().required("Укажите район"),
+      group: yup.string().trim().required("Укажите группу"),
+      stage: yup
+        .string()
+        .oneOf(stages, "Выберите стадию")
+        .required("Выберите стадию"),
+      birthDate: yup.string().nullable(),
+      startDate: yup.string().nullable(),
+      notes: yup.string().trim().nullable(),
     })
     .test("contact-required", "Укажите хотя бы один контакт", function (value) {
       if (!value) return false;
@@ -195,25 +225,65 @@ function LeadModal(
 
   const resolver = yupResolver(schema) as unknown as Resolver<LeadFormValues>;
 
+  const defaultArea = db.settings.areas[0] ?? "";
+  const defaultGroup = db.settings.groups[0] ?? "";
+
   const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<LeadFormValues>({
     resolver,
     mode: "onChange",
-    defaultValues: toLeadFormValues(lead),
+    defaultValues: toLeadFormValues(lead, { area: defaultArea, group: defaultGroup }),
   });
 
-  useEffect(() => reset(toLeadFormValues(lead)), [lead, reset]);
+  useEffect(() => {
+    reset(toLeadFormValues(lead, { area: defaultArea, group: defaultGroup }));
+  }, [lead, reset, defaultArea, defaultGroup]);
 
   const save = async (data: LeadFormValues) => {
+    const toISODate = (value: string): string | undefined => {
+      const trimmed = value?.trim();
+      return trimmed ? `${trimmed}T00:00:00.000Z` : undefined;
+    };
     const nextLead: Lead = {
       ...lead,
-      ...data,
+      name: data.name.trim(),
+      firstName: data.firstName?.trim() || undefined,
+      lastName: data.lastName?.trim() || undefined,
       parentName: data.parentName?.trim() || undefined,
       phone: data.phone?.trim() || undefined,
       whatsApp: data.whatsApp?.trim() || undefined,
       telegram: data.telegram?.trim() || undefined,
       instagram: data.instagram?.trim() || undefined,
+      source: data.source as ContactChannel,
+      area: data.area || defaultArea,
+      group: data.group || defaultGroup,
+      stage: data.stage as LeadStage,
+      birthDate: toISODate(data.birthDate) ?? undefined,
+      startDate: toISODate(data.startDate) ?? undefined,
+      notes: data.notes?.trim() || undefined,
       updatedAt: todayISO(),
     };
+
+    if (isPaidStage(nextLead.stage)) {
+      const newClient = convertLeadToClient(nextLead, db);
+      const next = {
+        ...db,
+        leads: db.leads.filter(l => l.id !== lead.id),
+        clients: [newClient, ...db.clients],
+        changelog: [
+          ...db.changelog,
+          { id: uid(), who: "UI", what: `Лид ${nextLead.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
+        ],
+      };
+      const ok = await commitDBUpdate(next, setDB);
+      if (!ok) {
+        window.alert("Не удалось сохранить изменения лида. Проверьте доступ к базе данных.");
+        return;
+      }
+      setEdit(false);
+      onClose();
+      return;
+    }
+
     const next = {
       ...db,
       leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
@@ -224,7 +294,8 @@ function LeadModal(
       window.alert("Не удалось сохранить изменения лида. Проверьте доступ к базе данных.");
       return;
     }
-    setEdit(false); onClose();
+    setEdit(false);
+    onClose();
   };
 
   const remove = async () => {
@@ -283,6 +354,8 @@ function LeadModal(
           <InfoRow label="WhatsApp" value={lead.whatsApp || "—"} />
           <InfoRow label="Telegram" value={lead.telegram || "—"} />
           <InfoRow label="Instagram" value={lead.instagram || "—"} />
+          <InfoRow label="Район" value={lead.area ?? "—"} />
+          <InfoRow label="Группа" value={lead.group ?? "—"} />
           <InfoRow label="Дата рождения" value={lead.birthDate ? fmtDate(lead.birthDate) : "—"} />
           <InfoRow label="Старт" value={lead.startDate ? fmtDate(lead.startDate) : "—"} />
           <InfoRow label="Создан" value={fmtDate(lead.createdAt)} />
@@ -299,8 +372,11 @@ function LeadModal(
             onSubmit={handleSubmit(save)}
             className="space-y-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
           >
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Название карточки
+                </label>
                 <input
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                   {...register("name")}
@@ -308,33 +384,171 @@ function LeadModal(
                 />
                 {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
               </div>
-              <div className="sm:col-span-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Имя ребёнка
+                </label>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("firstName")}
+                  placeholder="Имя ребёнка"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Фамилия
+                </label>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("lastName")}
+                  placeholder="Фамилия"
+                />
+              </div>
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Родитель
+                </label>
                 <input
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                   {...register("parentName")}
                   placeholder="Родитель"
                 />
               </div>
-              <input
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                {...register("phone")}
-                placeholder="Телефон"
-              />
-              <input
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                {...register("whatsApp")}
-                placeholder="WhatsApp"
-              />
-              <input
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                {...register("telegram")}
-                placeholder="Telegram"
-              />
-              <input
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                {...register("instagram")}
-                placeholder="Instagram"
-              />
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Статус лида
+                </label>
+                <select
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("stage")}
+                >
+                  {stages.map(stage => (
+                    <option key={stage} value={stage}>
+                      {stage}
+                    </option>
+                  ))}
+                </select>
+                {errors.stage && <span className="text-xs text-rose-600">{errors.stage.message}</span>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Источник
+                </label>
+                <select
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("source")}
+                >
+                  {CONTACT_CHANNELS.map(channel => (
+                    <option key={channel} value={channel}>
+                      {channel}
+                    </option>
+                  ))}
+                </select>
+                {errors.source && <span className="text-xs text-rose-600">{errors.source.message}</span>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Район
+                </label>
+                <select
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("area")}
+                >
+                  {db.settings.areas.map(area => (
+                    <option key={area} value={area}>
+                      {area}
+                    </option>
+                  ))}
+                </select>
+                {errors.area && <span className="text-xs text-rose-600">{errors.area.message}</span>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Группа
+                </label>
+                <select
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("group")}
+                >
+                  {db.settings.groups.map(group => (
+                    <option key={group} value={group}>
+                      {group}
+                    </option>
+                  ))}
+                </select>
+                {errors.group && <span className="text-xs text-rose-600">{errors.group.message}</span>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Дата рождения
+                </label>
+                <input
+                  type="date"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("birthDate")}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Дата старта
+                </label>
+                <input
+                  type="date"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("startDate")}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Телефон
+                </label>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("phone")}
+                  placeholder="Телефон"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  WhatsApp
+                </label>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("whatsApp")}
+                  placeholder="WhatsApp"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Telegram
+                </label>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("telegram")}
+                  placeholder="Telegram"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Instagram
+                </label>
+                <input
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("instagram")}
+                  placeholder="Instagram"
+                />
+              </div>
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Заметки
+                </label>
+                <textarea
+                  rows={4}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                  {...register("notes")}
+                  placeholder="Заметки"
+                />
+              </div>
             </div>
             {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
             <div className="flex justify-end gap-2">

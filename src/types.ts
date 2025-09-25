@@ -115,11 +115,20 @@ export interface Lead {
 
 export interface LeadFormValues {
   name: string;
+  firstName: string;
+  lastName: string;
   parentName: string;
   phone: string;
   whatsApp: string;
   telegram: string;
   instagram: string;
+  source: ContactChannel;
+  area: Area;
+  group: Group;
+  stage: LeadStage;
+  birthDate: string;
+  startDate: string;
+  notes: string;
 }
 
 export interface TaskItem {
