@@ -1,4 +1,5 @@
-import { render, waitFor, act, screen } from "@testing-library/react";
+import { render, waitFor, act, screen, fireEvent } from "@testing-library/react";
+import "@testing-library/jest-dom";
 import SettingsTab from "../SettingsTab";
 import type { DB } from "../../types";
 import { commitDBUpdate } from "../../state/appState";
@@ -24,7 +25,7 @@ const createDB = (): DB => ({
     limits: {},
     rentByAreaEUR: {},
     coachSalaryByAreaEUR: {},
-    currencyRates: { EUR: 1, TRY: 35, RUB: 100 },
+    currencyRates: { EUR: 1, TRY: 35.5, RUB: 101.2 },
     coachPayFormula: "",
     analyticsFavorites: [],
   },
@@ -56,7 +57,7 @@ describe("SettingsTab", () => {
       ok: true,
       json: async () => ({
         success: true,
-        rates: { TRY: 35.5, RUB: 101.2 },
+        rates: { TRY: 36.1, RUB: 102.4 },
       }),
     } as unknown as Response);
 
@@ -69,7 +70,7 @@ describe("SettingsTab", () => {
     await waitFor(() => expect(commitDBUpdate).toHaveBeenCalledTimes(1));
 
     const [updatedDBArg] = (commitDBUpdate as jest.Mock).mock.calls[0];
-    expect(updatedDBArg.settings.currencyRates).toEqual({ EUR: 1, TRY: 35.5, RUB: 101.2 });
+    expect(updatedDBArg.settings.currencyRates).toEqual({ EUR: 1, TRY: 36.1, RUB: 102.4 });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.exchangerate.host/latest?base=EUR&symbols=TRY,RUB",
     );
@@ -113,8 +114,41 @@ describe("SettingsTab", () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(commitDBUpdate).not.toHaveBeenCalled();
-    expect(screen.getByDisplayValue("35.00")).toBeDefined();
-    expect(screen.getByDisplayValue("100.00")).toBeDefined();
-    expect(screen.getByDisplayValue("2.86")).toBeDefined();
+    expect(screen.getByDisplayValue("35.50")).toBeDefined();
+    expect(screen.getByDisplayValue("101.20")).toBeDefined();
+    expect(screen.getByDisplayValue("2.85")).toBeDefined();
+  });
+
+  it("allows manually updating stored currency rates", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ rates: {} }),
+    } as unknown as Response);
+
+    const db = createDB();
+    const setDB = jest.fn();
+
+    render(<SettingsTab db={db} setDB={setDB} />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    (commitDBUpdate as jest.Mock).mockClear();
+
+    const eurTryInput = screen.getByLabelText("EUR → TRY");
+    const eurRubInput = screen.getByLabelText("EUR → RUB");
+    const saveButton = screen.getByRole("button", { name: "Сохранить курсы" });
+
+    await waitFor(() => expect(saveButton).toBeDisabled());
+
+    fireEvent.change(eurTryInput, { target: { value: "48.90" } });
+    fireEvent.change(eurRubInput, { target: { value: "104.10" } });
+
+    await waitFor(() => expect(saveButton).not.toBeDisabled());
+
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(commitDBUpdate).toHaveBeenCalledTimes(1));
+    const [payload] = (commitDBUpdate as jest.Mock).mock.calls[0];
+    expect(payload.settings.currencyRates).toEqual({ EUR: 1, TRY: 48.9, RUB: 104.1 });
   });
 });
