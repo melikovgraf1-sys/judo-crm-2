@@ -105,6 +105,7 @@ export default function LeadsTab({
 }
 
 const isPaidStage = (stage: LeadStage): boolean => stage.toLowerCase().includes("оплач");
+
 const CONTACT_CHANNELS: ContactChannel[] = ["Telegram", "WhatsApp", "Instagram"];
 function convertLeadToClient(lead: Lead, db: DB): Client {
   const fallbackDate = lead.updatedAt ?? todayISO();
@@ -276,8 +277,10 @@ function LeadModal(
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {
-        window.alert("Не удалось сохранить изменения лида. Проверьте доступ к базе данных.");
-        return;
+        window.alert(
+          "Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.",
+        );
+        setDB(next);
       }
       setEdit(false);
       onClose();
@@ -291,8 +294,8 @@ function LeadModal(
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
-      window.alert("Не удалось сохранить изменения лида. Проверьте доступ к базе данных.");
-      return;
+      window.alert("Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.");
+      setDB(next);
     }
     setEdit(false);
     onClose();
