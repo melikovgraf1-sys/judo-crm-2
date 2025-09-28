@@ -57,32 +57,13 @@ export default function ClientDetailsModal({
               {client.area} · {client.group}
             </div>
           </div>
-          <div className="flex gap-2">
-            {onEdit && (
-              <button
-                type="button"
-                onClick={() => {
-                  onEdit(client);
-                  onClose();
-                }}
-                className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
-              >
-                Редактировать
-              </button>
-            )}
-            {onRemove && (
-              <button
-                type="button"
-                onClick={() => {
-                  onRemove(client.id);
-                  onClose();
-                }}
-                className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
-              >
-                Удалить
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Закрыть
+          </button>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -169,15 +150,34 @@ export default function ClientDetailsModal({
           </div>
         )}
 
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-          >
-            Закрыть
-          </button>
-        </div>
+        {(onEdit || onRemove) && (
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit(client);
+                  onClose();
+                }}
+                className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                Редактировать
+              </button>
+            )}
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRemove(client.id);
+                  onClose();
+                }}
+                className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
+              >
+                Удалить
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   );

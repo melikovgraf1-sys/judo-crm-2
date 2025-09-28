@@ -321,43 +321,17 @@ function LeadModal({
   return (
     <Modal size="lg" onClose={onClose}>
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{lead.name}</div>
             <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{lead.stage}</div>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <button
-              onClick={onEdit}
-              className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-            >
-              Редактировать
-            </button>
-            <button
-              onClick={onConvert}
-              className="px-3 py-2 rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-            >
-              Оплаченный лид
-            </button>
-            <button
-              onClick={onArchive}
-              className="px-3 py-2 rounded-md border border-amber-300 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
-            >
-              Отмена
-            </button>
-            <button
-              onClick={onRemove}
-              className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
-            >
-              Удалить
-            </button>
-            <button
-              onClick={onClose}
-              className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-            >
-              Закрыть
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            Закрыть
+          </button>
         </div>
 
         <div className="grid gap-2 text-sm sm:grid-cols-2">
@@ -381,6 +355,33 @@ function LeadModal({
           label="Заметки"
           value={lead.notes ? <span className="whitespace-pre-line">{lead.notes}</span> : "—"}
         />
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <button
+            onClick={onEdit}
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            Редактировать
+          </button>
+          <button
+            onClick={onConvert}
+            className="px-3 py-2 rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          >
+            Оплаченный лид
+          </button>
+          <button
+            onClick={onArchive}
+            className="px-3 py-2 rounded-md border border-amber-300 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={onRemove}
+            className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
+          >
+            Удалить
+          </button>
+        </div>
       </div>
     </Modal>
   );
