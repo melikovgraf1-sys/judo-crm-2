@@ -42,8 +42,10 @@ function makeDb() {
   return {
     clients: [],
     attendance: [],
-    schedule: [],
+  schedule: [],
   leads: [],
+  leadsArchive: [],
+  leadHistory: [],
   tasks: [],
   tasksArchive: [],
     staff: [],

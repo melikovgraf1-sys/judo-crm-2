@@ -79,8 +79,6 @@ export default function Dashboard({ db, ui }: DashboardProps) {
     "Задержка",
     "Пробное",
     "Ожидание оплаты",
-    "Оплаченный абонемент",
-    "Отмена",
   ];
   const leads = useMemo(() => filterLeadsByPeriod(db.leads, period), [db.leads, period]);
   const leadsDistribution = useMemo(

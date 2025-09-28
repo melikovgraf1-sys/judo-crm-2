@@ -66,6 +66,8 @@ const makeDB = () => ({
     { id: 'slot-3', area: 'Area2', group: 'Group1', coachId: 's1', weekday: 3, time: '12:00', location: '' },
   ],
   leads: [],
+  leadsArchive: [],
+  leadHistory: [],
   tasks: [],
   tasksArchive: [],
   staff: [{ id: 's1', role: 'Тренер', name: 'Coach1' }],

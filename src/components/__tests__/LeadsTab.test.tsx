@@ -77,6 +77,8 @@ const makeDB = () => ({
       updatedAt: '2024-01-01T00:00:00.000Z',
     },
   ],
+  leadsArchive: [],
+  leadHistory: [],
   tasks: [],
   tasksArchive: [],
   staff: [],
@@ -161,7 +163,7 @@ test('update: saves changes from modal', async () => {
   const { getDB } = renderLeads();
   await userEvent.click(screen.getByRole('button', { name: 'Лид1' }));
   await userEvent.click(screen.getByText('Редактировать'));
-  const nameInput = screen.getByPlaceholderText('Имя');
+  const nameInput = await screen.findByPlaceholderText('Имя');
   fireEvent.change(nameInput, { target: { value: 'Лид1 обнов' } });
   fireEvent.submit(nameInput.closest('form'));
   await waitFor(() => expect(getDB().leads.find(l => l.id === 'l1').name).toBe('Лид1 обнов'));
@@ -187,7 +189,7 @@ test('move: changes stage with arrows', async () => {
   expect(getDB().leads.find(l => l.id === 'l1').stage).toBe('Задержка');
 });
 
-test('move: converts paid lead into client', async () => {
+test('convert: transforms lead into client via action', async () => {
   const base = makeDB();
   const db = {
     ...base,
@@ -199,9 +201,8 @@ test('move: converts paid lead into client', async () => {
     ],
   };
   const { getDB } = renderLeads(db);
-  const waiting = screen.getByText('Ожидание оплаты').parentElement;
-  const leadItem = within(waiting).getByRole('button', { name: 'Лид1' }).closest('div');
-  await userEvent.click(within(leadItem).getByText('▶'));
+  await userEvent.click(screen.getByRole('button', { name: 'Лид1' }));
+  await userEvent.click(screen.getByText('Оплаченный лид'));
   await waitFor(() => expect(getDB().leads).toHaveLength(0));
   expect(getDB().clients).toHaveLength(1);
   const created = getDB().clients[0];
@@ -209,4 +210,18 @@ test('move: converts paid lead into client', async () => {
   expect(created.group).toBe('Group1');
   expect(created.status).toBe('новый');
   expect(created.payStatus).toBe('ожидание');
+  await waitFor(() => expect(getDB().leadHistory).toHaveLength(1));
+  expect(getDB().leadHistory[0].outcome).toBe('converted');
+  expect(getDB().leadHistory[0].leadId).toBe('l1');
+});
+
+test('archive: moves lead to archive list', async () => {
+  const { getDB } = renderLeads();
+  await userEvent.click(screen.getByRole('button', { name: 'Лид1' }));
+  await userEvent.click(screen.getByText('Отмена'));
+  await waitFor(() => expect(getDB().leads.find(l => l.id === 'l1')).toBeUndefined());
+  expect(getDB().leadsArchive).toHaveLength(1);
+  expect(getDB().leadsArchive[0].id).toBe('l1');
+  await waitFor(() => expect(getDB().leadHistory).toHaveLength(1));
+  expect(getDB().leadHistory[0].outcome).toBe('canceled');
 });
