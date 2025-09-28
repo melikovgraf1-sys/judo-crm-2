@@ -61,7 +61,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
       label: "Имя",
       width: "minmax(160px, max-content)",
       renderCell: client => (
-        <span className="font-medium text-slate-800 dark:text-slate-100">
+        <span className="font-medium text-slate-800 transition-colors duration-150 group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-300">
           {client.firstName} {client.lastName}
         </span>
       ),
@@ -274,7 +274,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
               gridTemplateColumns: columnTemplate,
               alignItems: "center",
             }}
-            className="border-t border-slate-100 dark:border-slate-700"
+            className="group cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
             onClick={() => setSelected(c)}
           >
             {activeColumns.map(column => (
