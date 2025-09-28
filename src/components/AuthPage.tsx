@@ -162,20 +162,9 @@ export default function AuthPage({ roles, onLogin, onRegister, theme, onToggleTh
             >
               {loading ? "Вход..." : "Войти"}
             </button>
-            <div className="rounded-xl border border-slate-200/60 bg-slate-50/80 px-4 py-3 text-xs text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-400">
-              <p className="font-semibold text-slate-600 dark:text-slate-200">Доступы администратора:</p>
-              <ul className="mt-2 space-y-1">
-                <li>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">admin1</span> / admin1
-                </li>
-                <li>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">admin2</span> / admin2
-                </li>
-                <li>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">admin3</span> / admin3
-                </li>
-              </ul>
-            </div>
+            <p className="rounded-xl border border-slate-200/60 bg-slate-50/80 px-4 py-3 text-xs font-medium text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/70 dark:text-slate-400">
+              Чтобы получить доступ, обратитесь к администратору за учетными данными.
+            </p>
           </form>
         ) : (
           <form className="space-y-4" onSubmit={handleRegister}>
