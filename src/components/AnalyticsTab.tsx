@@ -15,7 +15,7 @@ import {
   type ProjectionKey,
 } from "../state/analytics";
 import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
-import { collectAvailableYears, formatMonthInput, getDefaultPeriod, type PeriodFilter } from "../state/period";
+import { MONTH_OPTIONS, collectAvailableYears, formatMonthInput, getDefaultPeriod, type PeriodFilter } from "../state/period";
 
 type Props = {
   db: DB;
@@ -52,6 +52,18 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     }
     return [...baseYears, period.year].sort((a, b) => b - a);
   }, [baseYears, period.year]);
+
+  const handleMonthChange = (value: string) => {
+    if (!value) {
+      setPeriod(prev => ({ ...prev, month: null }));
+      return;
+    }
+    const nextMonth = Number.parseInt(value, 10);
+    if (!Number.isFinite(nextMonth)) {
+      return;
+    }
+    setPeriod(prev => ({ ...prev, month: nextMonth }));
+  };
 
   useEffect(() => {
     if (!areas.includes(area)) {
@@ -214,6 +226,27 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     [snapshot.athleteStats],
   );
 
+  const leadMetrics = useMemo(
+    () => [
+      {
+        key: "created",
+        label: "Новые лиды",
+        value: snapshot.leadStats.created.toLocaleString("ru-RU"),
+      },
+      {
+        key: "converted",
+        label: "Оплаченные лиды",
+        value: snapshot.leadStats.converted.toLocaleString("ru-RU"),
+      },
+      {
+        key: "canceled",
+        label: "Отмененные лиды",
+        value: snapshot.leadStats.canceled.toLocaleString("ru-RU"),
+      },
+    ],
+    [snapshot.leadStats],
+  );
+
   return (
     <div className="space-y-4">
       <Breadcrumbs items={["Аналитика"]} />
@@ -240,26 +273,19 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         <label htmlFor="analytics-month" className="text-sm font-medium text-slate-600 dark:text-slate-300">
           Месяц
         </label>
-        <input
+        <select
           id="analytics-month"
-          type="month"
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={monthValue}
-          onChange={event => {
-            const value = event.target.value;
-            if (!value) {
-              setPeriod(prev => ({ ...prev, month: null }));
-              return;
-            }
-            const [yearPart, monthPart] = value.split("-");
-            const nextYear = Number.parseInt(yearPart, 10);
-            const nextMonth = Number.parseInt(monthPart, 10);
-            if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
-              return;
-            }
-            setPeriod({ year: nextYear, month: nextMonth });
-          }}
-        />
+          onChange={event => handleMonthChange(event.target.value)}
+        >
+          <option value="">Все месяцы</option>
+          {MONTH_OPTIONS.map(option => (
+            <option key={option.value} value={String(option.value)}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <label htmlFor="analytics-year" className="text-sm font-medium text-slate-600 dark:text-slate-300">
           Год
         </label>
@@ -401,6 +427,25 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {athleteMetrics.map(item => (
+            <div
+              key={item.key}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {item.label}
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+          <h2 className="text-base font-semibold text-slate-700 dark:text-slate-100">Лиды</h2>
+        </div>
+        <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+          {leadMetrics.map(item => (
             <div
               key={item.key}
               className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"

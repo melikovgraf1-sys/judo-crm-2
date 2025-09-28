@@ -5,6 +5,7 @@ import { buildFavoriteSummaries } from "../state/analytics";
 import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
 import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
 import {
+  MONTH_OPTIONS,
   collectAvailableYears,
   filterLeadsByPeriod,
   formatMonthInput,
@@ -79,8 +80,6 @@ export default function Dashboard({ db, ui }: DashboardProps) {
     "Задержка",
     "Пробное",
     "Ожидание оплаты",
-    "Оплаченный абонемент",
-    "Отмена",
   ];
   const leads = useMemo(() => filterLeadsByPeriod(db.leads, period), [db.leads, period]);
   const leadsDistribution = useMemo(
@@ -110,13 +109,11 @@ export default function Dashboard({ db, ui }: DashboardProps) {
       setPeriod(prev => ({ ...prev, month: null }));
       return;
     }
-    const [yearPart, monthPart] = value.split("-");
-    const nextYear = Number.parseInt(yearPart, 10);
-    const nextMonth = Number.parseInt(monthPart, 10);
-    if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
+    const nextMonth = Number.parseInt(value, 10);
+    if (!Number.isFinite(nextMonth)) {
       return;
     }
-    setPeriod({ year: nextYear, month: nextMonth });
+    setPeriod(prev => ({ ...prev, month: nextMonth }));
   };
 
   const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -134,13 +131,19 @@ export default function Dashboard({ db, ui }: DashboardProps) {
         <label htmlFor="dashboard-month" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Месяц
         </label>
-        <input
+        <select
           id="dashboard-month"
-          type="month"
           className={FIELD_CLASS}
           value={monthValue}
           onChange={event => handleMonthChange(event.target.value)}
-        />
+        >
+          <option value="">Все месяцы</option>
+          {MONTH_OPTIONS.map(option => (
+            <option key={option.value} value={String(option.value)}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <label htmlFor="dashboard-year" className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           Год
         </label>

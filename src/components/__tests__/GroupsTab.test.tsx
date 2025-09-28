@@ -66,6 +66,8 @@ const makeDB = () => ({
     { id: 'slot-3', area: 'Area2', group: 'Group1', coachId: 's1', weekday: 3, time: '12:00', location: '' },
   ],
   leads: [],
+  leadsArchive: [],
+  leadHistory: [],
   tasks: [],
   tasksArchive: [],
   staff: [{ id: 's1', role: 'Тренер', name: 'Coach1' }],
@@ -190,14 +192,20 @@ test('filters clients by selected month', async () => {
 
   renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
 
-  await waitFor(() => expect(screen.getByText('Январь')).toBeInTheDocument());
-  expect(screen.queryByText('Февраль')).not.toBeInTheDocument();
+  await waitFor(() => {
+    const rows = screen.getAllByRole('row');
+    expect(rows.length).toBe(2);
+    expect(rows[1]).toHaveTextContent('Январь');
+  });
 
   const monthInput = screen.getByLabelText('Фильтр по месяцу');
-  fireEvent.change(monthInput, { target: { value: '2024-02' } });
+  fireEvent.change(monthInput, { target: { value: '2' } });
 
-  await waitFor(() => expect(screen.getByText('Февраль')).toBeInTheDocument());
-  expect(screen.queryByText('Январь')).not.toBeInTheDocument();
+  await waitFor(() => {
+    const rows = screen.getAllByRole('row');
+    expect(rows.length).toBe(2);
+    expect(rows[1]).toHaveTextContent('Февраль');
+  });
 });
 
 test('update: edits client name', async () => {
@@ -301,7 +309,7 @@ test('creates payment task with client info', async () => {
   ];
 
   const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
-  fireEvent.change(screen.getByLabelText('Фильтр по месяцу'), { target: { value: '2024-02' } });
+  fireEvent.change(screen.getByLabelText('Фильтр по месяцу'), { target: { value: '2' } });
   const row = await screen.findByText('Ivan Petrov');
   const createTaskBtn = within(row.closest('tr')).getByRole('button', { name: 'Создать задачу' });
 

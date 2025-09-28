@@ -16,6 +16,8 @@ const createDB = (): DB => ({
   performance: [],
   schedule: [],
   leads: [],
+  leadsArchive: [],
+  leadHistory: [],
   tasks: [],
   tasksArchive: [],
   staff: [],
