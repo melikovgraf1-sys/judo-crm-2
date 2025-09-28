@@ -212,7 +212,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     : `Всего клиентов: ${total}`;
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Клиенты"]} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -252,16 +252,18 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           />
         </div>
       </div>
-      <ClientTable
-        list={list}
-        currency={ui.currency}
-        onEdit={startEdit}
-        onRemove={removeClient}
-        onCreateTask={createPaymentTask}
-        schedule={db.schedule}
-        attendance={db.attendance}
-        performance={db.performance}
-      />
+      <div className="flex-1 min-h-0">
+        <ClientTable
+          list={list}
+          currency={ui.currency}
+          onEdit={startEdit}
+          onRemove={removeClient}
+          onCreateTask={createPaymentTask}
+          schedule={db.schedule}
+          attendance={db.attendance}
+          performance={db.performance}
+        />
+      </div>
       {modalOpen && (
         <ClientForm
           db={db}

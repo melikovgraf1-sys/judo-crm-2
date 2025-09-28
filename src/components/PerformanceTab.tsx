@@ -259,7 +259,7 @@ export default function PerformanceTab({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Успеваемость"]} />
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -322,8 +322,9 @@ export default function PerformanceTab({
         {area && group ? `Найдено: ${list.length}` : "Выберите район и группу"}
       </div>
 
-      <VirtualizedTable
-        header={(
+      <div className="flex-1 min-h-0">
+        <VirtualizedTable
+          header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <tr
               style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
@@ -370,11 +371,11 @@ export default function PerformanceTab({
             </tr>
           </thead>
         )}
-        items={sortedClients}
-        rowHeight={48}
-        renderRow={(client, style) => (
-          <tr
-            key={client.id}
+          items={sortedClients}
+          rowHeight={48}
+          renderRow={(client, style) => (
+            <tr
+              key={client.id}
             style={{
               ...style,
               display: "grid",
@@ -391,8 +392,9 @@ export default function PerformanceTab({
               </td>
             ))}
           </tr>
-        )}
-      />
+          )}
+        />
+      </div>
 
       {selected && (
         <ClientDetailsModal
