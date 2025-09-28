@@ -14,7 +14,7 @@ export type PaymentStatus = "ожидание" | "действует" | "зад�
 
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
 
-export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты" | "Оплаченный абонемент" | "Отмена";
+export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты";
 
 export type Currency = "EUR" | "TRY" | "RUB";
 
@@ -168,6 +168,7 @@ export interface DB {
   performance: PerformanceEntry[];
   schedule: ScheduleSlot[];
   leads: Lead[];
+  leadsArchive: Lead[];
   tasks: TaskItem[];
   tasksArchive: TaskItem[];
   staff: StaffMember[];

@@ -102,6 +102,7 @@ function normalizeDB(value: unknown): DB | null {
     performance: ensureObjectArray<PerformanceEntry>(raw.performance),
     schedule: ensureObjectArray<ScheduleSlot>(raw.schedule),
     leads: ensureObjectArray<Lead>(raw.leads),
+    leadsArchive: ensureObjectArray<Lead>(raw.leadsArchive),
     tasks: ensureObjectArray<TaskItem>(raw.tasks),
     tasksArchive: ensureObjectArray<TaskItem>(raw.tasksArchive),
     staff: ensureObjectArray<StaffMember>(raw.staff),
