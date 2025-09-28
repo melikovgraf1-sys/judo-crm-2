@@ -9,9 +9,12 @@ import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
 import type {
   AttendanceEntry,
+  AuthState,
+  AuthUser,
   Client,
   DB,
   Lead,
+  LeadLifecycleEvent,
   PerformanceEntry,
   Role,
   ScheduleSlot,
@@ -27,6 +30,7 @@ import type {
 export const LS_KEYS = {
   ui: "judo_crm_ui_v1",
   db: "judo_crm_db_v1",
+  auth: "judo_crm_auth_v1",
 };
 
 export const LOCAL_ONLY_EVENT = "judo-crm/local-only";
@@ -48,6 +52,21 @@ const DEFAULT_SETTINGS: Settings = {
   coachPayFormula: "фикс 100€ + 5€ за ученика",
   analyticsFavorites: [],
 };
+
+const ROLE_LIST: Role[] = ["Администратор", "Менеджер", "Тренер"];
+
+function makeDefaultAuthState(): AuthState {
+  const defaultAdmins: AuthUser[] = [
+    { id: uid(), login: "admin1", password: "admin1", name: "Администратор 1", role: "Администратор" },
+    { id: uid(), login: "admin2", password: "admin2", name: "Администратор 2", role: "Администратор" },
+    { id: uid(), login: "admin3", password: "admin3", name: "Администратор 3", role: "Администратор" },
+  ];
+
+  return {
+    users: defaultAdmins,
+    currentUserId: null,
+  };
+}
 
 function ensureArray<T>(value: unknown): T[] {
   if (!Array.isArray(value)) return [];
@@ -102,6 +121,8 @@ function normalizeDB(value: unknown): DB | null {
     performance: ensureObjectArray<PerformanceEntry>(raw.performance),
     schedule: ensureObjectArray<ScheduleSlot>(raw.schedule),
     leads: ensureObjectArray<Lead>(raw.leads),
+    leadsArchive: ensureObjectArray<Lead>(raw.leadsArchive),
+    leadHistory: ensureObjectArray<LeadLifecycleEvent>(raw.leadHistory),
     tasks: ensureObjectArray<TaskItem>(raw.tasks),
     tasksArchive: ensureObjectArray<TaskItem>(raw.tasksArchive),
     staff: ensureObjectArray<StaffMember>(raw.staff),
@@ -273,12 +294,20 @@ function usePersistentState<T>(
   return [state, setState];
 }
 
+type AuthActionResult = { ok: true } | { ok: false; error: string };
+
+type RegisterPayload = { name: string; login: string; password: string; role: Role };
+
 export interface AppState {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
   ui: UIState;
   setUI: Dispatch<SetStateAction<UIState>>;
   roles: Role[];
+  currentUser: AuthUser | null;
+  loginUser: (login: string, password: string) => Promise<AuthActionResult>;
+  registerUser: (payload: RegisterPayload) => Promise<AuthActionResult>;
+  logoutUser: () => void;
   toasts: Toast[];
   isLocalOnly: boolean;
   quickOpen: boolean;
@@ -292,12 +321,75 @@ export interface AppState {
 export function useAppState(): AppState {
   const [db, setDB] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
-  const roles: Role[] = ["Администратор", "Менеджер", "Тренер"];
+  const [auth, setAuth] = usePersistentState<AuthState>(LS_KEYS.auth, makeDefaultAuthState(), 300);
+  const roles = ROLE_LIST;
+  const currentUser = auth.users.find(user => user.id === auth.currentUserId) ?? null;
   const { toasts, push } = useToasts();
   const [quickOpen, setQuickOpen] = useState(false);
   const [isLocalOnly, setIsLocalOnly] = useState<boolean>(() => !firestore);
   const location = useLocation();
   const localOnlyToastShownRef = useRef(false);
+
+  const loginUser = useCallback<Required<AppState>["loginUser"]>(
+    async (login, password) => {
+      const normalizedLogin = login.trim().toLowerCase();
+      if (!normalizedLogin || !password) {
+        return { ok: false, error: "Введите логин и пароль" };
+      }
+
+      const user = auth.users.find(u => u.login.toLowerCase() === normalizedLogin);
+      if (!user || user.password !== password) {
+        return { ok: false, error: "Неверный логин или пароль" };
+      }
+
+      setAuth(prev => {
+        if (prev.currentUserId === user.id) {
+          return prev;
+        }
+        return { ...prev, currentUserId: user.id };
+      });
+      setUI(prev => (prev.role === user.role ? prev : { ...prev, role: user.role }));
+      push(`Добро пожаловать, ${user.name || user.login}!`, "success");
+      return { ok: true };
+    },
+    [auth.users, setAuth, setUI, push],
+  );
+
+  const registerUser = useCallback<Required<AppState>["registerUser"]>(
+    async ({ name, login, password, role }) => {
+      const trimmedLogin = login.trim();
+      const trimmedPassword = password.trim();
+      if (!trimmedLogin || !trimmedPassword) {
+        return { ok: false, error: "Укажите логин и пароль" };
+      }
+
+      const normalizedLogin = trimmedLogin.toLowerCase();
+      if (auth.users.some(u => u.login.toLowerCase() === normalizedLogin)) {
+        return { ok: false, error: "Пользователь с таким логином уже существует" };
+      }
+
+      const safeRole = roles.includes(role) ? role : "Менеджер";
+      const newUser: AuthUser = {
+        id: uid(),
+        login: trimmedLogin,
+        password: trimmedPassword,
+        name: name.trim() || trimmedLogin,
+        role: safeRole,
+      };
+
+      setAuth(prev => ({ users: [...prev.users, newUser], currentUserId: newUser.id }));
+      setUI(prev => (prev.role === newUser.role ? prev : { ...prev, role: newUser.role }));
+      push("Пользователь успешно зарегистрирован", "success");
+      return { ok: true };
+    },
+    [auth.users, roles, setAuth, setUI, push],
+  );
+
+  const logoutUser = useCallback(() => {
+    setAuth(prev => (prev.currentUserId == null ? prev : { ...prev, currentUserId: null }));
+    setQuickOpen(false);
+    push("Вы вышли из аккаунта", "info");
+  }, [setAuth, setQuickOpen, push]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -327,6 +419,12 @@ export function useAppState(): AppState {
     if (ui.theme === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
   }, [ui.theme]);
+
+  useEffect(() => {
+    if (currentUser && ui.role !== currentUser.role) {
+      setUI(prev => (prev.role === currentUser.role ? prev : { ...prev, role: currentUser.role }));
+    }
+  }, [currentUser, ui.role, setUI]);
 
   useEffect(() => {
     if (!firestore) {
@@ -540,6 +638,10 @@ export function useAppState(): AppState {
     ui,
     setUI,
     roles,
+    currentUser,
+    loginUser,
+    registerUser,
+    logoutUser,
     toasts,
     isLocalOnly,
     quickOpen,

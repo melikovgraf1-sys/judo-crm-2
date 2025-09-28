@@ -51,6 +51,8 @@ describe("computeAnalyticsSnapshot with period", () => {
       { id: "s1", area: "Area1", group: "Group1", coachId: "coach-1", weekday: 1, time: "10:00", location: "" },
     ],
     leads: [],
+    leadsArchive: [],
+    leadHistory: [],
     tasks: [],
     tasksArchive: [],
     staff: [],

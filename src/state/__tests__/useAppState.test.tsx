@@ -69,4 +69,17 @@ describe('useAppState with local persistence', () => {
     warnSpy.mockRestore();
     errorSpy.mockRestore();
   });
+
+  it('allows logging in with predefined admin credentials', async () => {
+    const { result } = renderHook(() => useAppState());
+
+    let loginResult;
+    await act(async () => {
+      loginResult = await result.current.loginUser('admin1', 'admin1');
+    });
+
+    expect(loginResult).toEqual({ ok: true });
+    expect(result.current.currentUser).not.toBeNull();
+    expect(result.current.currentUser?.login).toBe('admin1');
+  });
 });

@@ -1,5 +1,6 @@
 import React from "react";
 import type { DB, Area, Group, PaymentStatus } from "../../types";
+import { MONTH_OPTIONS } from "../../state/period";
 
 type Props = {
   db: DB,
@@ -68,13 +69,19 @@ export default function ClientFilters({
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        <input
-          type="month"
+        <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={monthValue}
           onChange={event => onMonthChange(event.target.value)}
           aria-label="Фильтр по месяцу"
-        />
+        >
+          <option value="">Все месяцы</option>
+          {MONTH_OPTIONS.map(option => (
+            <option key={option.value} value={String(option.value)}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={year}

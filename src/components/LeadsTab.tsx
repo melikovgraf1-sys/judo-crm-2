@@ -9,7 +9,16 @@ import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import type { ContactChannel, DB, Lead, LeadStage, LeadFormValues, Client } from "../types";
+import type {
+  ContactChannel,
+  DB,
+  Lead,
+  LeadStage,
+  LeadFormValues,
+  Client,
+  LeadLifecycleEvent,
+  LeadLifecycleOutcome,
+} from "../types";
 
 export default function LeadsTab({
   db,
@@ -18,8 +27,9 @@ export default function LeadsTab({
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
 }) {
-  const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты", "Оплаченный абонемент", "Отмена"];
+  const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты"];
   const [open, setOpen] = useState<Lead | null>(null);
+  const [editing, setEditing] = useState<Lead | null>(null);
   const groupedLeads = useMemo((): Record<LeadStage, Lead[]> =>
     db.leads.reduce((acc, l) => {
       if (acc[l.stage]) acc[l.stage].push(l); else acc[l.stage] = [l];
@@ -32,25 +42,6 @@ export default function LeadsTab({
     const nextStage = stages[Math.min(stages.length - 1, Math.max(0, idx + dir))];
     const updatedLead: Lead = { ...current, stage: nextStage, updatedAt: todayISO() };
 
-    if (isPaidStage(nextStage)) {
-      const newClient = convertLeadToClient(updatedLead, db);
-      const next = {
-        ...db,
-        leads: db.leads.filter(lead => lead.id !== id),
-        clients: [newClient, ...db.clients],
-        changelog: [
-          ...db.changelog,
-          { id: uid(), who: "UI", what: `Лид ${current.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
-        ],
-      };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert("Не удалось обновить статус лида. Изменение сохранено локально, проверьте доступ к базе данных.");
-        setDB(next);
-      }
-      return;
-    }
-
     const next = { ...db, leads: db.leads.map(x => (x.id === id ? updatedLead : x)) };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -58,10 +49,102 @@ export default function LeadsTab({
       setDB(next);
     }
   };
+
+  const saveLead = async (lead: Lead, data: LeadFormValues) => {
+    const toISODate = (value: string): string | undefined => {
+      const trimmed = value?.trim();
+      return trimmed ? `${trimmed}T00:00:00.000Z` : undefined;
+    };
+
+    const fallbackArea = db.settings.areas[0] ?? "";
+    const fallbackGroup = db.settings.groups[0] ?? "";
+
+    const nextLead: Lead = {
+      ...lead,
+      name: data.name.trim(),
+      firstName: data.firstName?.trim() || undefined,
+      lastName: data.lastName?.trim() || undefined,
+      parentName: data.parentName?.trim() || undefined,
+      phone: data.phone?.trim() || undefined,
+      whatsApp: data.whatsApp?.trim() || undefined,
+      telegram: data.telegram?.trim() || undefined,
+      instagram: data.instagram?.trim() || undefined,
+      source: data.source as ContactChannel,
+      area: data.area || fallbackArea,
+      group: data.group || fallbackGroup,
+      stage: data.stage as LeadStage,
+      birthDate: toISODate(data.birthDate) ?? undefined,
+      startDate: toISODate(data.startDate) ?? undefined,
+      notes: data.notes?.trim() || undefined,
+      updatedAt: todayISO(),
+    };
+
+    const next = {
+      ...db,
+      leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
+    };
+
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.");
+      setDB(next);
+    }
+  };
+
+  const convertLead = async (lead: Lead) => {
+    const newClient = convertLeadToClient(lead, db);
+    const resolution = makeLeadHistoryEntry(lead, "converted");
+    const next = {
+      ...db,
+      leads: db.leads.filter(l => l.id !== lead.id),
+      clients: [newClient, ...db.clients],
+      leadHistory: [resolution, ...db.leadHistory.filter(entry => entry.leadId !== lead.id)],
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Лид ${lead.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
+      ],
+    };
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось обновить лида. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
+    }
+  };
+
+  const archiveLead = async (lead: Lead) => {
+    const archivedLead: Lead = { ...lead, updatedAt: todayISO() };
+    const resolution = makeLeadHistoryEntry(archivedLead, "canceled");
+    const next = {
+      ...db,
+      leads: db.leads.filter(l => l.id !== lead.id),
+      leadsArchive: [archivedLead, ...db.leadsArchive],
+      leadHistory: [resolution, ...db.leadHistory.filter(entry => entry.leadId !== lead.id)],
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Лид ${lead.name} перенесён в архив`, when: todayISO() }],
+    };
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось переместить лида в архив. Изменение сохранено локально, проверьте доступ к базе данных.");
+      setDB(next);
+    }
+  };
+
+  const removeLead = async (lead: Lead) => {
+    if (!window.confirm("Удалить лид?")) return;
+    const next = {
+      ...db,
+      leads: db.leads.filter(l => l.id !== lead.id),
+      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.id}`, when: todayISO() }],
+    };
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert("Не удалось удалить лида. Проверьте доступ к базе данных.");
+    }
+  };
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Лиды"]} />
-      <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {stages.map(s => {
 
           const leads: Lead[] = groupedLeads[s] ?? [];
@@ -79,7 +162,12 @@ export default function LeadsTab({
                   const l = leads[index];
                   return (
                     <div key={l.id} style={style} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                      <button onClick={() => setOpen(l)} className="text-sm font-medium text-left hover:underline w-full">{l.name}</button>
+                      <button
+                        onClick={() => setOpen(l)}
+                        className="w-full text-left text-sm font-medium transition-colors duration-150 hover:text-sky-600 hover:underline dark:hover:text-sky-300"
+                      >
+                        {l.name}
+                      </button>
                       <div className="text-xs text-slate-500">{l.source}{formatLeadContactSummary(l)}</div>
                       <div className="flex gap-1 mt-2">
                         <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">◀</button>
@@ -97,16 +185,39 @@ export default function LeadsTab({
         <LeadModal
           lead={open}
           onClose={() => setOpen(null)}
+          onEdit={() => {
+            setEditing(open);
+            setOpen(null);
+          }}
+          onConvert={() => {
+            setOpen(null);
+            void convertLead(open);
+          }}
+          onArchive={() => {
+            setOpen(null);
+            void archiveLead(open);
+          }}
+          onRemove={() => {
+            setOpen(null);
+            void removeLead(open);
+          }}
+        />
+      )}
+      {editing && (
+        <LeadFormModal
+          lead={editing}
           db={db}
-          setDB={setDB}
           stages={stages}
+          onSave={async values => {
+            await saveLead(editing, values);
+            setEditing(null);
+          }}
+          onClose={() => setEditing(null)}
         />
       )}
     </div>
   );
 }
-
-const isPaidStage = (stage: LeadStage): boolean => stage.toLowerCase().includes("оплач");
 
 const CONTACT_CHANNELS: ContactChannel[] = ["Telegram", "WhatsApp", "Instagram"];
 
@@ -153,6 +264,20 @@ function formatLeadContactSummary(lead: Lead): string {
   return contact ? ` · ${contact}` : "";
 }
 
+function makeLeadHistoryEntry(lead: Lead, outcome: LeadLifecycleOutcome): LeadLifecycleEvent {
+  return {
+    id: uid(),
+    leadId: lead.id,
+    name: lead.name,
+    source: lead.source,
+    area: lead.area,
+    group: lead.group,
+    createdAt: lead.createdAt ?? lead.updatedAt,
+    resolvedAt: todayISO(),
+    outcome,
+  };
+}
+
 const toLeadFormValues = (
   current: Lead,
   defaults: { area: string; group: string },
@@ -177,23 +302,104 @@ const toLeadFormValues = (
   };
 };
 
-function LeadModal(
-  {
-    lead,
-    onClose,
-    db,
-    setDB,
-    stages,
-  }: {
-    lead: Lead;
-    onClose: () => void;
-    db: DB;
-    setDB: Dispatch<SetStateAction<DB>>;
-    stages: LeadStage[];
-  },
-) {
-  const [edit, setEdit] = useState(false);
 
+function LeadModal({
+  lead,
+  onClose,
+  onEdit,
+  onConvert,
+  onArchive,
+  onRemove,
+}: {
+  lead: Lead;
+  onClose: () => void;
+  onEdit: () => void;
+  onConvert: () => void;
+  onArchive: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Modal size="lg" onClose={onClose}>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{lead.name}</div>
+            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{lead.stage}</div>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            Закрыть
+          </button>
+        </div>
+
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <InfoRow label="Имя ребёнка" value={lead.firstName ?? "—"} />
+          <InfoRow label="Фамилия" value={lead.lastName ?? "—"} />
+          <InfoRow label="Родитель" value={lead.parentName || "—"} />
+          <InfoRow label="Источник" value={lead.source} />
+          <InfoRow label="Телефон" value={lead.phone || "—"} />
+          <InfoRow label="WhatsApp" value={lead.whatsApp || "—"} />
+          <InfoRow label="Telegram" value={lead.telegram || "—"} />
+          <InfoRow label="Instagram" value={lead.instagram || "—"} />
+          <InfoRow label="Район" value={lead.area ?? "—"} />
+          <InfoRow label="Группа" value={lead.group ?? "—"} />
+          <InfoRow label="Дата рождения" value={lead.birthDate ? fmtDate(lead.birthDate) : "—"} />
+          <InfoRow label="Старт" value={lead.startDate ? fmtDate(lead.startDate) : "—"} />
+          <InfoRow label="Создан" value={fmtDate(lead.createdAt)} />
+          <InfoRow label="Обновлён" value={fmtDate(lead.updatedAt)} />
+        </div>
+
+        <InfoRow
+          label="Заметки"
+          value={lead.notes ? <span className="whitespace-pre-line">{lead.notes}</span> : "—"}
+        />
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <button
+            onClick={onEdit}
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            Редактировать
+          </button>
+          <button
+            onClick={onConvert}
+            className="px-3 py-2 rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          >
+            Оплаченный лид
+          </button>
+          <button
+            onClick={onArchive}
+            className="px-3 py-2 rounded-md border border-amber-300 text-sm text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:bg-amber-900/20 dark:text-amber-200 dark:hover:bg-amber-900/30"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={onRemove}
+            className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
+          >
+            Удалить
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function LeadFormModal({
+  lead,
+  db,
+  stages,
+  onSave,
+  onClose,
+}: {
+  lead: Lead;
+  db: DB;
+  stages: LeadStage[];
+  onSave: (values: LeadFormValues) => Promise<void> | void;
+  onClose: () => void;
+}) {
   const schema = yup
     .object({
       name: yup.string().trim().required("Имя обязательно"),
@@ -228,11 +434,15 @@ function LeadModal(
     });
 
   const resolver = yupResolver(schema) as unknown as Resolver<LeadFormValues>;
-
   const defaultArea = db.settings.areas[0] ?? "";
   const defaultGroup = db.settings.groups[0] ?? "";
 
-  const { register, handleSubmit, reset, formState: { errors, isValid } } = useForm<LeadFormValues>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isValid },
+  } = useForm<LeadFormValues>({
     resolver,
     mode: "onChange",
     defaultValues: toLeadFormValues(lead, { area: defaultArea, group: defaultGroup }),
@@ -242,344 +452,137 @@ function LeadModal(
     reset(toLeadFormValues(lead, { area: defaultArea, group: defaultGroup }));
   }, [lead, reset, defaultArea, defaultGroup]);
 
-  const save = async (data: LeadFormValues) => {
-    const toISODate = (value: string): string | undefined => {
-      const trimmed = value?.trim();
-      return trimmed ? `${trimmed}T00:00:00.000Z` : undefined;
-    };
-    const nextLead: Lead = {
-      ...lead,
-      name: data.name.trim(),
-      firstName: data.firstName?.trim() || undefined,
-      lastName: data.lastName?.trim() || undefined,
-      parentName: data.parentName?.trim() || undefined,
-      phone: data.phone?.trim() || undefined,
-      whatsApp: data.whatsApp?.trim() || undefined,
-      telegram: data.telegram?.trim() || undefined,
-      instagram: data.instagram?.trim() || undefined,
-      source: data.source as ContactChannel,
+  const submit = async (data: LeadFormValues) => {
+    await onSave({
+      ...data,
       area: data.area || defaultArea,
       group: data.group || defaultGroup,
-      stage: data.stage as LeadStage,
-      birthDate: toISODate(data.birthDate) ?? undefined,
-      startDate: toISODate(data.startDate) ?? undefined,
-      notes: data.notes?.trim() || undefined,
-      updatedAt: todayISO(),
-    };
-
-    if (isPaidStage(nextLead.stage)) {
-      const newClient = convertLeadToClient(nextLead, db);
-      const next = {
-        ...db,
-        leads: db.leads.filter(l => l.id !== lead.id),
-        clients: [newClient, ...db.clients],
-        changelog: [
-          ...db.changelog,
-          { id: uid(), who: "UI", what: `Лид ${nextLead.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
-        ],
-      };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert(
-          "Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.",
-        );
-        setDB(next);
-      }
-      setEdit(false);
-      onClose();
-      return;
-    }
-
-    const next = {
-      ...db,
-      leads: db.leads.map(l => (l.id === lead.id ? nextLead : l)),
-      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
-    };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.");
-      setDB(next);
-    }
-    setEdit(false);
+    });
     onClose();
   };
 
-  const remove = async () => {
-    if (!window.confirm("Удалить лид?")) return;
-    const next = {
-      ...db,
-      leads: db.leads.filter(l => l.id !== lead.id),
-      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.id}`, when: todayISO() }],
-    };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось удалить лида. Проверьте доступ к базе данных.");
-      return;
-    }
-    onClose();
-  };
+  const labelClass = "text-xs text-slate-500 dark:text-slate-400";
+  const fieldClass =
+    "px-3 py-2 rounded-md border border-slate-300 bg-white placeholder:text-slate-400 " +
+    "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
+  const selectClass = `${fieldClass} appearance-none`;
 
   return (
-    <Modal size="lg" onClose={onClose}>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">{lead.name}</div>
-            <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{lead.stage}</div>
+    <Modal size="xl" onClose={onClose}>
+      <div className="font-semibold text-slate-800 dark:text-slate-100">Редактирование лида</div>
+      <form onSubmit={handleSubmit(submit)} className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2 flex flex-col gap-1">
+            <label className={labelClass}>Название карточки</label>
+            <input className={fieldClass} {...register("name")} placeholder="Имя" />
+            {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            {!edit && (
-              <button
-                onClick={() => setEdit(true)}
-                className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-              >
-                Редактировать
-              </button>
-            )}
-            <button
-              onClick={remove}
-              className="px-3 py-2 rounded-md border border-rose-200 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:text-rose-300 dark:hover:bg-rose-900/30"
-            >
-              Удалить
-            </button>
-            <button
-              onClick={onClose}
-              className="px-3 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-            >
-              Закрыть
-            </button>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Имя ребёнка</label>
+            <input className={fieldClass} {...register("firstName")} placeholder="Имя ребёнка" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Фамилия</label>
+            <input className={fieldClass} {...register("lastName")} placeholder="Фамилия" />
+          </div>
+          <div className="sm:col-span-2 flex flex-col gap-1">
+            <label className={labelClass}>Родитель</label>
+            <input className={fieldClass} {...register("parentName")} placeholder="Родитель" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Статус лида</label>
+            <select className={selectClass} {...register("stage")}>
+              {stages.map(stage => (
+                <option key={stage} value={stage}>
+                  {stage}
+                </option>
+              ))}
+            </select>
+            {errors.stage && <span className="text-xs text-rose-600">{errors.stage.message}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Источник</label>
+            <select className={selectClass} {...register("source")}>
+              {CONTACT_CHANNELS.map(channel => (
+                <option key={channel} value={channel}>
+                  {channel}
+                </option>
+              ))}
+            </select>
+            {errors.source && <span className="text-xs text-rose-600">{errors.source.message}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Район</label>
+            <select className={selectClass} {...register("area")}>
+              {db.settings.areas.map(area => (
+                <option key={area} value={area}>
+                  {area}
+                </option>
+              ))}
+            </select>
+            {errors.area && <span className="text-xs text-rose-600">{errors.area.message}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Группа</label>
+            <select className={selectClass} {...register("group")}>
+              {db.settings.groups.map(group => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
+            {errors.group && <span className="text-xs text-rose-600">{errors.group.message}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Дата рождения</label>
+            <input type="date" className={fieldClass} {...register("birthDate")} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Дата старта</label>
+            <input type="date" className={fieldClass} {...register("startDate")} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Телефон</label>
+            <input className={fieldClass} {...register("phone")} placeholder="Телефон" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>WhatsApp</label>
+            <input className={fieldClass} {...register("whatsApp")} placeholder="WhatsApp" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Telegram</label>
+            <input className={fieldClass} {...register("telegram")} placeholder="Telegram" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Instagram</label>
+            <input className={fieldClass} {...register("instagram")} placeholder="Instagram" />
+          </div>
+          <div className="sm:col-span-2 flex flex-col gap-1">
+            <label className={labelClass}>Заметки</label>
+            <textarea rows={4} className={fieldClass} {...register("notes")} placeholder="Заметки" />
           </div>
         </div>
-
-        <div className="grid gap-2 text-sm sm:grid-cols-2">
-          <InfoRow label="Имя ребёнка" value={lead.firstName ?? "—"} />
-          <InfoRow label="Фамилия" value={lead.lastName ?? "—"} />
-          <InfoRow label="Родитель" value={lead.parentName || "—"} />
-          <InfoRow label="Источник" value={lead.source} />
-          <InfoRow label="Телефон" value={lead.phone || "—"} />
-          <InfoRow label="WhatsApp" value={lead.whatsApp || "—"} />
-          <InfoRow label="Telegram" value={lead.telegram || "—"} />
-          <InfoRow label="Instagram" value={lead.instagram || "—"} />
-          <InfoRow label="Район" value={lead.area ?? "—"} />
-          <InfoRow label="Группа" value={lead.group ?? "—"} />
-          <InfoRow label="Дата рождения" value={lead.birthDate ? fmtDate(lead.birthDate) : "—"} />
-          <InfoRow label="Старт" value={lead.startDate ? fmtDate(lead.startDate) : "—"} />
-          <InfoRow label="Создан" value={fmtDate(lead.createdAt)} />
-          <InfoRow label="Обновлён" value={fmtDate(lead.updatedAt)} />
-        </div>
-
-        <InfoRow
-          label="Заметки"
-          value={lead.notes ? <span className="whitespace-pre-line">{lead.notes}</span> : "—"}
-        />
-
-        {edit && (
-          <form
-            onSubmit={handleSubmit(save)}
-            className="space-y-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
+        {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
+        <div className="flex justify-end gap-2">
+          <button
+            type="submit"
+            disabled={!isValid}
+            className="rounded-md bg-sky-600 px-3 py-2 text-sm text-white disabled:bg-slate-400"
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Название карточки
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("name")}
-                  placeholder="Имя"
-                />
-                {errors.name && <span className="text-xs text-rose-600">{errors.name.message}</span>}
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Имя ребёнка
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("firstName")}
-                  placeholder="Имя ребёнка"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Фамилия
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("lastName")}
-                  placeholder="Фамилия"
-                />
-              </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Родитель
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("parentName")}
-                  placeholder="Родитель"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Статус лида
-                </label>
-                <select
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("stage")}
-                >
-                  {stages.map(stage => (
-                    <option key={stage} value={stage}>
-                      {stage}
-                    </option>
-                  ))}
-                </select>
-                {errors.stage && <span className="text-xs text-rose-600">{errors.stage.message}</span>}
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Источник
-                </label>
-                <select
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("source")}
-                >
-                  {CONTACT_CHANNELS.map(channel => (
-                    <option key={channel} value={channel}>
-                      {channel}
-                    </option>
-                  ))}
-                </select>
-                {errors.source && <span className="text-xs text-rose-600">{errors.source.message}</span>}
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Район
-                </label>
-                <select
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("area")}
-                >
-                  {db.settings.areas.map(area => (
-                    <option key={area} value={area}>
-                      {area}
-                    </option>
-                  ))}
-                </select>
-                {errors.area && <span className="text-xs text-rose-600">{errors.area.message}</span>}
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Группа
-                </label>
-                <select
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("group")}
-                >
-                  {db.settings.groups.map(group => (
-                    <option key={group} value={group}>
-                      {group}
-                    </option>
-                  ))}
-                </select>
-                {errors.group && <span className="text-xs text-rose-600">{errors.group.message}</span>}
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Дата рождения
-                </label>
-                <input
-                  type="date"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("birthDate")}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Дата старта
-                </label>
-                <input
-                  type="date"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("startDate")}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Телефон
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("phone")}
-                  placeholder="Телефон"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  WhatsApp
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("whatsApp")}
-                  placeholder="WhatsApp"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Telegram
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("telegram")}
-                  placeholder="Telegram"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Instagram
-                </label>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("instagram")}
-                  placeholder="Instagram"
-                />
-              </div>
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  Заметки
-                </label>
-                <textarea
-                  rows={4}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
-                  {...register("notes")}
-                  placeholder="Заметки"
-                />
-              </div>
-            </div>
-            {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
-            <div className="flex justify-end gap-2">
-              <button
-                type="submit"
-                disabled={!isValid}
-                className="rounded-md bg-sky-600 px-3 py-2 text-sm text-white disabled:bg-slate-400"
-              >
-                Сохранить
-              </button>
-              <button
-                type="button"
-                onClick={() => setEdit(false)}
-                className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-              >
-                Отмена
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
+            Сохранить
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+          >
+            Отмена
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }
-
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
