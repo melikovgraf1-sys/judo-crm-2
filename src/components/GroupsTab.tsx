@@ -262,7 +262,7 @@ export default function GroupsTab({
         onYearChange={handleYearChange}
         yearOptions={yearOptions}
       />
-      <div className="flex-1 min-h-0">
+      <div>
         <ClientTable
           list={list}
           currency={ui.currency}

@@ -210,10 +210,22 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
     return copy;
   }, [columns, list, sort]);
 
-  const columnTemplate = activeColumns.length ? activeColumns.map(column => column.width).join(" ") : "1fr";
+  const numberColumnWidth = "56px";
+  const columnTemplate = activeColumns.length
+    ? [numberColumnWidth, ...activeColumns.map(column => column.width)].join(" ")
+    : `${numberColumnWidth} 1fr`;
+
+  const rows = useMemo(
+    () =>
+      sortedList.map((client, index) => ({
+        client,
+        index,
+      })),
+    [sortedList],
+  );
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
+    <div className="flex flex-col gap-3">
       <div className="flex justify-end">
         <ColumnSettings
           options={columns.map(column => ({ id: column.id, label: column.label }))}
@@ -221,7 +233,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
           onChange={setVisibleColumns}
         />
       </div>
-      <div className="flex-1 min-h-0">
+        <div>
         <VirtualizedTable
           header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -229,6 +241,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
               className="w-full"
               style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
             >
+              <th className="p-2 text-center text-xs font-medium uppercase tracking-wide text-slate-500">№</th>
               {activeColumns.map(column => {
                 const isSorted = sort?.columnId === column.id;
                 const canSort = Boolean(column.sortValue);
@@ -264,23 +277,25 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
             </tr>
           </thead>
           )}
-          items={sortedList}
+          items={rows}
           rowHeight={48}
-          renderRow={(c, style) => (
+          virtualize={false}
+          renderRow={(row, style) => (
             <tr
-              key={c.id}
+              key={row.client.id}
               style={{
                 ...style,
                 display: "grid",
-              gridTemplateColumns: columnTemplate,
-              alignItems: "center",
-            }}
-            className="group cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-            onClick={() => setSelected(c)}
-          >
+                gridTemplateColumns: columnTemplate,
+                alignItems: "center",
+              }}
+              className="group cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              onClick={() => setSelected(row.client)}
+            >
+              <td className="p-2 text-center text-slate-500">{row.index + 1}</td>
               {activeColumns.map(column => (
                 <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
-                  {column.renderCell(c)}
+                  {column.renderCell(row.client)}
                 </td>
               ))}
             </tr>

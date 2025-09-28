@@ -252,7 +252,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           />
         </div>
       </div>
-      <div className="flex-1 min-h-0">
+      <div>
         <ClientTable
           list={list}
           currency={ui.currency}

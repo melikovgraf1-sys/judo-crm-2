@@ -455,7 +455,7 @@ export default function AttendanceTab({
         {area && group ? `Найдено: ${list.length}` : "Выберите район и группу"}
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div>
         <VirtualizedTable
           header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -506,19 +506,20 @@ export default function AttendanceTab({
         )}
           items={sortedClients}
           rowHeight={48}
+          virtualize={false}
           renderRow={(client, style) => (
             <tr
               key={client.id}
-            style={{
-              ...style,
-              display: "grid",
-              gridTemplateColumns: columnTemplate,
-              alignItems: "center",
-              cursor: "pointer",
-            }}
-            className="border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-            onClick={() => setSelected(client)}
-          >
+              style={{
+                ...style,
+                display: "grid",
+                gridTemplateColumns: columnTemplate,
+                alignItems: "center",
+                cursor: "pointer",
+              }}
+              className="border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              onClick={() => setSelected(client)}
+            >
             {activeColumns.map(column => (
               <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
                 {column.renderCell(client)}
