@@ -213,7 +213,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
   const columnTemplate = activeColumns.length ? activeColumns.map(column => column.width).join(" ") : "1fr";
 
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="flex justify-end">
         <ColumnSettings
           options={columns.map(column => ({ id: column.id, label: column.label }))}
@@ -221,8 +221,9 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
           onChange={setVisibleColumns}
         />
       </div>
-      <VirtualizedTable
-        header={(
+      <div className="flex-1 min-h-0">
+        <VirtualizedTable
+          header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <tr
               className="w-full"
@@ -262,29 +263,30 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
               })}
             </tr>
           </thead>
-        )}
-        items={sortedList}
-        rowHeight={48}
-        renderRow={(c, style) => (
-          <tr
-            key={c.id}
-            style={{
-              ...style,
-              display: "grid",
+          )}
+          items={sortedList}
+          rowHeight={48}
+          renderRow={(c, style) => (
+            <tr
+              key={c.id}
+              style={{
+                ...style,
+                display: "grid",
               gridTemplateColumns: columnTemplate,
               alignItems: "center",
             }}
             className="group cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
             onClick={() => setSelected(c)}
           >
-            {activeColumns.map(column => (
-              <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
-                {column.renderCell(c)}
-              </td>
-            ))}
-          </tr>
-        )}
-      />
+              {activeColumns.map(column => (
+                <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
+                  {column.renderCell(c)}
+                </td>
+              ))}
+            </tr>
+          )}
+        />
+      </div>
 
       {selected && (
         <ClientDetailsModal
@@ -298,6 +300,6 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
           onClose={() => setSelected(null)}
         />
       )}
-    </>
+    </div>
   );
 }
