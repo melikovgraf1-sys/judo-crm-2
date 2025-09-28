@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Topbar from "./components/Topbar";
 import Tabs from "./components/Tabs";
@@ -16,6 +16,7 @@ import AppealsTab from "./components/AppealsTab";
 import QuickAddModal from "./components/QuickAddModal";
 import Toasts from "./components/Toasts";
 import ErrorBoundary from "./components/ErrorBoundary";
+import AuthPage from "./components/AuthPage";
 import { useAppState, can, LOCAL_ONLY_MESSAGE } from "./state/appState";
 
 export default function App() {
@@ -28,6 +29,10 @@ export default function App() {
     ui,
     setUI,
     roles,
+    currentUser,
+    loginUser,
+    registerUser,
+    logoutUser,
     toasts,
     isLocalOnly,
     quickOpen,
@@ -40,15 +45,42 @@ export default function App() {
 
   const [hideLocalOnly, setHideLocalOnly] = useState(false);
 
+  const toggleTheme = useCallback(() => {
+    setUI(prev => ({ ...prev, theme: prev.theme === "light" ? "dark" : "light" }));
+  }, [setUI]);
+
   useEffect(() => {
     if (!isLocalOnly) {
       setHideLocalOnly(false);
     }
   }, [isLocalOnly]);
 
+  if (!currentUser) {
+    return (
+      <>
+        <Routes>
+          <Route
+            path="/auth"
+            element={
+              <AuthPage
+                roles={roles}
+                onLogin={loginUser}
+                onRegister={registerUser}
+                theme={ui.theme}
+                onToggleTheme={toggleTheme}
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/auth" replace />} />
+        </Routes>
+        <Toasts toasts={toasts} />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100/60 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_55%)] pb-16 text-slate-900 transition-colors duration-300 dark:bg-slate-950 dark:bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.22),_transparent_60%)] dark:text-slate-100">
-      <Topbar ui={ui} setUI={setUI} roleList={roles} onQuickAdd={onQuickAdd} />
+      <Topbar ui={ui} setUI={setUI} onQuickAdd={onQuickAdd} currentUser={currentUser} onLogout={logoutUser} />
       {isLocalOnly && !hideLocalOnly ? (
         <div className="bg-amber-100 border-y border-amber-200 text-amber-900 dark:bg-amber-900/70 dark:border-amber-800 dark:text-amber-100">
           <div className="max-w-7xl mx-auto flex items-start gap-3 px-3 py-2 text-sm font-medium" role="alert">

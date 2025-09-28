@@ -1,17 +1,18 @@
 import React, { useCallback, useRef } from "react";
-import type { Currency, Role, UIState } from "../types";
+import type { AuthUser, Currency, UIState } from "../types";
 
 type TopbarProps = {
   ui: UIState;
   setUI: React.Dispatch<React.SetStateAction<UIState>>;
-  roleList: Role[];
   onQuickAdd: () => void;
+  currentUser: AuthUser;
+  onLogout: () => void;
 };
 
 const CONTROL_CLASS =
   "rounded-xl border border-slate-200/60 bg-white/70 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200/60 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-200 dark:focus:border-sky-500/60 dark:focus:ring-sky-500/30";
 
-export default function Topbar({ ui, setUI, roleList, onQuickAdd }: TopbarProps) {
+export default function Topbar({ ui, setUI, onQuickAdd, currentUser, onLogout }: TopbarProps) {
   const searchTimeout = useRef<number | null>(null);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,21 +81,22 @@ export default function Topbar({ ui, setUI, roleList, onQuickAdd }: TopbarProps)
           >
             <span aria-hidden="true">＋</span> Быстро добавить
           </button>
-          <select
-            className={`${CONTROL_CLASS} w-auto`}
-            value={ui.role}
-            onChange={e => {
-              const u = { ...ui, role: e.target.value as Role };
-              setUI(u);
-            }}
-            title="Войти как"
-          >
-            {roleList.map(r => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200/60 bg-white/70 px-3 py-2 text-left shadow-sm transition dark:border-slate-700/60 dark:bg-slate-900/70">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/20 text-base font-semibold text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
+              {(currentUser.name || currentUser.login).slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{currentUser.name}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{currentUser.role}</div>
+            </div>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="ml-3 inline-flex items-center rounded-lg border border-slate-300/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-white"
+            >
+              Выйти
+            </button>
+          </div>
         </div>
       </div>
     </header>

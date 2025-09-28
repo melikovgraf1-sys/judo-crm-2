@@ -14,9 +14,22 @@ export type PaymentStatus = "ожидание" | "действует" | "зад�
 
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
 
-export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты" | "Оплаченный абонемент" | "Отмена";
+export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты";
 
 export type Currency = "EUR" | "TRY" | "RUB";
+
+export interface AuthUser {
+  id: string;
+  login: string;
+  password: string;
+  name: string;
+  role: Role;
+}
+
+export interface AuthState {
+  users: AuthUser[];
+  currentUserId: string | null;
+}
 
 export interface Client {
   id: string;
@@ -113,6 +126,20 @@ export interface Lead {
   updatedAt: string;
 }
 
+export type LeadLifecycleOutcome = "converted" | "canceled";
+
+export interface LeadLifecycleEvent {
+  id: string;
+  leadId: string;
+  name: string;
+  source?: ContactChannel;
+  area?: Area;
+  group?: Group;
+  createdAt: string;
+  resolvedAt: string;
+  outcome: LeadLifecycleOutcome;
+}
+
 export interface LeadFormValues {
   name: string;
   firstName: string;
@@ -168,6 +195,8 @@ export interface DB {
   performance: PerformanceEntry[];
   schedule: ScheduleSlot[];
   leads: Lead[];
+  leadsArchive: Lead[];
+  leadHistory: LeadLifecycleEvent[];
   tasks: TaskItem[];
   tasksArchive: TaskItem[];
   staff: StaffMember[];

@@ -6,7 +6,25 @@ export type PeriodFilter = {
   month: number | null;
 };
 
-const MONTH_PAD = new Intl.NumberFormat("ru-RU", { minimumIntegerDigits: 2 });
+const MONTH_NAMES = [
+  "Январь",
+  "Февраль",
+  "Март",
+  "Апрель",
+  "Май",
+  "Июнь",
+  "Июль",
+  "Август",
+  "Сентябрь",
+  "Октябрь",
+  "Ноябрь",
+  "Декабрь",
+];
+
+export const MONTH_OPTIONS = MONTH_NAMES.map((label, index) => ({
+  value: index + 1,
+  label,
+}));
 
 function parseYearPart(value?: string | null): number | null {
   if (!value) {
@@ -89,7 +107,7 @@ export function formatMonthInput(period: PeriodFilter): string {
   if (period.month == null) {
     return "";
   }
-  return `${period.year}-${MONTH_PAD.format(period.month)}`;
+  return String(period.month);
 }
 
 export function collectAvailableYears(db: DB): number[] {

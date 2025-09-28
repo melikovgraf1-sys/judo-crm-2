@@ -21,6 +21,7 @@ import type {
 } from "../types";
 import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
 import {
+  MONTH_OPTIONS,
   collectAvailableYears,
   formatMonthInput,
   getDefaultPeriod,
@@ -114,13 +115,11 @@ export default function PerformanceTab({
       setPeriod(prev => ({ ...prev, month: null }));
       return;
     }
-    const [yearPart, monthPart] = value.split("-");
-    const nextYear = Number.parseInt(yearPart, 10);
-    const nextMonth = Number.parseInt(monthPart, 10);
-    if (!Number.isFinite(nextYear) || !Number.isFinite(nextMonth)) {
+    const nextMonth = Number.parseInt(value, 10);
+    if (!Number.isFinite(nextMonth)) {
       return;
     }
-    setPeriod({ year: nextYear, month: nextMonth });
+    setPeriod(prev => ({ ...prev, month: nextMonth }));
   };
 
   const handleYearChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -288,12 +287,18 @@ export default function PerformanceTab({
             </option>
           ))}
         </select>
-        <input
-          type="month"
+        <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={monthValue}
           onChange={event => handleMonthChange(event.target.value)}
-        />
+        >
+          <option value="">Все месяцы</option>
+          {MONTH_OPTIONS.map(option => (
+            <option key={option.value} value={String(option.value)}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <select
           className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
           value={period.year}
