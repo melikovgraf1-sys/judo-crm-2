@@ -206,6 +206,10 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             <input className={fieldClass} {...register("lastName")} />
           </div>
           <div className="flex flex-col gap-1">
+            <label className={labelClass}>Родитель</label>
+            <input className={fieldClass} {...register("parentName")} />
+          </div>
+          <div className="flex flex-col gap-1">
             <label className={labelClass}>Телефон</label>
             <input className={fieldClass} {...register("phone")} />
             {errors.phone && <span className="text-xs text-rose-600">{errors.phone.message}</span>}
