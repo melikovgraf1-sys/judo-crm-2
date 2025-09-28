@@ -243,7 +243,7 @@ export default function GroupsTab({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Группы"]} />
       <ClientFilters
         db={db}
@@ -262,16 +262,18 @@ export default function GroupsTab({
         onYearChange={handleYearChange}
         yearOptions={yearOptions}
       />
-      <ClientTable
-        list={list}
-        currency={ui.currency}
-        onEdit={startEdit}
-        onRemove={removeClient}
-        onCreateTask={createPaymentTask}
-        schedule={db.schedule}
-        attendance={db.attendance}
-        performance={db.performance}
-      />
+      <div>
+        <ClientTable
+          list={list}
+          currency={ui.currency}
+          onEdit={startEdit}
+          onRemove={removeClient}
+          onCreateTask={createPaymentTask}
+          schedule={db.schedule}
+          attendance={db.attendance}
+          performance={db.performance}
+        />
+      </div>
       {modalOpen && (
         <ClientForm
           db={db}

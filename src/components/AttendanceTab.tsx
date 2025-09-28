@@ -365,7 +365,7 @@ export default function AttendanceTab({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Посещаемость"]} />
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -455,8 +455,9 @@ export default function AttendanceTab({
         {area && group ? `Найдено: ${list.length}` : "Выберите район и группу"}
       </div>
 
-      <VirtualizedTable
-        header={(
+      <div>
+        <VirtualizedTable
+          header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <tr
               style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
@@ -503,29 +504,31 @@ export default function AttendanceTab({
             </tr>
           </thead>
         )}
-        items={sortedClients}
-        rowHeight={48}
-        renderRow={(client, style) => (
-          <tr
-            key={client.id}
-            style={{
-              ...style,
-              display: "grid",
-              gridTemplateColumns: columnTemplate,
-              alignItems: "center",
-              cursor: "pointer",
-            }}
-            className="border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-            onClick={() => setSelected(client)}
-          >
+          items={sortedClients}
+          rowHeight={48}
+          virtualize={false}
+          renderRow={(client, style) => (
+            <tr
+              key={client.id}
+              style={{
+                ...style,
+                display: "grid",
+                gridTemplateColumns: columnTemplate,
+                alignItems: "center",
+                cursor: "pointer",
+              }}
+              className="border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              onClick={() => setSelected(client)}
+            >
             {activeColumns.map(column => (
               <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
                 {column.renderCell(client)}
               </td>
             ))}
           </tr>
-        )}
-      />
+          )}
+        />
+      </div>
 
       {selected && (
         <ClientDetailsModal

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import type { Dispatch, SetStateAction, ChangeEvent } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
@@ -7,6 +7,11 @@ import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
 import { transformClientFormValues } from "./clients/clientMutations";
+import {
+  appendImportedClients,
+  exportClientsToCsv,
+  parseClientsCsv,
+} from "./clients/clientCsv";
 import type { Client, ClientFormValues, DB, TaskItem, UIState } from "../types";
 
 type ClientsTabProps = {
@@ -19,6 +24,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [query, setQuery] = useState(ui.search);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setQuery(ui.search);
@@ -140,6 +146,65 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const result = parseClientsCsv(text, db);
+
+      const messages: string[] = [];
+
+      if (result.processed) {
+        messages.push(`Обработано строк: ${result.processed}`);
+      }
+
+      if (result.clients.length) {
+        const { next } = appendImportedClients(db, result.clients);
+        const ok = await commitDBUpdate(next, setDB);
+        if (!ok) {
+          window.alert(
+            "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
+          );
+          setDB(next);
+        }
+        messages.push(`Импортировано клиентов: ${result.clients.length}`);
+        if (result.skipped) {
+          messages.push(`Пропущено строк: ${result.skipped}`);
+        }
+      } else if (!result.errors.length) {
+        messages.push("Подходящих строк не найдено");
+      }
+
+      if (result.errors.length) {
+        messages.push("Ошибки:");
+        messages.push(...result.errors);
+      }
+
+      if (messages.length) {
+        window.alert(messages.join("\n"));
+      }
+    } catch (error) {
+      window.alert(`Не удалось прочитать файл: ${(error as Error).message}`);
+    }
+  };
+
+  const handleExport = () => {
+    if (!db.clients.length) {
+      window.alert("Список клиентов пуст — экспортировать нечего.");
+      return;
+    }
+    exportClientsToCsv(db.clients);
+  };
+
   const total = db.clients.length;
   const visibleCount = list.length;
   const counterText = search
@@ -147,7 +212,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     : `Всего клиентов: ${total}`;
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Клиенты"]} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -159,23 +224,46 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           />
           <div className="text-xs text-slate-500">{counterText}</div>
         </div>
-        <button
-          onClick={openAddModal}
-          className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
-        >
-          + Добавить клиента
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={openAddModal}
+            className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
+          >
+            + Добавить клиента
+          </button>
+          <button
+            onClick={handleExport}
+            className="px-3 py-2 rounded-lg border border-sky-600 text-sky-600 text-sm hover:bg-sky-50 dark:border-sky-500 dark:text-sky-300 dark:hover:bg-slate-800"
+          >
+            Экспорт CSV
+          </button>
+          <button
+            onClick={handleImportClick}
+            className="px-3 py-2 rounded-lg border border-emerald-600 text-emerald-600 text-sm hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-300 dark:hover:bg-slate-800"
+          >
+            Импорт CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+        </div>
       </div>
-      <ClientTable
-        list={list}
-        currency={ui.currency}
-        onEdit={startEdit}
-        onRemove={removeClient}
-        onCreateTask={createPaymentTask}
-        schedule={db.schedule}
-        attendance={db.attendance}
-        performance={db.performance}
-      />
+      <div>
+        <ClientTable
+          list={list}
+          currency={ui.currency}
+          onEdit={startEdit}
+          onRemove={removeClient}
+          onCreateTask={createPaymentTask}
+          schedule={db.schedule}
+          attendance={db.attendance}
+          performance={db.performance}
+        />
+      </div>
       {modalOpen && (
         <ClientForm
           db={db}

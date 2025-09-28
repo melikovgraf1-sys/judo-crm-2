@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import { commitDBUpdate } from "../state/appState";
 import type { DB } from "../types";
+import { downloadClientCsvTemplate } from "./clients/clientCsv";
 
 const formatRate = (value?: number) => (value != null ? value.toFixed(2) : "");
 const parseRateInputValue = (raw: string): number | undefined => {
@@ -261,6 +262,22 @@ export default function SettingsTab({
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Настройки"]} />
+      <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3">
+        <div className="font-semibold">Импорт клиентов</div>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Скачайте шаблон CSV, заполните его данными и загрузите файл в разделе «Клиенты», чтобы добавить несколько учеников
+          за один раз. Строки, начинающиеся с символа «#», игнорируются при импорте.
+        </p>
+        <div>
+          <button
+            type="button"
+            onClick={() => downloadClientCsvTemplate()}
+            className="rounded-md border border-emerald-600 px-4 py-2 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-300 dark:hover:bg-slate-800"
+          >
+            Скачать шаблон CSV
+          </button>
+        </div>
+      </div>
       <div className="p-4 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 space-y-3">
         <div className="font-semibold">Курсы валют</div>
         <div className="grid sm:grid-cols-3 gap-2">
