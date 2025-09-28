@@ -9,7 +9,16 @@ import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import type { ContactChannel, DB, Lead, LeadStage, LeadFormValues, Client } from "../types";
+import type {
+  ContactChannel,
+  DB,
+  Lead,
+  LeadStage,
+  LeadFormValues,
+  Client,
+  LeadLifecycleEvent,
+  LeadLifecycleOutcome,
+} from "../types";
 
 export default function LeadsTab({
   db,
@@ -85,10 +94,12 @@ export default function LeadsTab({
 
   const convertLead = async (lead: Lead) => {
     const newClient = convertLeadToClient(lead, db);
+    const resolution = makeLeadHistoryEntry(lead, "converted");
     const next = {
       ...db,
       leads: db.leads.filter(l => l.id !== lead.id),
       clients: [newClient, ...db.clients],
+      leadHistory: [resolution, ...db.leadHistory.filter(entry => entry.leadId !== lead.id)],
       changelog: [
         ...db.changelog,
         { id: uid(), who: "UI", what: `Лид ${lead.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
@@ -103,10 +114,12 @@ export default function LeadsTab({
 
   const archiveLead = async (lead: Lead) => {
     const archivedLead: Lead = { ...lead, updatedAt: todayISO() };
+    const resolution = makeLeadHistoryEntry(archivedLead, "canceled");
     const next = {
       ...db,
       leads: db.leads.filter(l => l.id !== lead.id),
       leadsArchive: [archivedLead, ...db.leadsArchive],
+      leadHistory: [resolution, ...db.leadHistory.filter(entry => entry.leadId !== lead.id)],
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Лид ${lead.name} перенесён в архив`, when: todayISO() }],
     };
     const ok = await commitDBUpdate(next, setDB);
@@ -131,7 +144,7 @@ export default function LeadsTab({
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Лиды"]} />
-      <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {stages.map(s => {
 
           const leads: Lead[] = groupedLeads[s] ?? [];
@@ -249,6 +262,20 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
 function formatLeadContactSummary(lead: Lead): string {
   const contact = [lead.phone, lead.whatsApp, lead.telegram, lead.instagram].find(value => value?.trim().length);
   return contact ? ` · ${contact}` : "";
+}
+
+function makeLeadHistoryEntry(lead: Lead, outcome: LeadLifecycleOutcome): LeadLifecycleEvent {
+  return {
+    id: uid(),
+    leadId: lead.id,
+    name: lead.name,
+    source: lead.source,
+    area: lead.area,
+    group: lead.group,
+    createdAt: lead.createdAt ?? lead.updatedAt,
+    resolvedAt: todayISO(),
+    outcome,
+  };
 }
 
 const toLeadFormValues = (

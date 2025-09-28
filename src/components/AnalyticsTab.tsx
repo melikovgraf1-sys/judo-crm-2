@@ -214,6 +214,27 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     [snapshot.athleteStats],
   );
 
+  const leadMetrics = useMemo(
+    () => [
+      {
+        key: "created",
+        label: "Новые лиды",
+        value: snapshot.leadStats.created.toLocaleString("ru-RU"),
+      },
+      {
+        key: "converted",
+        label: "Оплаченные лиды",
+        value: snapshot.leadStats.converted.toLocaleString("ru-RU"),
+      },
+      {
+        key: "canceled",
+        label: "Отмененные лиды",
+        value: snapshot.leadStats.canceled.toLocaleString("ru-RU"),
+      },
+    ],
+    [snapshot.leadStats],
+  );
+
   return (
     <div className="space-y-4">
       <Breadcrumbs items={["Аналитика"]} />
@@ -401,6 +422,25 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {athleteMetrics.map(item => (
+            <div
+              key={item.key}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {item.label}
+              </div>
+              <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
+        <div className="border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+          <h2 className="text-base font-semibold text-slate-700 dark:text-slate-100">Лиды</h2>
+        </div>
+        <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+          {leadMetrics.map(item => (
             <div
               key={item.key}
               className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"

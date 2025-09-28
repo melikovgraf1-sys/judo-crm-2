@@ -52,6 +52,7 @@ describe("computeAnalyticsSnapshot with period", () => {
     ],
     leads: [],
     leadsArchive: [],
+    leadHistory: [],
     tasks: [],
     tasksArchive: [],
     staff: [],

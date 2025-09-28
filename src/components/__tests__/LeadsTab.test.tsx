@@ -78,6 +78,7 @@ const makeDB = () => ({
     },
   ],
   leadsArchive: [],
+  leadHistory: [],
   tasks: [],
   tasksArchive: [],
   staff: [],
@@ -209,6 +210,20 @@ test('convert: transforms lead into client via action', async () => {
   expect(created.group).toBe('Group1');
   expect(created.status).toBe('новый');
   expect(created.payStatus).toBe('ожидание');
+  await waitFor(() => expect(getDB().leadHistory).toHaveLength(1));
+  expect(getDB().leadHistory[0].outcome).toBe('converted');
+  expect(getDB().leadHistory[0].leadId).toBe('l1');
+});
+
+test('archive: moves lead to archive list', async () => {
+  const { getDB } = renderLeads();
+  await userEvent.click(screen.getByRole('button', { name: 'Лид1' }));
+  await userEvent.click(screen.getByText('Отмена'));
+  await waitFor(() => expect(getDB().leads.find(l => l.id === 'l1')).toBeUndefined());
+  expect(getDB().leadsArchive).toHaveLength(1);
+  expect(getDB().leadsArchive[0].id).toBe('l1');
+  await waitFor(() => expect(getDB().leadHistory).toHaveLength(1));
+  expect(getDB().leadHistory[0].outcome).toBe('canceled');
 });
 
 test('archive: moves lead to archive list', async () => {

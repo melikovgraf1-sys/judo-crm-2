@@ -1,6 +1,6 @@
 import { getDefaultPayAmount } from "./payments";
-import { isAttendanceInPeriod, isClientInPeriod, type PeriodFilter } from "./period";
-import type { Area, Client, Currency, DB } from "../types";
+import { isAttendanceInPeriod, isClientInPeriod, matchesPeriod, type PeriodFilter } from "./period";
+import type { Area, Client, Currency, DB, Lead, LeadLifecycleEvent } from "../types";
 
 export type AreaScope = Area | "all";
 
@@ -53,6 +53,12 @@ export type AthleteStats = {
   attendanceRate: number;
 };
 
+export type LeadStats = {
+  created: number;
+  converted: number;
+  canceled: number;
+};
+
 export type AnalyticsSnapshot = {
   area: AreaScope;
   metrics: Record<MetricKey, MetricSnapshot>;
@@ -60,6 +66,7 @@ export type AnalyticsSnapshot = {
   rent: number;
   coachSalary: number;
   athleteStats: AthleteStats;
+  leadStats: LeadStats;
 };
 
 export function encodeFavorite(favorite: AnalyticsFavorite): string {
@@ -81,6 +88,13 @@ export function decodeFavorite(id: string): AnalyticsFavorite | null {
 }
 
 const ensureNumber = (value: number) => (Number.isFinite(value) ? value : 0);
+
+function ensureLeadHistoryEntries(entries?: LeadLifecycleEvent[]): LeadLifecycleEvent[] {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+  return entries.filter((entry): entry is LeadLifecycleEvent => !!entry && typeof entry === "object");
+}
 
 function collectActiveAreas(db: DB): Area[] {
   const scheduled = new Set<Area>();
@@ -271,7 +285,47 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     attendanceRate: ensureNumber(attendanceRate),
   };
 
-  return { area, metrics, capacity, rent, coachSalary, athleteStats };
+  const leadHistoryEntries = ensureLeadHistoryEntries(db.leadHistory);
+  const creationMap = new Map<string, string>();
+  const pushCreation = (leadId: string, value?: string | null) => {
+    if (!leadId || !value || creationMap.has(leadId)) {
+      return;
+    }
+    creationMap.set(leadId, value);
+  };
+  const pushLead = (lead: Lead) => {
+    pushCreation(lead.id, lead.createdAt ?? lead.updatedAt ?? null);
+  };
+  db.leads.forEach(pushLead);
+  db.leadsArchive.forEach(pushLead);
+  leadHistoryEntries.forEach(entry => {
+    pushCreation(entry.leadId, entry.createdAt ?? entry.resolvedAt);
+  });
+
+  const createdCount = period
+    ? Array.from(creationMap.values()).filter(value => matchesPeriod(value, period)).length
+    : creationMap.size;
+
+  const resolvedInPeriod = period
+    ? leadHistoryEntries.filter(entry => matchesPeriod(entry.resolvedAt, period))
+    : leadHistoryEntries;
+  const convertedCount = resolvedInPeriod.filter(entry => entry.outcome === "converted").length;
+  let canceledCount = resolvedInPeriod.filter(entry => entry.outcome === "canceled").length;
+
+  const historyLeadIds = new Set(leadHistoryEntries.map(entry => entry.leadId));
+  const legacyCanceled = period
+    ? db.leadsArchive.filter(lead => !historyLeadIds.has(lead.id) && matchesPeriod(lead.updatedAt ?? lead.createdAt, period))
+        .length
+    : db.leadsArchive.filter(lead => !historyLeadIds.has(lead.id)).length;
+  canceledCount += legacyCanceled;
+
+  const leadStats: LeadStats = {
+    created: createdCount,
+    converted: convertedCount,
+    canceled: canceledCount,
+  };
+
+  return { area, metrics, capacity, rent, coachSalary, athleteStats, leadStats };
 }
 
 export type FavoriteSummary = {
