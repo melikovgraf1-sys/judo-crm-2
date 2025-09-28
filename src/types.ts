@@ -18,6 +18,19 @@ export type LeadStage = "Очередь" | "Задержка" | "Пробное"
 
 export type Currency = "EUR" | "TRY" | "RUB";
 
+export interface AuthUser {
+  id: string;
+  login: string;
+  password: string;
+  name: string;
+  role: Role;
+}
+
+export interface AuthState {
+  users: AuthUser[];
+  currentUserId: string | null;
+}
+
 export interface Client {
   id: string;
   firstName: string;
