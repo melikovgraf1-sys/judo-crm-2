@@ -24,6 +24,10 @@ jest.mock('../../state/utils', () => ({
   parseDateInput: jest.fn(),
   calcAgeYears: jest.fn(),
   calcExperience: jest.fn(),
+  isReserveArea: jest.fn(() => false),
+  ensureReserveAreaIncluded: jest.fn(v => v),
+  RESERVE_AREA_NAME: 'резерв',
+
 }));
 
 jest.mock('../../state/reserve', () => ({
@@ -35,7 +39,7 @@ jest.mock('../../state/reserve', () => ({
 
 import ClientsTab from '../ClientsTab';
 import { commitDBUpdate } from '../../state/appState';
-import { uid, todayISO, fmtMoney, fmtDate, parseDateInput, calcAgeYears, calcExperience } from '../../state/utils';
+import { uid, todayISO, fmtMoney, fmtDate, parseDateInput, calcAgeYears, calcExperience, calcExperienceMonths } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -51,6 +55,7 @@ beforeEach(() => {
   parseDateInput.mockImplementation(value => (value ? `${value}T00:00:00.000Z` : ''));
   calcAgeYears.mockReturnValue(10);
   calcExperience.mockReturnValue('1 год');
+  calcExperienceMonths.mockReturnValue(12);
   window.alert = jest.fn();
   global.confirm = jest.fn(() => true);
 });

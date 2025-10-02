@@ -1,4 +1,4 @@
-import type { Currency } from "../types";
+import type { Area, Currency } from "../types";
 
 export const rnd = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
@@ -33,12 +33,22 @@ export const calcAgeYears = (iso: string) => {
   return age;
 };
 
-export const calcExperience = (iso: string) => {
+const calcMonthDifference = (start: Date, end: Date) => {
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
+  const base = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  return base < 0 ? 0 : base;
+};
+
+export const calcExperienceMonths = (iso: string) => {
   const start = new Date(iso);
   const now = new Date();
-  const months =
-    (now.getFullYear() - start.getFullYear()) * 12 +
-    now.getMonth() - start.getMonth();
+  return calcMonthDifference(start, now);
+};
+
+export const calcExperience = (iso: string) => {
+  const months = calcExperienceMonths(iso);
   if (months < 12) return `${months} мес.`;
   const years = Math.floor(months / 12);
   const rest = months % 12;

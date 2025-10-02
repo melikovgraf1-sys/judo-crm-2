@@ -16,6 +16,7 @@ import type {
 } from "../types";
 import { clientRequiresManualRemainingLessons } from "./lessons";
 import { SUBSCRIPTION_PLANS } from "./payments";
+import { RESERVE_AREA_NAME } from "./areas";
 
 export function makeSeedDB(): DB {
   const activeAreas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];

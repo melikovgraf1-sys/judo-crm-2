@@ -25,6 +25,7 @@ import {
   type PeriodFilter,
 } from "../state/period";
 
+import { isReserveArea } from "../state/areas";
 
 export default function GroupsTab({
   db,
@@ -62,6 +63,20 @@ export default function GroupsTab({
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
+  const [ageMin, setAgeMin] = useState("");
+  const [ageMax, setAgeMax] = useState("");
+  const [experienceMin, setExperienceMin] = useState("");
+  const [experienceMax, setExperienceMax] = useState("");
+  const ageExperienceFilter = useMemo(
+    () =>
+      parseAgeExperienceFilter({
+        minAgeText: ageMin,
+        maxAgeText: ageMax,
+        minExperienceYearsText: experienceMin,
+        maxExperienceYearsText: experienceMax,
+      }),
+    [ageMin, ageMax, experienceMin, experienceMax],
+  );
 
   useEffect(() => {
     writeDailyPeriod("groups", period.month, period.year);
@@ -100,6 +115,7 @@ export default function GroupsTab({
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search, search, period]);
+
 
   const monthValue = formatMonthInput(period);
   const baseYears = useMemo(() => collectAvailableYears(db), [db]);
@@ -215,7 +231,7 @@ export default function GroupsTab({
     };
 
     const nextTasks = [task, ...db.tasks];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks);
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, db.tasksArchive);
     const next = {
       ...db,
       tasks: nextTasks,
@@ -264,6 +280,14 @@ export default function GroupsTab({
         year={period.year}
         onYearChange={handleYearChange}
         yearOptions={yearOptions}
+        ageMin={ageMin}
+        onAgeMinChange={setAgeMin}
+        ageMax={ageMax}
+        onAgeMaxChange={setAgeMax}
+        experienceMin={experienceMin}
+        onExperienceMinChange={setExperienceMin}
+        experienceMax={experienceMax}
+        onExperienceMaxChange={setExperienceMax}
       />
       <div>
         <ClientTable
