@@ -12,8 +12,13 @@ import {
   getSubscriptionPlanAmount,
   shouldAllowCustomPayAmount,
   subscriptionPlanAllowsCustomAmount,
+  subscriptionPlanRequiresManualRemainingLessons,
 } from "../../state/payments";
-import { buildGroupsByArea, estimateGroupRemainingLessonsByParams, requiresManualRemainingLessons } from "../../state/lessons";
+import {
+  buildGroupsByArea,
+  estimateGroupRemainingLessonsByParams,
+  requiresManualRemainingLessons,
+} from "../../state/lessons";
 import type { Area, DB, Client, ClientFormValues, Group } from "../../types";
 
 type Props = {
@@ -133,7 +138,8 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
   const currentPayAmount = watch("payAmount");
   const subscriptionPlan = watch("subscriptionPlan");
   const selectedArea = watch("area");
-  const manualRemaining = requiresManualRemainingLessons(selectedGroup);
+  const planRequiresManual = subscriptionPlanRequiresManualRemainingLessons(subscriptionPlan);
+  const manualRemaining = requiresManualRemainingLessons(selectedGroup) || planRequiresManual;
   const areaGroups = useMemo(() => {
     const manualGroups = db.settings.groups.filter(groupName => requiresManualRemainingLessons(groupName));
     if (!selectedArea) {

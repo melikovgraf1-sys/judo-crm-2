@@ -59,6 +59,19 @@ describe("transformClientFormValues", () => {
     });
   });
 
+  it("allows manual remaining lessons for single visit plan", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      subscriptionPlan: "single",
+      group: "Group1",
+      remainingLessons: "3",
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result).toMatchObject({ remainingLessons: 3, subscriptionPlan: "single" });
+  });
+
   it("preserves previous numeric payAmount when input is empty", () => {
     const data: ClientFormValues = {
       ...baseFormValues,

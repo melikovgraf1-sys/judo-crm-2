@@ -21,6 +21,12 @@ export function subscriptionPlanAllowsCustomAmount(plan: SubscriptionPlan | unde
   return getSubscriptionPlanAmount(plan) == null;
 }
 
+export function subscriptionPlanRequiresManualRemainingLessons(
+  plan: SubscriptionPlan | undefined | null,
+): boolean {
+  return plan === "single";
+}
+
 const INDIVIDUAL_GROUP_NAMES = ["индивидуальное", "индивидуальные", "индивидуальная", "индивидуал"];
 const ADULT_GROUP_NAMES = ["взрослое", "взрослые", "взрослая"];
 

@@ -13,7 +13,7 @@ import type {
   AttendanceEntry,
   PerformanceEntry,
 } from "../types";
-import { requiresManualRemainingLessons } from "./lessons";
+import { clientRequiresManualRemainingLessons } from "./lessons";
 import { SUBSCRIPTION_PLANS } from "./payments";
 
 export function makeSeedDB(): DB {
@@ -99,9 +99,9 @@ export function makeSeedDB(): DB {
     const gender: Gender = Math.random() < 0.5 ? "м" : "ж";
     const area = areas[rnd(0, areas.length - 1)];
     const group = groups[rnd(0, groups.length - 1)];
-    const manual = requiresManualRemainingLessons(group);
     const subscriptionPlan = SUBSCRIPTION_PLANS[rnd(0, SUBSCRIPTION_PLANS.length - 1)].value;
     const planMeta = SUBSCRIPTION_PLANS.find(option => option.value === subscriptionPlan);
+    const manual = clientRequiresManualRemainingLessons({ group, subscriptionPlan });
     const start = new Date();
     start.setMonth(start.getMonth() - rnd(0, 6));
     return {

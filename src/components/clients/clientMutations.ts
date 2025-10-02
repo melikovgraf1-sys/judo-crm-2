@@ -3,6 +3,7 @@ import {
   getSubscriptionPlanAmount,
   shouldAllowCustomPayAmount,
   subscriptionPlanAllowsCustomAmount,
+  subscriptionPlanRequiresManualRemainingLessons,
 } from "../../state/payments";
 import { parseDateInput } from "../../state/utils";
 import { requiresManualRemainingLessons } from "../../state/lessons";
@@ -57,7 +58,10 @@ export function transformClientFormValues(
   } = data;
   const resolvedPayAmount = resolvePayAmount(payAmountRaw, base.group, subscriptionPlan, editing?.payAmount);
   let resolvedRemaining: number | undefined;
-  if (requiresManualRemainingLessons(base.group)) {
+  if (
+    requiresManualRemainingLessons(base.group) ||
+    subscriptionPlanRequiresManualRemainingLessons(subscriptionPlan)
+  ) {
     const parsedRemaining = Number.parseInt(remainingLessonsRaw, 10);
     if (!Number.isNaN(parsedRemaining)) {
       resolvedRemaining = parsedRemaining;
