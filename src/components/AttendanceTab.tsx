@@ -10,6 +10,7 @@ import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea, clientRequiresManualRemainingLessons } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
+import { isReserveArea } from "../state/areas";
 import type {
   Area,
   AttendanceEntry,
@@ -122,7 +123,7 @@ export default function AttendanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(client => client.area === area && client.group === group);
+    return db.clients.filter(client => client.area === area && client.group === group && !isReserveArea(client.area));
   }, [area, group, db.clients]);
 
   type ColumnConfig = {
