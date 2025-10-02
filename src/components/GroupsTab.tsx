@@ -4,7 +4,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { uid, todayISO, fmtMoney } from "../state/utils";
+import { fmtMoney, isReserveArea, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import {
   applyPaymentStatusRules,
@@ -93,6 +93,7 @@ export default function GroupsTab({
     return db.clients.filter(c =>
       c.area === area &&
       c.group === group &&
+      !isReserveArea(c.area) &&
       (pay === "all" || c.payStatus === pay) &&
       (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))

@@ -6,7 +6,7 @@ import ClientDetailsModal from "./clients/ClientDetailsModal";
 import ClientForm from "./clients/ClientForm";
 import ColumnSettings from "./ColumnSettings";
 import { compareValues, toggleSort } from "./tableUtils";
-import { fmtDate, todayISO, uid } from "../state/utils";
+import { fmtDate, isReserveArea, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
@@ -78,7 +78,7 @@ export default function PerformanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(client => client.area === area && client.group === group);
+    return db.clients.filter(client => client.area === area && client.group === group && !isReserveArea(client.area));
   }, [area, group, db.clients]);
 
   type ColumnConfig = {

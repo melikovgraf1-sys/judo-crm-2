@@ -12,7 +12,10 @@ jest.mock('../../state/utils', () => ({
   __esModule: true,
   fmtDate: (iso: string) => new Intl.DateTimeFormat('ru-RU').format(new Date(iso)),
   uid: () => 'uid',
-  todayISO: () => '2025-01-01T00:00:00.000Z'
+  todayISO: () => '2025-01-01T00:00:00.000Z',
+  isReserveArea: () => false,
+  ensureReserveAreaIncluded: (areas: string[]) => areas,
+  RESERVE_AREA_NAME: 'резерв',
 }));
 import TasksTab from '../TasksTab';
 import { commitDBUpdate } from '../../state/appState';

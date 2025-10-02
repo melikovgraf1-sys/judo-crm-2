@@ -6,10 +6,11 @@ import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
-import { todayISO, uid } from "./utils";
+import { ensureReserveAreaIncluded, todayISO, uid } from "./utils";
 import { DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
 import type {
   AttendanceEntry,
+  Area,
   AuthState,
   AuthUser,
   Client,
@@ -39,11 +40,13 @@ export const LOCAL_ONLY_EVENT = "judo-crm/local-only";
 export const LOCAL_ONLY_MESSAGE =
   "Данные сейчас сохраняются только в этом браузере — синхронизация с Firebase отключена, поэтому содержимое может отличаться в других окнах.";
 
+const DEFAULT_AREAS: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
+
 const DEFAULT_SETTINGS: Settings = {
-  areas: ["Махмутлар", "Центр", "Джикджилли"],
+  areas: DEFAULT_AREAS,
   groups: ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"],
   limits: Object.fromEntries(
-    ["Махмутлар", "Центр", "Джикджилли"].flatMap(area =>
+    DEFAULT_AREAS.flatMap(area =>
       ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"].map(group => [`${area}|${group}`, 20]),
     ),
   ) as Settings["limits"],
@@ -81,15 +84,21 @@ function ensureObjectArray<T>(value: unknown): T[] {
 
 function normalizeSettings(value: unknown): Settings {
   if (!value || typeof value !== "object") {
-    return DEFAULT_SETTINGS;
+    return {
+      ...DEFAULT_SETTINGS,
+      areas: ensureReserveAreaIncluded(DEFAULT_SETTINGS.areas) as Settings["areas"],
+    };
   }
 
   const raw = value as Partial<Settings>;
   const areas = ensureArray<string>(raw.areas);
   const groups = ensureArray<string>(raw.groups);
+  const normalizedAreas = ensureReserveAreaIncluded(
+    areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
+  ) as Settings["areas"];
 
   return {
-    areas: areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
+    areas: normalizedAreas,
     groups: groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,
     limits: raw.limits && typeof raw.limits === "object" ? (raw.limits as Settings["limits"]) : DEFAULT_SETTINGS.limits,
     rentByAreaEUR:
