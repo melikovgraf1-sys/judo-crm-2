@@ -7,7 +7,6 @@ import ClientForm from "./clients/ClientForm";
 import ColumnSettings from "./ColumnSettings";
 import { compareValues, toggleSort } from "./tableUtils";
 import { fmtDate, todayISO, uid } from "../state/utils";
-import { isReserveArea } from "../state/reserve";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea, clientRequiresManualRemainingLessons } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
