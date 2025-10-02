@@ -7,6 +7,7 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
+import { DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
 import type {
   AttendanceEntry,
   AuthState,
@@ -555,6 +556,7 @@ export function useAppState(): AppState {
 
   const onQuickAdd = () => setQuickOpen(true);
   const addQuickClient = async () => {
+    const defaultPlanMeta = getSubscriptionPlanMeta(DEFAULT_SUBSCRIPTION_PLAN);
     const c: Client = {
       id: uid(),
       firstName: "Новый",
@@ -573,6 +575,9 @@ export function useAppState(): AppState {
       payMethod: "перевод",
       payStatus: "ожидание",
       status: "новый",
+      subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
+      ...(defaultPlanMeta?.amount != null ? { payAmount: defaultPlanMeta.amount } : {}),
+      payDate: todayISO(),
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
     if (await commitDBUpdate(next, setDB)) {
@@ -595,6 +600,7 @@ export function useAppState(): AppState {
       group: db.settings.groups[0],
       source: "Instagram",
       stage: "Очередь",
+      subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
       phone: "",
       whatsApp: "",
       telegram: "",

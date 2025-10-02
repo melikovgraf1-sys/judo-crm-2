@@ -1,11 +1,29 @@
-import { getDefaultPayAmount, shouldAllowCustomPayAmount } from "../../state/payments";
+import {
+  getDefaultPayAmount,
+  getSubscriptionPlanAmount,
+  shouldAllowCustomPayAmount,
+  subscriptionPlanAllowsCustomAmount,
+} from "../../state/payments";
 import { parseDateInput } from "../../state/utils";
 import { requiresManualRemainingLessons } from "../../state/lessons";
-import type { Client, ClientFormValues, Group } from "../../types";
+import type { Client, ClientFormValues, Group, SubscriptionPlan } from "../../types";
 
-export function resolvePayAmount(rawValue: string, group: Group, previous?: number): number | undefined {
+export function resolvePayAmount(
+  rawValue: string,
+  group: Group,
+  subscriptionPlan: SubscriptionPlan,
+  previous?: number,
+): number | undefined {
+  const planAmount = getSubscriptionPlanAmount(subscriptionPlan);
   const defaultAmount = getDefaultPayAmount(group);
-  if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
+  const groupAllowsCustom = shouldAllowCustomPayAmount(group);
+  const planAllowsCustom = subscriptionPlanAllowsCustomAmount(subscriptionPlan);
+
+  if (planAmount != null && !groupAllowsCustom) {
+    return planAmount;
+  }
+
+  if (!groupAllowsCustom && !planAllowsCustom && defaultAmount != null) {
     return defaultAmount;
   }
 
@@ -14,7 +32,7 @@ export function resolvePayAmount(rawValue: string, group: Group, previous?: numb
     return parsed;
   }
 
-  if (defaultAmount != null) {
+  if (!groupAllowsCustom && !planAllowsCustom && defaultAmount != null) {
     return defaultAmount;
   }
 
@@ -25,11 +43,21 @@ export function transformClientFormValues(
   data: ClientFormValues,
   editing?: Client | null,
 ): Omit<Client, "id"> {
-  const { payAmount: payAmountRaw, remainingLessons: remainingLessonsRaw, ...rest } = data;
-  const { lastName, parentName, phone, whatsApp, telegram, instagram, ...base } = rest;
-  const resolvedPayAmount = resolvePayAmount(payAmountRaw, rest.group, editing?.payAmount);
+  const {
+    payAmount: payAmountRaw,
+    remainingLessons: remainingLessonsRaw,
+    subscriptionPlan,
+    lastName,
+    parentName,
+    phone,
+    whatsApp,
+    telegram,
+    instagram,
+    ...base
+  } = data;
+  const resolvedPayAmount = resolvePayAmount(payAmountRaw, base.group, subscriptionPlan, editing?.payAmount);
   let resolvedRemaining: number | undefined;
-  if (requiresManualRemainingLessons(rest.group)) {
+  if (requiresManualRemainingLessons(base.group)) {
     const parsedRemaining = Number.parseInt(remainingLessonsRaw, 10);
     if (!Number.isNaN(parsedRemaining)) {
       resolvedRemaining = parsedRemaining;
@@ -38,6 +66,7 @@ export function transformClientFormValues(
 
   return {
     ...base,
+    subscriptionPlan,
     ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
     ...(parentName.trim() ? { parentName: parentName.trim() } : {}),
     ...(phone.trim() ? { phone: phone.trim() } : {}),

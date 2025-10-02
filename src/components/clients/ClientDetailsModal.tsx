@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import { calcAgeYears, calcExperience, fmtDate, fmtMoney } from "../../state/utils";
+import { getSubscriptionPlanMeta } from "../../state/payments";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
 
@@ -101,6 +102,10 @@ export default function ClientDetailsModal({
             <InfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
             <InfoRow label="Статус" value={client.status ?? "—"} />
             <InfoRow label="Статус оплаты" value={client.payStatus} />
+            <InfoRow
+              label="Форма абонемента"
+              value={client.subscriptionPlan ? getSubscriptionPlanMeta(client.subscriptionPlan)?.label ?? "—" : "—"}
+            />
             <InfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
             <InfoRow
               label="Сумма оплаты"
