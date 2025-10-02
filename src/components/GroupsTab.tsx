@@ -5,7 +5,6 @@ import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { fmtMoney, todayISO, uid } from "../state/utils";
-import { isReserveArea } from "../state/reserve";
 import { commitDBUpdate } from "../state/appState";
 import {
   applyPaymentStatusRules,
@@ -26,6 +25,7 @@ import {
 } from "../state/period";
 
 import { isReserveArea } from "../state/areas";
+import { parseAgeExperienceFilter } from "../utils/clientFilters";
 
 export default function GroupsTab({
   db,

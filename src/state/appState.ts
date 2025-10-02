@@ -7,7 +7,6 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
-import { ensureReserveAreaIncluded } from "./reserve";
 import { DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
 import { ensureReserveAreaIncluded } from "./areas";
 import type {
