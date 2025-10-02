@@ -6,7 +6,9 @@ export type DuplicateField =
   | "phone"
   | "whatsApp"
   | "telegram"
-  | "instagram";
+  | "instagram"
+  | "area"
+  | "group";
 
 export type DuplicateMatchDetail = {
   field: DuplicateField;
@@ -35,6 +37,8 @@ type NormalizedClient = {
   fullName: string;
   parentName: string;
   contacts: Record<(typeof CONTACT_FIELDS)[number], string>;
+  area: string;
+  group: string;
 };
 
 const normalizeWhitespace = (value: string): string => value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -88,6 +92,8 @@ const getNormalizedClient = (client: ComparableClient): NormalizedClient => ({
   fullName: normalizeFullName(client),
   parentName: normalizeParentName(client),
   contacts: normalizeContacts(client),
+  area: normalizeWhitespace(client.area ?? ""),
+  group: normalizeWhitespace(client.group ?? ""),
 });
 
 const formatClientName = (client: ComparableClient): string => {
@@ -106,6 +112,10 @@ const duplicateFieldValue = (client: ComparableClient, field: DuplicateField): s
     case "telegram":
     case "instagram":
       return client[field]?.trim() ?? "";
+    case "area":
+      return client.area?.trim() ?? "";
+    case "group":
+      return client.group?.trim() ?? "";
     default:
       return "";
   }
@@ -140,6 +150,14 @@ export function findClientDuplicates(
       normalizedCandidate.parentName === normalizedExisting.parentName
     ) {
       details.push({ field: "parentName", value: duplicateFieldValue(client, "parentName") });
+    }
+
+    if (normalizedCandidate.area && normalizedCandidate.area === normalizedExisting.area) {
+      details.push({ field: "area", value: duplicateFieldValue(client, "area") });
+    }
+
+    if (normalizedCandidate.group && normalizedCandidate.group === normalizedExisting.group) {
+      details.push({ field: "group", value: duplicateFieldValue(client, "group") });
     }
 
     for (const candidateField of CONTACT_FIELDS) {
