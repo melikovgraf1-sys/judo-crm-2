@@ -26,6 +26,44 @@ export const MONTH_OPTIONS = MONTH_NAMES.map((label, index) => ({
   label,
 }));
 
+function parseISODate(value?: string | null): Date | null {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function comparePeriodToYearMonth(period: PeriodFilter, year: number, month: number): number {
+  if (period.year < year) {
+    return -1;
+  }
+  if (period.year > year) {
+    return 1;
+  }
+  if (period.month == null) {
+    return 0;
+  }
+  if (period.month < month) {
+    return -1;
+  }
+  if (period.month > month) {
+    return 1;
+  }
+  return 0;
+}
+
+const makeUTCDate = (year: number, month: number, day: number) => new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+function projectDayIntoPeriod(day: number, period: PeriodFilter): string | null {
+  if (period.month == null) {
+    return null;
+  }
+  const maxDay = new Date(Date.UTC(period.year, period.month, 0)).getUTCDate();
+  const normalizedDay = Math.min(Math.max(day, 1), maxDay);
+  return makeUTCDate(period.year, period.month, normalizedDay).toISOString();
+}
+
 function parseYearPart(value?: string | null): number | null {
   if (!value) {
     return null;
@@ -66,6 +104,28 @@ export function matchesPeriod(value: string | null | undefined, period: PeriodFi
 
 export function isClientInPeriod(client: Client, period: PeriodFilter): boolean {
   return matchesPeriod(client.payDate ?? client.startDate, period);
+}
+
+export function isClientActiveInPeriod(client: Client, period: PeriodFilter): boolean {
+  const anchor = parseISODate(client.startDate ?? client.payDate ?? null);
+  if (!anchor) {
+    return false;
+  }
+  const year = anchor.getUTCFullYear();
+  const month = anchor.getUTCMonth() + 1;
+  return comparePeriodToYearMonth(period, year, month) >= 0;
+}
+
+export function getClientRecurringPayDate(client: Client, period: PeriodFilter): string | null {
+  if (period.month == null) {
+    return client.payDate ?? client.startDate ?? null;
+  }
+  const source = parseISODate(client.payDate ?? client.startDate ?? null);
+  if (!source) {
+    return null;
+  }
+  const day = source.getUTCDate();
+  return projectDayIntoPeriod(day, period);
 }
 
 export function isLeadInPeriod(lead: Lead, period: PeriodFilter): boolean {

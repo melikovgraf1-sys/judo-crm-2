@@ -4,6 +4,7 @@ import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
 import { compareValues, toggleSort, type SortState } from "../tableUtils";
 import { fmtMoney, fmtDate } from "../../state/utils";
+import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
 
@@ -16,6 +17,7 @@ type Props = {
   schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
+  billingPeriod?: PeriodFilter;
 };
 
 type ColumnConfig = {
@@ -29,7 +31,17 @@ type ColumnConfig = {
   headerAlign?: "left" | "center" | "right";
 };
 
-export default function ClientTable({ list, currency, onEdit, onRemove, onCreateTask, schedule, attendance, performance }: Props) {
+export default function ClientTable({
+  list,
+  currency,
+  onEdit,
+  onRemove,
+  onCreateTask,
+  schedule,
+  attendance,
+  performance,
+  billingPeriod,
+}: Props) {
   const [selected, setSelected] = useState<Client | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([
     "name",
@@ -158,8 +170,18 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
       id: "payDate",
       label: "Дата оплаты",
       width: "minmax(140px, max-content)",
-      renderCell: client => (client.payDate ? fmtDate(client.payDate) : "—"),
-      sortValue: client => client.payDate ?? "",
+      renderCell: client => {
+        const displayDate = billingPeriod
+          ? getClientRecurringPayDate(client, billingPeriod) ?? client.payDate ?? client.startDate ?? null
+          : client.payDate ?? null;
+        return displayDate ? fmtDate(displayDate) : "—";
+      },
+      sortValue: client => {
+        const displayDate = billingPeriod
+          ? getClientRecurringPayDate(client, billingPeriod) ?? client.payDate ?? client.startDate ?? null
+          : client.payDate ?? null;
+        return displayDate ?? "";
+      },
     },
     {
       id: "actions",
@@ -191,7 +213,7 @@ export default function ClientTable({ list, currency, onEdit, onRemove, onCreate
         </>
       ),
     },
-  ], [currency, onCreateTask, onEdit, onRemove, remainingMap]);
+  ], [billingPeriod, currency, onCreateTask, onEdit, onRemove, remainingMap]);
 
   const activeColumns = useMemo(
     () => columns.filter(column => visibleColumns.includes(column.id)),

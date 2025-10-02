@@ -186,25 +186,27 @@ test('read: filters clients by area, group and pay status', () => {
 test('filters clients by selected month', async () => {
   const db = makeDB();
   db.clients = [
-    makeClient({ id: 'jan', firstName: 'Январь', payDate: '2024-01-05T00:00:00.000Z' }),
-    makeClient({ id: 'feb', firstName: 'Февраль', payDate: '2024-02-05T00:00:00.000Z' }),
+    makeClient({ id: 'jan', firstName: 'Январь', startDate: '2024-01-01T00:00:00.000Z', payDate: '2024-01-05T00:00:00.000Z' }),
+    makeClient({ id: 'feb', firstName: 'Февраль', startDate: '2024-02-01T00:00:00.000Z', payDate: '2024-02-05T00:00:00.000Z' }),
+    makeClient({ id: 'mar', firstName: 'Март', startDate: '2024-03-01T00:00:00.000Z', payDate: '2024-03-05T00:00:00.000Z' }),
   ];
 
   renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
 
+  const monthInput = screen.getByLabelText('Фильтр по месяцу');
+  fireEvent.change(monthInput, { target: { value: '1' } });
+
   await waitFor(() => {
-    const rows = screen.getAllByRole('row');
-    expect(rows.length).toBe(2);
-    expect(rows[1]).toHaveTextContent('Январь');
+    expect(screen.getByRole('row', { name: /Январь/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Февраль/ })).not.toBeInTheDocument();
   });
 
-  const monthInput = screen.getByLabelText('Фильтр по месяцу');
   fireEvent.change(monthInput, { target: { value: '2' } });
 
   await waitFor(() => {
-    const rows = screen.getAllByRole('row');
-    expect(rows.length).toBe(2);
-    expect(rows[1]).toHaveTextContent('Февраль');
+    expect(screen.getByRole('row', { name: /Январь/ })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Февраль/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Март/ })).not.toBeInTheDocument();
   });
 });
 

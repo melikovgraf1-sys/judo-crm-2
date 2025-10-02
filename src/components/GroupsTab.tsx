@@ -19,6 +19,7 @@ import {
   collectAvailableYears,
   formatMonthInput,
   getDefaultPeriod,
+  isClientActiveInPeriod,
   isClientInPeriod,
   type PeriodFilter,
 } from "../state/period";
@@ -93,7 +94,7 @@ export default function GroupsTab({
       c.area === area &&
       c.group === group &&
       (pay === "all" || c.payStatus === pay) &&
-      isClientInPeriod(c, period) &&
+      (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search, search, period]);
@@ -272,6 +273,7 @@ export default function GroupsTab({
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}
+          billingPeriod={period}
         />
       </div>
       {modalOpen && (
