@@ -2,6 +2,7 @@ import { parseCsv, stringifyCsv } from "../../utils/csv";
 import { downloadTextFile } from "../../utils/download";
 import { transformClientFormValues } from "./clientMutations";
 import { todayISO, uid } from "../../state/utils";
+import { findClientDuplicates, type DuplicateMatchDetail } from "../../state/clients";
 import type {
   Area,
   Client,
@@ -173,6 +174,19 @@ type ClientCsvImportResult = {
   errors: string[];
   processed: number;
   skipped: number;
+};
+
+export type DuplicateSummaryEntry = {
+  type: "existing" | "imported";
+  client: Client;
+  matches: DuplicateMatchDetail[];
+};
+
+export type AppendImportedClientsSummary = {
+  added: number;
+  skipped: number;
+  merged: number;
+  duplicates: DuplicateSummaryEntry[];
 };
 
 const COMMENT_PREFIX = "#";
@@ -542,23 +556,84 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
   };
 }
 
+const MERGEABLE_FIELDS: Array<keyof Omit<Client, "id">> = [
+  "lastName",
+  "parentName",
+  "phone",
+  "whatsApp",
+  "telegram",
+  "instagram",
+  "coachId",
+];
+
+function mergeClientData(target: Client, source: Omit<Client, "id">) {
+  for (const field of MERGEABLE_FIELDS) {
+    const current = target[field];
+    const incoming = source[field];
+    if ((current == null || current === "") && incoming) {
+      target[field] = incoming as Client[typeof field];
+    }
+  }
+}
+
 export function appendImportedClients(
   db: DB,
   imported: Omit<Client, "id">[],
-): { next: DB; changelogMessage: string } {
-  const newClients: Client[] = imported.map(client => ({ ...client, id: uid() }));
-  const next: DB = {
-    ...db,
-    clients: [...newClients, ...db.clients],
-    changelog: [
+): { next: DB; changelogMessage: string; summary: AppendImportedClientsSummary } {
+  const accepted: Client[] = [];
+  const summary: AppendImportedClientsSummary = {
+    added: 0,
+    skipped: 0,
+    merged: 0,
+    duplicates: [],
+  };
+
+  for (const candidate of imported) {
+    const matches = findClientDuplicates({ ...db, clients: [...db.clients, ...accepted] }, candidate);
+
+    if (!matches.length) {
+      const client: Client = { ...candidate, id: uid() };
+      accepted.push(client);
+      continue;
+    }
+
+    const matchWithAccepted = matches.find(match => accepted.some(client => client.id === match.client.id));
+
+    if (matchWithAccepted) {
+      const target = accepted.find(client => client.id === matchWithAccepted.client.id);
+      if (target) {
+        mergeClientData(target, candidate);
+        summary.merged += 1;
+        summary.duplicates.push({ type: "imported", client: target, matches: matchWithAccepted.matches });
+      }
+      continue;
+    }
+
+    summary.skipped += 1;
+    const primaryMatch = matches[0];
+    summary.duplicates.push({ type: "existing", client: primaryMatch.client, matches: primaryMatch.matches });
+  }
+
+  summary.added = accepted.length;
+
+  let nextChangelog = db.changelog;
+  if (summary.added > 0) {
+    nextChangelog = [
       ...db.changelog,
       {
         id: uid(),
         who: "UI",
-        what: `Импортировано клиентов из CSV: ${newClients.length}`,
+        what: `Импортировано клиентов из CSV: ${summary.added}`,
         when: todayISO(),
       },
-    ],
+    ];
+  }
+
+  const next: DB = {
+    ...db,
+    clients: [...accepted, ...db.clients],
+    changelog: nextChangelog,
   };
-  return { next, changelogMessage: `Добавлено клиентов: ${newClients.length}` };
+
+  return { next, changelogMessage: `Добавлено клиентов: ${summary.added}`, summary };
 }
