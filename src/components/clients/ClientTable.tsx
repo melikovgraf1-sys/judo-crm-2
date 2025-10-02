@@ -2,11 +2,12 @@ import React, { useMemo, useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
 import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
-import { compareValues, toggleSort, type SortState } from "../tableUtils";
+import { compareValues, toggleSort } from "../tableUtils";
 import { fmtMoney, fmtDate } from "../../state/utils";
 import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
+import { usePersistentTableSettings } from "../../utils/tableSettings";
 
 type Props = {
   list: Client[];
@@ -31,6 +32,24 @@ type ColumnConfig = {
   headerAlign?: "left" | "center" | "right";
 };
 
+const DEFAULT_VISIBLE_COLUMNS = [
+  "name",
+  "phone",
+  "whatsApp",
+  "telegram",
+  "instagram",
+  "area",
+  "group",
+  "status",
+  "payStatus",
+  "remainingLessons",
+  "payAmount",
+  "payDate",
+  "actions",
+];
+
+const TABLE_SETTINGS_KEY = "clients";
+
 export default function ClientTable({
   list,
   currency,
@@ -43,22 +62,6 @@ export default function ClientTable({
   billingPeriod,
 }: Props) {
   const [selected, setSelected] = useState<Client | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>([
-    "name",
-    "phone",
-    "whatsApp",
-    "telegram",
-    "instagram",
-    "area",
-    "group",
-    "status",
-    "payStatus",
-    "remainingLessons",
-    "payAmount",
-    "payDate",
-    "actions",
-  ]);
-  const [sort, setSort] = useState<SortState | null>(null);
   const remainingMap = useMemo(() => {
     const map = new Map<string, number | null>();
     list.forEach(client => {
@@ -213,7 +216,14 @@ export default function ClientTable({
         </>
       ),
     },
-  ], [billingPeriod, currency, onCreateTask, onEdit, onRemove, remainingMap]);
+  ], [billingPeriod, currency, onCreateTask, onRemove, remainingMap]);
+
+  const columnIds = useMemo(() => columns.map(column => column.id), [columns]);
+  const { visibleColumns, setVisibleColumns, sort, setSort } = usePersistentTableSettings(
+    TABLE_SETTINGS_KEY,
+    columnIds,
+    DEFAULT_VISIBLE_COLUMNS,
+  );
 
   const activeColumns = useMemo(
     () => columns.filter(column => visibleColumns.includes(column.id)),

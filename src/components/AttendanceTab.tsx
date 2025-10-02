@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
 import ClientDetailsModal from "./clients/ClientDetailsModal";
 import ClientForm from "./clients/ClientForm";
 import ColumnSettings from "./ColumnSettings";
-import { compareValues, toggleSort, type SortState } from "./tableUtils";
+import { compareValues, toggleSort } from "./tableUtils";
 import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea, clientRequiresManualRemainingLessons } from "../state/lessons";
@@ -19,6 +19,11 @@ import type {
   DB,
   Group,
 } from "../types";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
+import { usePersistentTableSettings } from "../utils/tableSettings";
+
+const DEFAULT_VISIBLE_COLUMNS = ["name", "area", "group", "mark"];
+const TABLE_SETTINGS_KEY = "attendance";
 
 const toMiddayISO = (value: string): string | null => {
   if (!value) return null;
@@ -48,14 +53,13 @@ export default function AttendanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
-  const [area, setArea] = useState<Area | null>(null);
-  const [group, setGroup] = useState<Group | null>(null);
+  const storedSelection = useMemo(() => readDailySelection("attendance"), []);
+  const [area, setArea] = useState<Area | null>(storedSelection.area);
+  const [group, setGroup] = useState<Group | null>(storedSelection.group);
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(["name", "area", "group", "mark"]);
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(() => todayISO().slice(0, 10));
-  const [sort, setSort] = useState<SortState | null>(null);
 
   const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
   const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
@@ -69,6 +73,14 @@ export default function AttendanceTab({
       setGroup(null);
     }
   }, [area, availableGroups, group]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("attendance", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("attendance");
+    }
+  }, [area, group]);
 
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
   const selectedMonthDate = useMemo(() => {
@@ -196,7 +208,7 @@ export default function AttendanceTab({
 
   const selectedDateISO = useMemo(() => toMiddayISO(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => (selectedDateISO ? fmtDate(selectedDateISO) : ""), [selectedDateISO]);
-  const cycleMark = async (clientId: string) => {
+  const cycleMark = useCallback(async (clientId: string) => {
     if (!selectedDate) {
       window.alert("Выберите дату для отметки посещаемости.");
       return;
@@ -267,7 +279,7 @@ export default function AttendanceTab({
         setDB(next);
       }
     }
-  };
+  }, [db, marksForSelectedDate, selectedDate, setDB]);
 
   const columns: ColumnConfig[] = useMemo(() => {
     return [
@@ -330,7 +342,14 @@ export default function AttendanceTab({
         },
       },
     ];
-  }, [marksForSelectedDate, selectedDateLabel]);
+  }, [cycleMark, marksForSelectedDate, selectedDateLabel]);
+
+  const columnIds = useMemo(() => columns.map(column => column.id), [columns]);
+  const { visibleColumns, setVisibleColumns, sort, setSort } = usePersistentTableSettings(
+    TABLE_SETTINGS_KEY,
+    columnIds,
+    DEFAULT_VISIBLE_COLUMNS,
+  );
 
   const activeColumns = useMemo(
     () => columns.filter(column => visibleColumns.includes(column.id)),
