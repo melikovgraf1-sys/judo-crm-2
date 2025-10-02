@@ -8,7 +8,7 @@ import ColumnSettings from "./ColumnSettings";
 import { compareValues, toggleSort, type SortState } from "./tableUtils";
 import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import { buildGroupsByArea, requiresManualRemainingLessons } from "../state/lessons";
+import { buildGroupsByArea, clientRequiresManualRemainingLessons } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
 import type {
   Area,
@@ -204,7 +204,7 @@ export default function AttendanceTab({
     const mark = marksForSelectedDate.get(clientId);
     const client = db.clients.find(c => c.id === clientId);
     if (!client) return;
-    const manual = requiresManualRemainingLessons(client.group);
+    const manual = clientRequiresManualRemainingLessons(client);
 
     if (mark && mark.came === false) {
       const next = {

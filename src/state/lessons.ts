@@ -1,10 +1,23 @@
 import type { Area, Client, Group, ScheduleSlot } from "../types";
-import { isAdultGroup, isIndividualGroup } from "./payments";
+import {
+  isAdultGroup,
+  isIndividualGroup,
+  subscriptionPlanRequiresManualRemainingLessons,
+} from "./payments";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 export function requiresManualRemainingLessons(group: string): boolean {
   return isIndividualGroup(group) || isAdultGroup(group);
+}
+
+export function clientRequiresManualRemainingLessons(
+  client: Pick<Client, "group" | "subscriptionPlan">,
+): boolean {
+  if (requiresManualRemainingLessons(client.group)) {
+    return true;
+  }
+  return subscriptionPlanRequiresManualRemainingLessons(client.subscriptionPlan);
 }
 
 const isoWeekday = (date: Date): number => {
@@ -65,7 +78,7 @@ export function getEffectiveRemainingLessons(
   schedule: ScheduleSlot[],
   today: Date = new Date(),
 ): number | null {
-  if (requiresManualRemainingLessons(client.group)) {
+  if (clientRequiresManualRemainingLessons(client)) {
     if (typeof client.remainingLessons === "number") {
       return client.remainingLessons < 0 ? 0 : client.remainingLessons;
     }

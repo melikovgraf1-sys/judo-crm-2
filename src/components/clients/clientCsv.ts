@@ -13,7 +13,9 @@ import type {
   Group,
   PaymentMethod,
   PaymentStatus,
+  SubscriptionPlan,
 } from "../../types";
+import { DEFAULT_SUBSCRIPTION_PLAN, SUBSCRIPTION_PLANS } from "../../state/payments";
 
 export const CLIENT_CSV_HEADERS = [
   "firstName",
@@ -32,6 +34,7 @@ export const CLIENT_CSV_HEADERS = [
   "payMethod",
   "payStatus",
   "status",
+  "subscriptionPlan",
   "payDate",
   "payAmount",
   "remainingLessons",
@@ -79,6 +82,9 @@ const HEADER_ALIASES: HeaderAliasMap = {
   "статус_оплаты": "payStatus",
   status: "status",
   "статус": "status",
+  subscriptionplan: "subscriptionPlan",
+  "форма_абонемента": "subscriptionPlan",
+  "тип_абонемента": "subscriptionPlan",
   paydate: "payDate",
   "дата_оплаты": "payDate",
   payamount: "payAmount",
@@ -135,6 +141,7 @@ const PAYMENT_STATUS_ALIASES: Record<string, PaymentStatus> = {
   debt: "задолженность",
 };
 
+
 const CLIENT_STATUS_ALIASES: Record<string, ClientStatus> = {
   "действующий": "действующий",
   "активный": "действующий",
@@ -171,6 +178,23 @@ type ClientCsvImportResult = {
 const COMMENT_PREFIX = "#";
 
 const sanitizeKey = (value: string) => value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+
+const SUBSCRIPTION_PLAN_ALIASES: Record<string, SubscriptionPlan> = SUBSCRIPTION_PLANS.reduce(
+  (acc, option) => {
+    acc[sanitizeKey(option.value)] = option.value;
+    acc[sanitizeKey(option.label)] = option.value;
+    return acc;
+  },
+  {
+    "месячный": "monthly",
+    "месячныйабонемент": "monthly",
+    "halfmonth": "half-month",
+    "полмесяца": "half-month",
+    "полмесяцаабонемент": "half-month",
+    "разовый": "single",
+    "разовоезанятие": "single",
+  } as Record<string, SubscriptionPlan>,
+);
 
 function normalizeEnumValue<T extends string>(value: string, map: Record<string, T>): T | null {
   if (!value) {
@@ -252,6 +276,7 @@ function clientToRow(client: Client): (string | number | null | undefined)[] {
     client.payMethod,
     client.payStatus,
     client.status ?? "",
+    client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
     client.payDate ? client.payDate.slice(0, 10) : "",
     client.payAmount != null ? client.payAmount : "",
     client.remainingLessons != null ? client.remainingLessons : "",
@@ -285,6 +310,7 @@ export function buildClientCsvTemplate(): string {
     "перевод",
     "ожидание",
     "новый",
+    "monthly",
     "2024-09-10",
     "12000",
     "",
@@ -415,6 +441,18 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       hasError = true;
     }
 
+    let subscriptionPlan = DEFAULT_SUBSCRIPTION_PLAN;
+    const rawSubscriptionPlan = record.subscriptionPlan.trim();
+    if (rawSubscriptionPlan) {
+      const normalizedPlan = normalizeEnumValue(rawSubscriptionPlan, SUBSCRIPTION_PLAN_ALIASES);
+      if (!normalizedPlan) {
+        errors.push(`Строка ${lineNumber}: неизвестная форма абонемента "${record.subscriptionPlan}"`);
+        hasError = true;
+      } else {
+        subscriptionPlan = normalizedPlan;
+      }
+    }
+
     const birthDate = normalizeDate(record.birthDate);
     if (!birthDate) {
       errors.push(`Строка ${lineNumber}: неверный формат birthDate (ожидается ГГГГ-ММ-ДД)`);
@@ -482,6 +520,7 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       payMethod: payMethod!,
       payStatus: payStatus!,
       status: status!,
+      subscriptionPlan,
       payDate: payDate ?? "",
       payAmount: payAmountRaw,
       remainingLessons: remainingRaw,

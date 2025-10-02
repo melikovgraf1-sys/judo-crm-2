@@ -9,6 +9,11 @@ import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import {
+  DEFAULT_SUBSCRIPTION_PLAN,
+  SUBSCRIPTION_PLANS,
+  getSubscriptionPlanMeta,
+} from "../state/payments";
 import type {
   ContactChannel,
   DB,
@@ -18,6 +23,7 @@ import type {
   Client,
   LeadLifecycleEvent,
   LeadLifecycleOutcome,
+  SubscriptionPlan,
 } from "../types";
 
 export default function LeadsTab({
@@ -73,6 +79,7 @@ export default function LeadsTab({
       area: data.area || fallbackArea,
       group: data.group || fallbackGroup,
       stage: data.stage as LeadStage,
+      subscriptionPlan: data.subscriptionPlan,
       birthDate: toISODate(data.birthDate) ?? undefined,
       startDate: toISODate(data.startDate) ?? undefined,
       notes: data.notes?.trim() || undefined,
@@ -220,6 +227,7 @@ export default function LeadsTab({
 }
 
 const CONTACT_CHANNELS: ContactChannel[] = ["Telegram", "WhatsApp", "Instagram"];
+const SUBSCRIPTION_PLAN_VALUES = SUBSCRIPTION_PLANS.map(option => option.value as SubscriptionPlan);
 
 function convertLeadToClient(lead: Lead, db: DB): Client {
   const fallbackDate = lead.updatedAt ?? todayISO();
@@ -228,6 +236,8 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
   const coach =
     db.staff.find(member => member.role === "Тренер" && member.areas.includes(area) && member.groups.includes(group)) ??
     db.staff.find(member => member.role === "Тренер");
+  const subscriptionPlan = lead.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+  const subscriptionPlanMeta = getSubscriptionPlanMeta(subscriptionPlan);
 
   const rawName = (lead.firstName ?? lead.name ?? "Новый клиент").trim();
   const nameParts = rawName.split(/\s+/).filter(Boolean);
@@ -253,7 +263,9 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     payMethod: "перевод",
     payStatus: "ожидание",
     status: "новый",
+    subscriptionPlan,
     payDate: fallbackDate,
+    ...(subscriptionPlanMeta?.amount != null ? { payAmount: subscriptionPlanMeta.amount } : {}),
   };
 
   return client;
@@ -296,6 +308,7 @@ const toLeadFormValues = (
     area: current.area ?? defaults.area,
     group: current.group ?? defaults.group,
     stage: current.stage,
+    subscriptionPlan: current.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
     birthDate: current.birthDate ? current.birthDate.slice(0, 10) : "",
     startDate: current.startDate ? current.startDate.slice(0, 10) : "",
     notes: current.notes ?? "",
@@ -345,6 +358,10 @@ function LeadModal({
           <InfoRow label="Instagram" value={lead.instagram || "—"} />
           <InfoRow label="Район" value={lead.area ?? "—"} />
           <InfoRow label="Группа" value={lead.group ?? "—"} />
+          <InfoRow
+            label="Форма абонемента"
+            value={lead.subscriptionPlan ? getSubscriptionPlanMeta(lead.subscriptionPlan)?.label ?? "—" : "—"}
+          />
           <InfoRow label="Дата рождения" value={lead.birthDate ? fmtDate(lead.birthDate) : "—"} />
           <InfoRow label="Старт" value={lead.startDate ? fmtDate(lead.startDate) : "—"} />
           <InfoRow label="Создан" value={fmtDate(lead.createdAt)} />
@@ -420,6 +437,10 @@ function LeadFormModal({
         .string()
         .oneOf(stages, "Выберите стадию")
         .required("Выберите стадию"),
+      subscriptionPlan: yup
+        .string()
+        .oneOf(SUBSCRIPTION_PLAN_VALUES, "Выберите форму абонемента")
+        .required("Выберите форму абонемента"),
       birthDate: yup.string().nullable(),
       startDate: yup.string().nullable(),
       notes: yup.string().trim().nullable(),
@@ -532,6 +553,19 @@ function LeadFormModal({
               ))}
             </select>
             {errors.group && <span className="text-xs text-rose-600">{errors.group.message}</span>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Форма абонемента</label>
+            <select className={selectClass} {...register("subscriptionPlan")}>
+              {SUBSCRIPTION_PLANS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {errors.subscriptionPlan && (
+              <span className="text-xs text-rose-600">{errors.subscriptionPlan.message}</span>
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Дата рождения</label>

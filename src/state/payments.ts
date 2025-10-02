@@ -1,4 +1,31 @@
-import type { Client, PaymentStatus, TaskItem } from "../types";
+import type { Client, PaymentStatus, SubscriptionPlan, TaskItem } from "../types";
+
+export const SUBSCRIPTION_PLANS: { value: SubscriptionPlan; label: string; amount: number | null }[] = [
+  { value: "monthly", label: "Месячный абонемент", amount: 55 },
+  { value: "half-month", label: "Полмесяца абонемент", amount: 27.5 },
+  { value: "discount", label: "Скидка", amount: null },
+  { value: "single", label: "Разовое занятие", amount: null },
+];
+
+export const DEFAULT_SUBSCRIPTION_PLAN: SubscriptionPlan = "monthly";
+
+export function getSubscriptionPlanMeta(plan: SubscriptionPlan | undefined | null) {
+  return SUBSCRIPTION_PLANS.find(option => option.value === plan);
+}
+
+export function getSubscriptionPlanAmount(plan: SubscriptionPlan | undefined | null): number | null {
+  return getSubscriptionPlanMeta(plan)?.amount ?? null;
+}
+
+export function subscriptionPlanAllowsCustomAmount(plan: SubscriptionPlan | undefined | null): boolean {
+  return getSubscriptionPlanAmount(plan) == null;
+}
+
+export function subscriptionPlanRequiresManualRemainingLessons(
+  plan: SubscriptionPlan | undefined | null,
+): boolean {
+  return plan === "single";
+}
 
 const INDIVIDUAL_GROUP_NAMES = ["индивидуальное", "индивидуальные", "индивидуальная", "индивидуал"];
 const ADULT_GROUP_NAMES = ["взрослое", "взрослые", "взрослая"];

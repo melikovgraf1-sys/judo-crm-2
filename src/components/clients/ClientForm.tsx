@@ -5,8 +5,20 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import Modal from "../Modal";
 import { todayISO } from "../../state/utils";
-import { getDefaultPayAmount, shouldAllowCustomPayAmount } from "../../state/payments";
-import { buildGroupsByArea, estimateGroupRemainingLessonsByParams, requiresManualRemainingLessons } from "../../state/lessons";
+import {
+  DEFAULT_SUBSCRIPTION_PLAN,
+  SUBSCRIPTION_PLANS,
+  getDefaultPayAmount,
+  getSubscriptionPlanAmount,
+  shouldAllowCustomPayAmount,
+  subscriptionPlanAllowsCustomAmount,
+  subscriptionPlanRequiresManualRemainingLessons,
+} from "../../state/payments";
+import {
+  buildGroupsByArea,
+  estimateGroupRemainingLessonsByParams,
+  requiresManualRemainingLessons,
+} from "../../state/lessons";
 import type { Area, DB, Client, ClientFormValues, Group } from "../../types";
 
 type Props = {
@@ -58,6 +70,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     parentName: "",
     payAmount: String(getDefaultPayAmount(db.settings.groups[0]) ?? ""),
     remainingLessons: "",
+    subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
   }), [db.settings.areas, db.settings.groups, firstAreaWithSchedule, firstGroupForArea]);
 
   const schema = yup.object({
@@ -113,6 +126,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         parentName: editing.parentName ?? "",
         payAmount: editing.payAmount != null ? String(editing.payAmount) : String(getDefaultPayAmount(editing.group) ?? ""),
         remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
+        subscriptionPlan: editing.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
       };
       reset(values);
     } else {
@@ -122,8 +136,10 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
 
   const selectedGroup = watch("group");
   const currentPayAmount = watch("payAmount");
+  const subscriptionPlan = watch("subscriptionPlan");
   const selectedArea = watch("area");
-  const manualRemaining = requiresManualRemainingLessons(selectedGroup);
+  const planRequiresManual = subscriptionPlanRequiresManualRemainingLessons(subscriptionPlan);
+  const manualRemaining = requiresManualRemainingLessons(selectedGroup) || planRequiresManual;
   const areaGroups = useMemo(() => {
     const manualGroups = db.settings.groups.filter(groupName => requiresManualRemainingLessons(groupName));
     if (!selectedArea) {
@@ -133,6 +149,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     return Array.from(new Set([...scheduled, ...manualGroups]));
   }, [db.settings.groups, groupsByArea, selectedArea]);
   const selectedPayDate = watch("payDate");
+  const groupAllowsCustom = selectedGroup ? shouldAllowCustomPayAmount(selectedGroup) : false;
+  const planAllowsCustom = subscriptionPlanAllowsCustomAmount(subscriptionPlan);
+  const subscriptionPlanAmount = getSubscriptionPlanAmount(subscriptionPlan);
   const computedRemaining = useMemo(() => {
     if (manualRemaining) return null;
     if (!selectedArea || !selectedGroup) return null;
@@ -140,7 +159,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
       estimateGroupRemainingLessonsByParams(selectedArea, selectedGroup, selectedPayDate, db.schedule) ?? null
     );
   }, [db.schedule, manualRemaining, selectedArea, selectedGroup, selectedPayDate]);
-  const canEditPayAmount = shouldAllowCustomPayAmount(selectedGroup);
+  const canEditPayAmount = groupAllowsCustom || planAllowsCustom;
   const defaultPayAmount = getDefaultPayAmount(selectedGroup);
   const prevGroupRef = useRef<string | null>(null);
   const prevAreaRef = useRef<string | null>(null);
@@ -149,7 +168,19 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     const previousGroup = prevGroupRef.current;
     prevGroupRef.current = selectedGroup ?? null;
 
-    if (!canEditPayAmount && defaultPayAmount != null) {
+    if (subscriptionPlanAmount != null && !groupAllowsCustom) {
+      const targetValue = String(subscriptionPlanAmount);
+      if (currentPayAmount !== targetValue) {
+        setValue("payAmount", targetValue, { shouldDirty: true, shouldValidate: false });
+      }
+      return;
+    }
+
+    if (!selectedGroup) {
+      return;
+    }
+
+    if (!groupAllowsCustom && !planAllowsCustom && defaultPayAmount != null) {
       const targetValue = String(defaultPayAmount);
       if (currentPayAmount !== targetValue) {
         setValue("payAmount", targetValue, { shouldDirty: true, shouldValidate: false });
@@ -157,13 +188,21 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
       return;
     }
 
-    if (canEditPayAmount && defaultPayAmount != null) {
+    if (groupAllowsCustom && defaultPayAmount != null && !planAllowsCustom) {
       const switchedGroup = previousGroup !== selectedGroup;
       if (!currentPayAmount || switchedGroup) {
         setValue("payAmount", String(defaultPayAmount), { shouldDirty: false, shouldValidate: false });
       }
     }
-  }, [canEditPayAmount, defaultPayAmount, currentPayAmount, selectedGroup, setValue]);
+  }, [
+    currentPayAmount,
+    defaultPayAmount,
+    groupAllowsCustom,
+    planAllowsCustom,
+    selectedGroup,
+    setValue,
+    subscriptionPlanAmount,
+  ]);
 
   useEffect(() => {
     const previousArea = prevAreaRef.current;
@@ -190,6 +229,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
   const selectClass = `${fieldClass} appearance-none`; // prevent iOS default background from breaking dark theme
   const subtleTextClass = "text-xs text-slate-500 dark:text-slate-400";
+  const payAmountLockedByPlan = subscriptionPlanAmount != null && !groupAllowsCustom;
 
   return (
     <Modal size="xl" onClose={onClose}>
@@ -293,6 +333,16 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             </select>
           </div>
           <div className="flex flex-col gap-1">
+            <label className={labelClass}>Форма абонемента</label>
+            <select className={selectClass} {...register("subscriptionPlan")}>
+              {SUBSCRIPTION_PLANS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
             <label className={labelClass}>Дата оплаты</label>
             <input type="date" className={fieldClass} {...register("payDate")} />
           </div>
@@ -307,7 +357,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               placeholder="Укажите сумму"
             />
             {!canEditPayAmount && defaultPayAmount != null && (
-              <span className={subtleTextClass}>Сумма фиксирована для этой группы</span>
+              <span className={subtleTextClass}>
+                {payAmountLockedByPlan ? "Сумма выбрана формой абонемента" : "Сумма фиксирована для этой группы"}
+              </span>
             )}
           </div>
           <div className="flex flex-col gap-1">

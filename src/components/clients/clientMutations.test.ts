@@ -20,6 +20,7 @@ describe("transformClientFormValues", () => {
     payMethod: "перевод",
     payStatus: "ожидание",
     status: "действующий",
+    subscriptionPlan: "monthly",
     payDate: "2024-01-10",
     payAmount: "",
     remainingLessons: "",
@@ -56,6 +57,19 @@ describe("transformClientFormValues", () => {
       remainingLessons: 8,
       telegram: "@client",
     });
+  });
+
+  it("allows manual remaining lessons for single visit plan", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      subscriptionPlan: "single",
+      group: "Group1",
+      remainingLessons: "3",
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result).toMatchObject({ remainingLessons: 3, subscriptionPlan: "single" });
   });
 
   it("preserves previous numeric payAmount when input is empty", () => {
