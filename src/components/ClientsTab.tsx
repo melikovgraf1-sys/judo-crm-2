@@ -249,7 +249,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     };
 
     const nextTasks = [task, ...db.tasks];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks);
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, db.tasksArchive);
     const next = {
       ...db,
       tasks: nextTasks,
