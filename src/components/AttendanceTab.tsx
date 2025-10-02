@@ -138,10 +138,8 @@ export default function AttendanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients
-      .filter(client => client.area === area && client.group === group)
-      .filter(client => matchesClientAgeExperience(client, ageExperienceFilter));
-  }, [ageExperienceFilter, area, db.clients, group]);
+    return db.clients.filter(client => client.area === area && client.group === group && !isReserveArea(client.area));
+  }, [area, group, db.clients]);
 
 
   type ColumnConfig = {

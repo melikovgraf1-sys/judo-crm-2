@@ -23,7 +23,8 @@ import {
   isClientInPeriod,
   type PeriodFilter,
 } from "../state/period";
-import { matchesClientAgeExperience, parseAgeExperienceFilter } from "../utils/clientFilters";
+
+import { isReserveArea } from "../state/areas";
 
 export default function GroupsTab({
   db,
@@ -104,16 +105,16 @@ export default function GroupsTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients
-      .filter(c =>
-        c.area === area &&
-        c.group === group &&
-        (pay === "all" || c.payStatus === pay) &&
-        (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
-        (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search)),
-      )
-      .filter(client => matchesClientAgeExperience(client, ageExperienceFilter));
-  }, [ageExperienceFilter, area, db.clients, group, pay, period, search, ui.search]);
+    return db.clients.filter(c =>
+      c.area === area &&
+      c.group === group &&
+      !isReserveArea(c.area) &&
+      (pay === "all" || c.payStatus === pay) &&
+      (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
+      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
+    );
+  }, [db.clients, area, group, pay, ui.search, search, period]);
+
 
   const monthValue = formatMonthInput(period);
   const baseYears = useMemo(() => collectAvailableYears(db), [db]);
