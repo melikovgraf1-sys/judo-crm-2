@@ -20,7 +20,9 @@ import type {
   DB,
   Group,
 } from "../types";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { usePersistentTableSettings } from "../utils/tableSettings";
+import { matchesClientAgeExperience, parseAgeExperienceFilter } from "../utils/clientFilters";
 
 const DEFAULT_VISIBLE_COLUMNS = ["name", "area", "group", "mark"];
 const TABLE_SETTINGS_KEY = "attendance";
@@ -53,12 +55,27 @@ export default function AttendanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
-  const [area, setArea] = useState<Area | null>(null);
-  const [group, setGroup] = useState<Group | null>(null);
+  const storedSelection = useMemo(() => readDailySelection("attendance"), []);
+  const [area, setArea] = useState<Area | null>(storedSelection.area);
+  const [group, setGroup] = useState<Group | null>(storedSelection.group);
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(() => todayISO().slice(0, 10));
+  const [ageMin, setAgeMin] = useState("");
+  const [ageMax, setAgeMax] = useState("");
+  const [experienceMin, setExperienceMin] = useState("");
+  const [experienceMax, setExperienceMax] = useState("");
+  const ageExperienceFilter = useMemo(
+    () =>
+      parseAgeExperienceFilter({
+        minAgeText: ageMin,
+        maxAgeText: ageMax,
+        minExperienceYearsText: experienceMin,
+        maxExperienceYearsText: experienceMax,
+      }),
+    [ageMin, ageMax, experienceMin, experienceMax],
+  );
 
   const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
   const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
@@ -72,6 +89,14 @@ export default function AttendanceTab({
       setGroup(null);
     }
   }, [area, availableGroups, group]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("attendance", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("attendance");
+    }
+  }, [area, group]);
 
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
   const selectedMonthDate = useMemo(() => {
@@ -115,6 +140,7 @@ export default function AttendanceTab({
     }
     return db.clients.filter(client => client.area === area && client.group === group && !isReserveArea(client.area));
   }, [area, group, db.clients]);
+
 
   type ColumnConfig = {
     id: string;
@@ -431,6 +457,42 @@ export default function AttendanceTab({
           options={columns.map(column => ({ id: column.id, label: column.label }))}
           value={visibleColumns}
           onChange={setVisibleColumns}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          placeholder="Возраст от"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={ageMin}
+          onChange={event => setAgeMin(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          placeholder="Возраст до"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={ageMax}
+          onChange={event => setAgeMax(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          placeholder="Опыт от (лет)"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={experienceMin}
+          onChange={event => setExperienceMin(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          placeholder="Опыт до (лет)"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={experienceMax}
+          onChange={event => setExperienceMax(event.target.value)}
         />
       </div>
       {area && group && (

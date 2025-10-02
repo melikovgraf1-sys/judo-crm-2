@@ -3,10 +3,10 @@ import VirtualizedTable from "../VirtualizedTable";
 import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
 import { compareValues, toggleSort } from "../tableUtils";
-import { fmtMoney, fmtDate } from "../../state/utils";
+import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
 import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
+import type { AttendanceEntry, Client, ClientStatus, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
 
 type Props = {
@@ -40,6 +40,8 @@ const DEFAULT_VISIBLE_COLUMNS = [
   "instagram",
   "area",
   "group",
+  "age",
+  "experience",
   "status",
   "payStatus",
   "remainingLessons",
@@ -125,11 +127,43 @@ export default function ClientTable({
       sortValue: client => client.group,
     },
     {
+      id: "age",
+      label: "Возраст",
+      width: "minmax(110px, max-content)",
+      headerAlign: "center",
+      cellClassName: "text-center",
+      renderCell: client => {
+        const age = calcAgeYears(client.birthDate);
+        return Number.isNaN(age) ? "—" : `${age} лет`;
+      },
+      sortValue: client => {
+        const age = calcAgeYears(client.birthDate);
+        return Number.isNaN(age) ? -1 : age;
+      },
+    },
+    {
+      id: "experience",
+      label: "Опыт",
+      width: "minmax(140px, max-content)",
+      renderCell: client => calcExperience(client.startDate),
+      sortValue: client => calcExperienceMonths(client.startDate),
+    },
+    {
       id: "status",
       label: "Статус",
       width: "minmax(140px, max-content)",
-      renderCell: client => client.status ?? "—",
-      sortValue: client => client.status ?? "",
+      renderCell: client => {
+        if (!client.status) {
+          return "—";
+        }
+        const isCanceled = client.status === "отмена";
+        return (
+          <span className={isCanceled ? "font-medium text-rose-500 dark:text-rose-400" : undefined}>
+            {client.status}
+          </span>
+        );
+      },
+      sortValue: client => getStatusSortValue(client.status),
     },
     {
       id: "payStatus",
@@ -350,3 +384,19 @@ export default function ClientTable({
     </div>
   );
 }
+const STATUS_ORDER: ClientStatus[] = [
+  "отмена",
+  "новый",
+  "продлившийся",
+  "вернувшийся",
+  "действующий",
+];
+
+const getStatusSortValue = (status?: ClientStatus | null): number => {
+  if (!status) {
+    return STATUS_ORDER.length;
+  }
+  const index = STATUS_ORDER.indexOf(status);
+  return index === -1 ? STATUS_ORDER.length : index;
+};
+

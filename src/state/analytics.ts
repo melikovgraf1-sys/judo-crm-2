@@ -2,6 +2,16 @@ import { getDefaultPayAmount } from "./payments";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
 import type { Area, Client, Currency, DB, Lead, LeadLifecycleEvent } from "../types";
 
+const CANCELED_STATUSES = new Set(["отмена", "отменен", "отменён", "cancelled"]);
+
+const isCanceledStatus = (status?: Client["status"] | string | null): boolean => {
+  if (!status) {
+    return false;
+  }
+  const normalized = status.toString().toLowerCase();
+  return CANCELED_STATUSES.has(normalized);
+};
+
 export type AreaScope = Area | "all";
 
 export type MetricKey = "revenue" | "profit" | "fill" | "athletes";
@@ -202,7 +212,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     }
     return isClientActiveInPeriod(client, period);
   });
-  const rosterClients = periodClients.filter(client => client.status !== "отмена");
+  const rosterClients = periodClients.filter(client => !isCanceledStatus(client.status));
   const actualClients = rosterClients.filter(client => client.payStatus === "действует");
 
   const capacity = relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
@@ -279,7 +289,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     total: rosterClients.length,
     new: rosterClients.filter(client => client.status === "новый").length,
     firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
-    canceled: periodClients.filter(client => client.status === "отмена").length,
+    canceled: periodClients.filter(client => isCanceledStatus(client.status)).length,
     returned: rosterClients.filter(client => client.status === "вернувшийся").length,
     dropIns: rosterClients.filter(client => (client.remainingLessons ?? 0) > 0).length,
     attendanceRate: ensureNumber(attendanceRate),

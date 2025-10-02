@@ -2,22 +2,27 @@ import React, { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
+import ClientDetailsModal from "./clients/ClientDetailsModal";
 import { fmtDate, uid, todayISO } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
-import type { DB, TaskItem } from "../types";
+import type { Currency, DB, TaskItem } from "../types";
 
 export default function TasksTab({
   db,
   setDB,
+  currency,
 }: {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
+  currency: Currency;
 }) {
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const [showArchive, setShowArchive] = useState(false);
+  const [viewClientId, setViewClientId] = useState<string | null>(null);
 
   const archiveCount = db.tasksArchive.length;
+  const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
   const sortedArchive = useMemo(
     () =>
       db.tasksArchive
@@ -25,13 +30,21 @@ export default function TasksTab({
         .sort((a, b) => +new Date(b.due) - +new Date(a.due)),
     [db.tasksArchive],
   );
-  const toggle = async (id: string) => {
-    const nextTasks = db.tasks.map<TaskItem>(t => (t.id === id ? { ...t, status: t.status === "open" ? "done" : "open" } : t));
+  const recalcClients = (tasks: TaskItem[], archive: TaskItem[]) =>
+    applyPaymentStatusRules(db.clients, tasks, archive);
+
+  const complete = async (id: string) => {
+    const task = db.tasks.find(t => t.id === id);
+    if (!task) return;
+
+    const completed: TaskItem = { ...task, status: "done" };
+    const nextTasks = db.tasks.filter(t => t.id !== id);
+    const nextArchive = [completed, ...db.tasksArchive];
     const next: DB = {
       ...db,
       tasks: nextTasks,
-      tasksArchive: db.tasksArchive,
-      clients: applyPaymentStatusRules(db.clients, nextTasks),
+      tasksArchive: nextArchive,
+      clients: recalcClients(nextTasks, nextArchive),
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -46,7 +59,7 @@ export default function TasksTab({
       ...db,
       tasks: nextTasks,
       tasksArchive: db.tasksArchive,
-      clients: applyPaymentStatusRules(db.clients, nextTasks),
+      clients: recalcClients(nextTasks, db.tasksArchive),
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -63,7 +76,7 @@ export default function TasksTab({
       ...db,
       tasks: nextTasks,
       tasksArchive: db.tasksArchive,
-      clients: applyPaymentStatusRules(db.clients, nextTasks),
+      clients: recalcClients(nextTasks, db.tasksArchive),
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -80,7 +93,7 @@ export default function TasksTab({
       ...db,
       tasks: nextTasks,
       tasksArchive: nextArchive,
-      clients: applyPaymentStatusRules(db.clients, nextTasks),
+      clients: recalcClients(nextTasks, nextArchive),
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -92,13 +105,14 @@ export default function TasksTab({
   const restore = async (id: string) => {
     const archived = db.tasksArchive.find(t => t.id === id);
     if (!archived) return;
+    const restored = { ...archived, status: "open" as const };
     const nextArchive = db.tasksArchive.filter(t => t.id !== id);
-    const nextTasks = [archived, ...db.tasks];
+    const nextTasks = [restored, ...db.tasks];
     const next: DB = {
       ...db,
       tasks: nextTasks,
       tasksArchive: nextArchive,
-      clients: applyPaymentStatusRules(db.clients, nextTasks),
+      clients: recalcClients(nextTasks, nextArchive),
     };
     const ok = await commitDBUpdate(next, setDB);
     if (!ok) {
@@ -107,75 +121,168 @@ export default function TasksTab({
     }
   };
 
+  const openTask = (task: TaskItem) => {
+    setEdit({ ...task });
+  };
+
+  const clientToView = viewClientId ? db.clients.find(client => client.id === viewClientId) ?? null : null;
+  const schedule = db.schedule ?? [];
+  const attendance = db.attendance ?? [];
+  const performance = db.performance ?? [];
+
   return (
-    <div className="space-y-3">
-      <Breadcrumbs items={["Задачи"]} />
-      <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Задача</button>
-      <ul className="space-y-2">
-        {db.tasks.map(t => (
-          <li key={t.id} className="p-3 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <input type="checkbox" checked={t.status === "done"} onChange={() => toggle(t.id)} />
-              <span className={`text-sm ${t.status === "done" ? "line-through text-slate-500" : ""}`}>{t.title}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-slate-500">{fmtDate(t.due)}</span>
-              <button onClick={() => setEdit(t)} className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">✎</button>
-              <button onClick={() => remove(t.id)} className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">✕</button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
-        <button
-          type="button"
-          onClick={() => setShowArchive(v => !v)}
-          className="flex items-center justify-between w-full px-3 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700"
-        >
-          <span>Архив задач</span>
-          <span className="text-xs text-slate-500">{archiveCount}</span>
-        </button>
-        {showArchive && (
-          <ul className="space-y-2">
-            {sortedArchive.length ? (
-              sortedArchive.map(task => (
-                <li
-                  key={task.id}
-                  className="p-3 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 text-sm flex flex-col gap-1"
+    <>
+      <div className="space-y-3">
+        <Breadcrumbs items={["Задачи"]} />
+        <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Задача</button>
+        <ul className="space-y-2">
+          {activeTasks.map(t => (
+            <li
+              key={t.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openTask(t)}
+              onKeyDown={event => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openTask(t);
+                }
+              }}
+              className="p-3 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 flex items-center justify-between gap-2 cursor-pointer transition hover:border-sky-200 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:border-sky-400/60 dark:hover:bg-slate-800/60"
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={t.status === "done"}
+                  onClick={event => event.stopPropagation()}
+                  onChange={() => complete(t.id)}
+                />
+                <span
+                  className={`text-sm ${
+                    t.status === "done" ? "line-through text-slate-500" : "text-slate-800 dark:text-slate-100"
+                  }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-medium text-slate-700 dark:text-slate-200">{task.title}</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{fmtDate(task.due)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                    <span>{task.topic ?? ""}</span>
-                    <button
-                      type="button"
-                      onClick={() => restore(task.id)}
-                      className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
-                    >
-                      Вернуть
-                    </button>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li className="text-sm text-slate-500 dark:text-slate-400 px-3">Архив пуст</li>
-            )}
-          </ul>
+                  {t.title}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-500">{fmtDate(t.due)}</span>
+                <button
+                  onClick={event => {
+                    event.stopPropagation();
+                    openTask(t);
+                  }}
+                  className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={event => {
+                    event.stopPropagation();
+                    remove(t.id);
+                  }}
+                  className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                >
+                  ✕
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+          <button
+            type="button"
+            onClick={() => setShowArchive(v => !v)}
+            className="flex items-center justify-between w-full px-3 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700"
+          >
+            <span>Архив задач</span>
+            <span className="text-xs text-slate-500">{archiveCount}</span>
+          </button>
+          {showArchive && (
+            <ul className="space-y-2">
+              {sortedArchive.length ? (
+                sortedArchive.map(task => (
+                  <li
+                    key={task.id}
+                    className="p-3 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 text-sm flex flex-col gap-1"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-slate-700 dark:text-slate-200">{task.title}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{fmtDate(task.due)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <span>{task.topic ?? ""}</span>
+                      <button
+                        type="button"
+                        onClick={() => restore(task.id)}
+                        className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                      >
+                        Вернуть
+                      </button>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-slate-500 dark:text-slate-400 px-3">Архив пуст</li>
+              )}
+            </ul>
+          )}
+        </div>
+        {edit && (
+          <Modal size="md" onClose={() => setEdit(null)}>
+            <div className="font-semibold text-slate-800">Редактирование задачи</div>
+            <input
+              className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={edit.title}
+              onChange={e => setEdit({ ...edit, title: e.target.value })}
+            />
+            <input
+              type="date"
+              className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={edit.due.slice(0, 10)}
+              onChange={e => setEdit({ ...edit, due: e.target.value })}
+            />
+            {edit.assigneeType === "client" ? (
+              (() => {
+                const client = db.clients.find(c => c.id === edit.assigneeId);
+                if (!client) {
+                  return <div className="text-xs text-slate-500">Клиент не найден</div>;
+                }
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setViewClientId(client.id)}
+                    className="w-full rounded-md border border-sky-500 px-3 py-2 text-sm font-medium text-sky-600 transition hover:bg-sky-50 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-slate-800"
+                  >
+                    Открыть карточку клиента
+                  </button>
+                );
+              })()
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setEdit(null)}
+                className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+              >
+                Отмена
+              </button>
+              <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">
+                Сохранить
+              </button>
+            </div>
+          </Modal>
         )}
       </div>
-      {edit && (
-        <Modal size="md" onClose={() => setEdit(null)}>
-          <div className="font-semibold text-slate-800">Редактирование задачи</div>
-          <input className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
-          <input type="date" className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100" value={edit.due.slice(0,10)} onChange={e => setEdit({ ...edit, due: e.target.value })} />
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setEdit(null)} className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">Отмена</button>
-            <button onClick={save} className="px-3 py-2 rounded-md bg-sky-600 text-white">Сохранить</button>
-          </div>
-        </Modal>
+      {clientToView && (
+        <ClientDetailsModal
+          client={clientToView}
+          currency={currency}
+          schedule={schedule}
+          attendance={attendance}
+          performance={performance}
+          onClose={() => setViewClientId(null)}
+        />
       )}
-    </div>
+    </>
   );
 }

@@ -15,3 +15,4 @@ export function ensureReserveAreaIncluded(areas: readonly Area[]): Area[] {
   }
   return [...areas, RESERVE_AREA_NAME];
 }
+

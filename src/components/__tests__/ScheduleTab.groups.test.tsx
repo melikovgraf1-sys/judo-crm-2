@@ -17,6 +17,7 @@ jest.mock("../../state/utils", () => ({
   fmtMoney: (v: number) => String(v),
   calcAgeYears: () => 0,
   calcExperience: () => 0,
+  calcExperienceMonths: () => 0,
 }));
 
 jest.mock("../VirtualizedTable", () => (props) => <table>{props.children}</table>);
