@@ -17,10 +17,17 @@ jest.mock('../../state/utils', () => ({
 import TasksTab from '../TasksTab';
 import { commitDBUpdate } from '../../state/appState';
 
-function setup(initialTasks) {
+function setup(initialTasks, overrides = {}) {
   const Wrapper = () => {
-    const [db, setDB] = React.useState({ tasks: initialTasks, tasksArchive: [], clients: [] });
-    return <TasksTab db={db} setDB={setDB} />;
+    const [db, setDB] = React.useState({
+      tasks: initialTasks,
+      tasksArchive: overrides.tasksArchive ?? [],
+      clients: overrides.clients ?? [],
+      attendance: overrides.attendance ?? [],
+      performance: overrides.performance ?? [],
+      schedule: overrides.schedule ?? [],
+    });
+    return <TasksTab db={db} setDB={setDB} currency="RUB" />;
   };
   return render(<Wrapper />);
 }
@@ -72,13 +79,46 @@ describe('TasksTab CRUD operations', () => {
     expect(screen.queryByText('Вторая')).not.toBeInTheDocument();
   });
 
-  test('Toggle: checkbox toggles status', async () => {
+  test('Complete: checkbox moves task to archive', async () => {
     setup(tasks);
     const checkbox = screen.getAllByRole('checkbox')[0];
-    expect(checkbox).not.toBeChecked();
     await userEvent.click(checkbox);
-    expect(checkbox).toBeChecked();
-    await userEvent.click(checkbox);
-    expect(checkbox).not.toBeChecked();
+    expect(screen.queryByText('Первая')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Архив задач'));
+    expect(screen.getByText('Первая')).toBeInTheDocument();
+  });
+
+  test('Task item click opens modal', async () => {
+    setup(tasks);
+    await userEvent.click(screen.getByText('Первая'));
+    expect(screen.getByText('Редактирование задачи')).toBeInTheDocument();
+  });
+
+  test('Modal shows client card action when client is linked', async () => {
+    const clientTask = [{
+      id: 'tc1',
+      title: 'Оплата',
+      due: '2025-03-03T00:00:00.000Z',
+      status: 'open',
+      assigneeType: 'client',
+      assigneeId: 'c1',
+    }];
+    const client = {
+      id: 'c1',
+      firstName: 'Иван',
+      lastName: 'Иванов',
+      channel: 'Telegram',
+      birthDate: '2015-01-01',
+      gender: 'м',
+      area: 'A',
+      group: 'G',
+      startDate: '2020-01-01',
+      payMethod: 'наличные',
+      payStatus: 'ожидание',
+      status: 'новый',
+    };
+    setup(clientTask, { clients: [client] });
+    await userEvent.click(screen.getByText('Оплата'));
+    expect(screen.getByText('Открыть карточку клиента')).toBeInTheDocument();
   });
 });
