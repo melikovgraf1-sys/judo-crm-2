@@ -19,6 +19,7 @@ import type {
   DB,
   Group,
 } from "../types";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { usePersistentTableSettings } from "../utils/tableSettings";
 
 const DEFAULT_VISIBLE_COLUMNS = ["name", "area", "group", "mark"];
@@ -52,8 +53,9 @@ export default function AttendanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
-  const [area, setArea] = useState<Area | null>(null);
-  const [group, setGroup] = useState<Group | null>(null);
+  const storedSelection = useMemo(() => readDailySelection("attendance"), []);
+  const [area, setArea] = useState<Area | null>(storedSelection.area);
+  const [group, setGroup] = useState<Group | null>(storedSelection.group);
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
@@ -71,6 +73,14 @@ export default function AttendanceTab({
       setGroup(null);
     }
   }, [area, availableGroups, group]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("attendance", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("attendance");
+    }
+  }, [area, group]);
 
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
   const selectedMonthDate = useMemo(() => {
