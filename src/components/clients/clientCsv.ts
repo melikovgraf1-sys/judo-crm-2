@@ -40,6 +40,7 @@ export const CLIENT_CSV_HEADERS = [
   "payDate",
   "payAmount",
   "remainingLessons",
+  "statusUpdatedAt",
 ] as const;
 
 type ClientCsvColumn = (typeof CLIENT_CSV_HEADERS)[number];
@@ -93,6 +94,9 @@ const HEADER_ALIASES: HeaderAliasMap = {
   "сумма": "payAmount",
   remaininglessons: "remainingLessons",
   "оставшиеся_занятия": "remainingLessons",
+  statusupdatedat: "statusUpdatedAt",
+  "status_updated_at": "statusUpdatedAt",
+  "обновление_статуса": "statusUpdatedAt",
 };
 
 const REQUIRED_COLUMNS: ClientCsvColumn[] = [
@@ -304,6 +308,7 @@ function clientToRow(client: Client): (string | number | null | undefined)[] {
     client.payDate ? client.payDate.slice(0, 10) : "",
     client.payAmount != null ? client.payAmount : "",
     client.remainingLessons != null ? client.remainingLessons : "",
+    client.statusUpdatedAt ? client.statusUpdatedAt.slice(0, 10) : "",
   ];
 }
 
@@ -338,6 +343,7 @@ export function buildClientCsvTemplate(): string {
     "2024-09-10",
     "12000",
     "",
+    "2024-10-10",
   ];
 
   return stringifyCsv([[...CLIENT_CSV_HEADERS], commentRow]);
@@ -495,6 +501,12 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       hasError = true;
     }
 
+    const statusUpdatedAt = normalizeDate(record.statusUpdatedAt, true);
+    if (record.statusUpdatedAt.trim() && !statusUpdatedAt) {
+      errors.push(`Строка ${lineNumber}: неверный формат statusUpdatedAt (ожидается ГГГГ-ММ-ДД)`);
+      hasError = true;
+    }
+
     const payAmountRaw = normalizeNumberString(record.payAmount);
     if (payAmountRaw) {
       const parsedAmount = Number.parseFloat(payAmountRaw);
@@ -555,6 +567,10 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       ...prepared,
       coachId: prepared.coachId ?? defaultCoachId,
     };
+    const derivedStatusUpdatedAt = statusUpdatedAt ?? client.startDate ?? client.statusUpdatedAt;
+    if (derivedStatusUpdatedAt) {
+      client.statusUpdatedAt = derivedStatusUpdatedAt;
+    }
     created.push(client);
   }
 

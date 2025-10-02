@@ -6,6 +6,7 @@ import ClientForm from "./clients/ClientForm";
 import Modal from "./Modal";
 import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import { applyClientStatusAutoTransition } from "../state/clientLifecycle";
 import { applyPaymentStatusRules } from "../state/payments";
 import { transformClientFormValues } from "./clients/clientMutations";
 import {
@@ -184,10 +185,14 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
       if (!Object.prototype.hasOwnProperty.call(prepared, "remainingLessons")) {
         delete updated.remainingLessons;
       }
+      const finalClient = applyClientStatusAutoTransition(updated);
       const next = {
         ...db,
-        clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
-        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
+        clients: db.clients.map(cl => (cl.id === editing.id ? finalClient : cl)),
+        changelog: [
+          ...db.changelog,
+          { id: uid(), who: "UI", what: `Обновлён клиент ${finalClient.firstName}`, when: todayISO() },
+        ],
       };
       const ok = await commitDBUpdate(next, setDB);
       if (!ok) {

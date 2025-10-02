@@ -119,6 +119,7 @@ export function makeSeedDB(): DB {
       payMethod: "перевод",
       payStatus: "действует",
       status: "действующий",
+      statusUpdatedAt: start.toISOString(),
       subscriptionPlan,
       payDate: start.toISOString(),
       payAmount: planMeta?.amount ?? rnd(50, 100),

@@ -52,6 +52,7 @@ export interface Client {
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
   status: ClientStatus;
+  statusUpdatedAt?: string; // ISO
   subscriptionPlan?: SubscriptionPlan;
   payDate?: string; // ISO
   payAmount?: number;
