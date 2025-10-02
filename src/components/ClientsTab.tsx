@@ -12,6 +12,7 @@ import {
   appendImportedClients,
   exportClientsToCsv,
   parseClientsCsv,
+  replaceImportedClients,
 } from "./clients/clientCsv";
 import {
   findClientDuplicates,
@@ -299,33 +300,68 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
       }
 
       if (result.clients.length) {
-        const { next, summary } = appendImportedClients(db, result.clients);
-        const ok = await commitDBUpdate(next, setDB);
-        if (!ok) {
-          window.alert(
-            "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
+        const shouldReplace =
+          db.clients.length > 0 &&
+          window.confirm(
+            "Заменить текущий список клиентов импортируемыми данными? Это удалит существующих клиентов и связанные с ними посещаемость, успеваемость и задачи.",
           );
-          setDB(next);
+
+        if (shouldReplace) {
+          const { next, summary } = replaceImportedClients(db, result.clients);
+          const ok = await commitDBUpdate(next, setDB);
+          if (!ok) {
+            window.alert(
+              "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
+            );
+            setDB(next);
+          }
+          messages.push(`Заменено клиентов: ${summary.replaced}`);
+          const removedClients = summary.previous - summary.replaced;
+          if (removedClients > 0) {
+            messages.push(`Удалено клиентов: ${removedClients}`);
+          }
+          if (summary.removedAttendance > 0) {
+            messages.push(`Удалено отметок посещаемости: ${summary.removedAttendance}`);
+          }
+          if (summary.removedPerformance > 0) {
+            messages.push(`Удалено записей успеваемости: ${summary.removedPerformance}`);
+          }
+          if (summary.removedClientTasks > 0) {
+            messages.push(`Удалено задач клиентов: ${summary.removedClientTasks}`);
+          }
+          if (summary.removedClientTasksArchive > 0) {
+            messages.push(`Удалено архивных задач клиентов: ${summary.removedClientTasksArchive}`);
+          }
+        } else {
+          const { next, summary } = appendImportedClients(db, result.clients);
+          const ok = await commitDBUpdate(next, setDB);
+          if (!ok) {
+            window.alert(
+              "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
+            );
+            setDB(next);
+          }
+          messages.push(`Импортировано клиентов: ${summary.added}`);
+          if (summary.merged) {
+            messages.push(`Объединено строк: ${summary.merged}`);
+          }
+          if (summary.skipped) {
+            messages.push(`Пропущено дублей: ${summary.skipped}`);
+          }
+          if (summary.duplicates.length) {
+            messages.push("Возможные дубликаты:");
+            for (const entry of summary.duplicates) {
+              const reasonText = entry.matches.length
+                ? ` (${entry.matches.map(describeDuplicateMatch).join("; ")})`
+                : "";
+              const action = entry.type === "existing" ? "уже в базе" : "объединено с другой строкой";
+              messages.push(`- ${formatClientName(entry.client)} — ${action}${reasonText}`);
+            }
+          }
         }
-        messages.push(`Импортировано клиентов: ${summary.added}`);
-        if (summary.merged) {
-          messages.push(`Объединено строк: ${summary.merged}`);
-        }
-        if (summary.skipped) {
-          messages.push(`Пропущено дублей: ${summary.skipped}`);
-        }
+
         if (result.skipped) {
           messages.push(`Пропущено строк: ${result.skipped}`);
-        }
-        if (summary.duplicates.length) {
-          messages.push("Возможные дубликаты:");
-          for (const entry of summary.duplicates) {
-            const reasonText = entry.matches.length
-              ? ` (${entry.matches.map(describeDuplicateMatch).join("; ")})`
-              : "";
-            const action = entry.type === "existing" ? "уже в базе" : "объединено с другой строкой";
-            messages.push(`- ${formatClientName(entry.client)} — ${action}${reasonText}`);
-          }
         }
       } else if (!result.errors.length) {
         messages.push("Подходящих строк не найдено");

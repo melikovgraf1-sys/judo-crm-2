@@ -15,6 +15,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
   SubscriptionPlan,
+  TaskItem,
 } from "../../types";
 import { DEFAULT_SUBSCRIPTION_PLAN, SUBSCRIPTION_PLANS } from "../../state/payments";
 
@@ -187,6 +188,15 @@ export type AppendImportedClientsSummary = {
   skipped: number;
   merged: number;
   duplicates: DuplicateSummaryEntry[];
+};
+
+export type ReplaceImportedClientsSummary = {
+  replaced: number;
+  previous: number;
+  removedAttendance: number;
+  removedPerformance: number;
+  removedClientTasks: number;
+  removedClientTasksArchive: number;
 };
 
 const COMMENT_PREFIX = "#";
@@ -591,7 +601,9 @@ export function appendImportedClients(
   };
 
   for (const candidate of imported) {
-    const matches = findClientDuplicates({ ...db, clients: [...db.clients, ...accepted] }, candidate);
+    const matches = findClientDuplicates({ ...db, clients: [...db.clients, ...accepted] }, candidate).filter(
+      match => match.matches.some(detail => detail.field !== "area" && detail.field !== "group"),
+    );
 
     if (!matches.length) {
       const client: Client = { ...candidate, id: uid() };
@@ -638,4 +650,60 @@ export function appendImportedClients(
   };
 
   return { next, changelogMessage: `Добавлено клиентов: ${summary.added}`, summary };
+}
+
+function filterClientTasks(tasks: TaskItem[], allowedClientIds: Set<string>): TaskItem[] {
+  return tasks.filter(task => {
+    if (task.assigneeType !== "client") {
+      return true;
+    }
+    if (!task.assigneeId) {
+      return false;
+    }
+    return allowedClientIds.has(task.assigneeId);
+  });
+}
+
+export function replaceImportedClients(
+  db: DB,
+  imported: Omit<Client, "id">[],
+): { next: DB; changelogMessage: string; summary: ReplaceImportedClientsSummary } {
+  const defaultCoachId = db.staff.find(staffMember => staffMember.role === "Тренер")?.id;
+  const clients: Client[] = imported.map(candidate => ({
+    ...candidate,
+    id: uid(),
+    coachId: candidate.coachId ?? defaultCoachId,
+  }));
+
+  const allowedClientIds = new Set(clients.map(client => client.id));
+
+  const filteredAttendance = db.attendance.filter(entry => allowedClientIds.has(entry.clientId));
+  const filteredPerformance = db.performance.filter(entry => allowedClientIds.has(entry.clientId));
+  const filteredTasks = filterClientTasks(db.tasks, allowedClientIds);
+  const filteredTasksArchive = filterClientTasks(db.tasksArchive, allowedClientIds);
+
+  const summary: ReplaceImportedClientsSummary = {
+    replaced: clients.length,
+    previous: db.clients.length,
+    removedAttendance: db.attendance.length - filteredAttendance.length,
+    removedPerformance: db.performance.length - filteredPerformance.length,
+    removedClientTasks: db.tasks.length - filteredTasks.length,
+    removedClientTasksArchive: db.tasksArchive.length - filteredTasksArchive.length,
+  };
+
+  const changelogMessage = `Заменено клиентов: ${summary.replaced}`;
+  const next: DB = {
+    ...db,
+    clients,
+    attendance: filteredAttendance,
+    performance: filteredPerformance,
+    tasks: filteredTasks,
+    tasksArchive: filteredTasksArchive,
+    changelog: [
+      ...db.changelog,
+      { id: uid(), who: "UI", what: `Заменён список клиентов из CSV: ${clients.length}`, when: todayISO() },
+    ],
+  };
+
+  return { next, changelogMessage, summary };
 }
