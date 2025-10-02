@@ -36,6 +36,9 @@ const toMiddayISO = (value: string): string | null => {
   return date.toISOString();
 };
 
+const createUTCDate = (year: number, monthIndex: number, day: number) =>
+  new Date(Date.UTC(year, monthIndex, day, 12, 0, 0));
+
 export default function AttendanceTab({
   db,
   setDB,
@@ -76,7 +79,7 @@ export default function AttendanceTab({
     if (Number.isNaN(year) || Number.isNaN(monthIndex)) {
       return null;
     }
-    const base = new Date(year, monthIndex, 1);
+    const base = createUTCDate(year, monthIndex, 1);
     if (Number.isNaN(base.getTime())) {
       return null;
     }
@@ -85,9 +88,13 @@ export default function AttendanceTab({
 
   useEffect(() => {
     if (!selectedMonthDate) return;
-    const prefix = `${selectedMonthDate.getFullYear()}-${String(selectedMonthDate.getMonth() + 1).padStart(2, "0")}`;
+    const prefix = `${selectedMonthDate.getUTCFullYear()}-${String(selectedMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
     if (selectedDate.slice(0, 7) !== prefix) {
-      const normalized = new Date(Date.UTC(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth(), 1, 12, 0, 0));
+      const normalized = createUTCDate(
+        selectedMonthDate.getUTCFullYear(),
+        selectedMonthDate.getUTCMonth(),
+        1,
+      );
       setSelectedDate(normalized.toISOString().slice(0, 10));
     }
   }, [selectedDate, selectedMonthDate]);
@@ -118,7 +125,7 @@ export default function AttendanceTab({
   };
 
   const isoWeekday = (date: Date) => {
-    const day = date.getDay();
+    const day = date.getUTCDay();
     return day === 0 ? 7 : day;
   };
 
@@ -143,9 +150,9 @@ export default function AttendanceTab({
     }
 
     const result: { date: string; label: string; times: string[]; isToday: boolean }[] = [];
-    const cursor = new Date(selectedMonthDate);
-    const monthIndex = cursor.getMonth();
-    while (cursor.getMonth() === monthIndex) {
+    const cursor = new Date(selectedMonthDate.getTime());
+    const monthIndex = cursor.getUTCMonth();
+    while (cursor.getUTCMonth() === monthIndex) {
       const weekday = isoWeekday(cursor);
       const times = timesByWeekday.get(weekday);
       if (times?.length) {
@@ -153,7 +160,7 @@ export default function AttendanceTab({
         const label = cursor.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", weekday: "short" });
         result.push({ date: iso, label, times, isToday: iso === todayStr });
       }
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
 
     result.sort((a, b) => a.date.localeCompare(b.date));
@@ -365,7 +372,7 @@ export default function AttendanceTab({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Посещаемость"]} />
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -455,8 +462,9 @@ export default function AttendanceTab({
         {area && group ? `Найдено: ${list.length}` : "Выберите район и группу"}
       </div>
 
-      <VirtualizedTable
-        header={(
+      <div>
+        <VirtualizedTable
+          header={(
           <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
             <tr
               style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
@@ -503,29 +511,31 @@ export default function AttendanceTab({
             </tr>
           </thead>
         )}
-        items={sortedClients}
-        rowHeight={48}
-        renderRow={(client, style) => (
-          <tr
-            key={client.id}
-            style={{
-              ...style,
-              display: "grid",
-              gridTemplateColumns: columnTemplate,
-              alignItems: "center",
-              cursor: "pointer",
-            }}
-            className="border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-            onClick={() => setSelected(client)}
-          >
+          items={sortedClients}
+          rowHeight={48}
+          virtualize={false}
+          renderRow={(client, style) => (
+            <tr
+              key={client.id}
+              style={{
+                ...style,
+                display: "grid",
+                gridTemplateColumns: columnTemplate,
+                alignItems: "center",
+                cursor: "pointer",
+              }}
+              className="border-t border-slate-100 transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              onClick={() => setSelected(client)}
+            >
             {activeColumns.map(column => (
               <td key={column.id} className={`p-2 ${column.cellClassName ?? ""}`}>
                 {column.renderCell(client)}
               </td>
             ))}
           </tr>
-        )}
-      />
+          )}
+        />
+      </div>
 
       {selected && (
         <ClientDetailsModal

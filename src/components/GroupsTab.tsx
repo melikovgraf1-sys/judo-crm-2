@@ -19,6 +19,7 @@ import {
   collectAvailableYears,
   formatMonthInput,
   getDefaultPeriod,
+  isClientActiveInPeriod,
   isClientInPeriod,
   type PeriodFilter,
 } from "../state/period";
@@ -93,7 +94,7 @@ export default function GroupsTab({
       c.area === area &&
       c.group === group &&
       (pay === "all" || c.payStatus === pay) &&
-      isClientInPeriod(c, period) &&
+      (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search, search, period]);
@@ -243,7 +244,7 @@ export default function GroupsTab({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Группы"]} />
       <ClientFilters
         db={db}
@@ -262,16 +263,19 @@ export default function GroupsTab({
         onYearChange={handleYearChange}
         yearOptions={yearOptions}
       />
-      <ClientTable
-        list={list}
-        currency={ui.currency}
-        onEdit={startEdit}
-        onRemove={removeClient}
-        onCreateTask={createPaymentTask}
-        schedule={db.schedule}
-        attendance={db.attendance}
-        performance={db.performance}
-      />
+      <div>
+        <ClientTable
+          list={list}
+          currency={ui.currency}
+          onEdit={startEdit}
+          onRemove={removeClient}
+          onCreateTask={createPaymentTask}
+          schedule={db.schedule}
+          attendance={db.attendance}
+          performance={db.performance}
+          billingPeriod={period}
+        />
+      </div>
       {modalOpen && (
         <ClientForm
           db={db}
