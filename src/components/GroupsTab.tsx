@@ -23,6 +23,7 @@ import {
   isClientInPeriod,
   type PeriodFilter,
 } from "../state/period";
+import { isReserveArea } from "../state/areas";
 
 
 export default function GroupsTab({
@@ -93,6 +94,7 @@ export default function GroupsTab({
     return db.clients.filter(c =>
       c.area === area &&
       c.group === group &&
+      !isReserveArea(c.area) &&
       (pay === "all" || c.payStatus === pay) &&
       (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
