@@ -3,7 +3,7 @@ import VirtualizedTable from "../VirtualizedTable";
 import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
 import { compareValues, toggleSort } from "../tableUtils";
-import { fmtMoney, fmtDate } from "../../state/utils";
+import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
 import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
@@ -40,6 +40,8 @@ const DEFAULT_VISIBLE_COLUMNS = [
   "instagram",
   "area",
   "group",
+  "age",
+  "experience",
   "status",
   "payStatus",
   "remainingLessons",
@@ -123,6 +125,28 @@ export default function ClientTable({
       width: "minmax(120px, max-content)",
       renderCell: client => client.group,
       sortValue: client => client.group,
+    },
+    {
+      id: "age",
+      label: "Возраст",
+      width: "minmax(110px, max-content)",
+      headerAlign: "center",
+      cellClassName: "text-center",
+      renderCell: client => {
+        const age = calcAgeYears(client.birthDate);
+        return Number.isNaN(age) ? "—" : `${age} лет`;
+      },
+      sortValue: client => {
+        const age = calcAgeYears(client.birthDate);
+        return Number.isNaN(age) ? -1 : age;
+      },
+    },
+    {
+      id: "experience",
+      label: "Опыт",
+      width: "minmax(140px, max-content)",
+      renderCell: client => calcExperience(client.startDate),
+      sortValue: client => calcExperienceMonths(client.startDate),
     },
     {
       id: "status",

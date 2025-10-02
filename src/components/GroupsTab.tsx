@@ -23,6 +23,7 @@ import {
   isClientInPeriod,
   type PeriodFilter,
 } from "../state/period";
+import { matchesClientAgeExperience, parseAgeExperienceFilter } from "../utils/clientFilters";
 
 
 export default function GroupsTab({
@@ -61,6 +62,20 @@ export default function GroupsTab({
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
+  const [ageMin, setAgeMin] = useState("");
+  const [ageMax, setAgeMax] = useState("");
+  const [experienceMin, setExperienceMin] = useState("");
+  const [experienceMax, setExperienceMax] = useState("");
+  const ageExperienceFilter = useMemo(
+    () =>
+      parseAgeExperienceFilter({
+        minAgeText: ageMin,
+        maxAgeText: ageMax,
+        minExperienceYearsText: experienceMin,
+        maxExperienceYearsText: experienceMax,
+      }),
+    [ageMin, ageMax, experienceMin, experienceMax],
+  );
 
   useEffect(() => {
     writeDailyPeriod("groups", period.month, period.year);
@@ -90,14 +105,16 @@ export default function GroupsTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(c =>
-      c.area === area &&
-      c.group === group &&
-      (pay === "all" || c.payStatus === pay) &&
-      (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
-      (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
-    );
-  }, [db.clients, area, group, pay, ui.search, search, period]);
+    return db.clients
+      .filter(c =>
+        c.area === area &&
+        c.group === group &&
+        (pay === "all" || c.payStatus === pay) &&
+        (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
+        (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search)),
+      )
+      .filter(client => matchesClientAgeExperience(client, ageExperienceFilter));
+  }, [ageExperienceFilter, area, db.clients, group, pay, period, search, ui.search]);
 
   const monthValue = formatMonthInput(period);
   const baseYears = useMemo(() => collectAvailableYears(db), [db]);
@@ -262,6 +279,14 @@ export default function GroupsTab({
         year={period.year}
         onYearChange={handleYearChange}
         yearOptions={yearOptions}
+        ageMin={ageMin}
+        onAgeMinChange={setAgeMin}
+        ageMax={ageMax}
+        onAgeMaxChange={setAgeMax}
+        experienceMin={experienceMin}
+        onExperienceMinChange={setExperienceMin}
+        experienceMax={experienceMax}
+        onExperienceMaxChange={setExperienceMax}
       />
       <div>
         <ClientTable

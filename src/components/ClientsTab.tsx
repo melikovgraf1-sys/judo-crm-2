@@ -22,6 +22,11 @@ import {
   type DuplicateMatchDetail,
 } from "../state/clients";
 import type { Client, ClientFormValues, DB, TaskItem, UIState } from "../types";
+import {
+  isAgeExperienceFilterActive,
+  matchesClientAgeExperience,
+  parseAgeExperienceFilter,
+} from "../utils/clientFilters";
 
 type ClientsTabProps = {
   db: DB;
@@ -67,6 +72,10 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicatePromptState | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [query, setQuery] = useState(ui.search);
+  const [ageMin, setAgeMin] = useState("");
+  const [ageMax, setAgeMax] = useState("");
+  const [experienceMin, setExperienceMin] = useState("");
+  const [experienceMax, setExperienceMax] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -74,20 +83,31 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   }, [ui.search]);
 
   const search = query.trim().toLowerCase();
+  const ageExperienceFilter = useMemo(
+    () =>
+      parseAgeExperienceFilter({
+        minAgeText: ageMin,
+        maxAgeText: ageMax,
+        minExperienceYearsText: experienceMin,
+        maxExperienceYearsText: experienceMax,
+      }),
+    [ageMin, ageMax, experienceMin, experienceMax],
+  );
+  const isAgeExperienceActive = isAgeExperienceFilterActive(ageExperienceFilter);
   const list = useMemo(() => {
-    if (!search) {
-      return db.clients;
-    }
-    return db.clients.filter(client => {
-      const fullName = `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase();
-      if (fullName.includes(search)) {
-        return true;
-      }
-      const contacts = `${client.phone ?? ""} ${client.whatsApp ?? ""} ${client.telegram ?? ""} ${client.instagram ?? ""}`
-        .toLowerCase();
-      return contacts.includes(search);
-    });
-  }, [db.clients, search]);
+    const base = !search
+      ? db.clients
+      : db.clients.filter(client => {
+          const fullName = `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase();
+          if (fullName.includes(search)) {
+            return true;
+          }
+          const contacts = `${client.phone ?? ""} ${client.whatsApp ?? ""} ${client.telegram ?? ""} ${client.instagram ?? ""}`
+            .toLowerCase();
+          return contacts.includes(search);
+        });
+    return base.filter(client => matchesClientAgeExperience(client, ageExperienceFilter));
+  }, [ageExperienceFilter, db.clients, search]);
 
   const duplicatePairs = useMemo(() => {
     const map = new Map<
@@ -395,7 +415,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
 
   const total = db.clients.length;
   const visibleCount = list.length;
-  const counterText = search
+  const counterText = search || isAgeExperienceActive
     ? `Найдено: ${visibleCount} из ${total}`
     : `Всего клиентов: ${total}`;
 
@@ -445,6 +465,42 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
             onChange={handleImportFile}
           />
         </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          placeholder="Возраст от"
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+          value={ageMin}
+          onChange={event => setAgeMin(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          placeholder="Возраст до"
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+          value={ageMax}
+          onChange={event => setAgeMax(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          placeholder="Опыт от (лет)"
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+          value={experienceMin}
+          onChange={event => setExperienceMin(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          placeholder="Опыт до (лет)"
+          className="px-3 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+          value={experienceMax}
+          onChange={event => setExperienceMax(event.target.value)}
+        />
       </div>
       <div>
         <ClientTable

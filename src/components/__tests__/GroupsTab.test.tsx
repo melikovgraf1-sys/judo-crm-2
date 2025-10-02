@@ -32,11 +32,12 @@ jest.mock('../../state/utils', () => ({
   fmtDate: jest.fn(),
   calcAgeYears: jest.fn(),
   calcExperience: jest.fn(),
+  calcExperienceMonths: jest.fn(),
 }));
 
 import GroupsTab from '../GroupsTab';
 import { commitDBUpdate } from '../../state/appState';
-import { uid, todayISO, parseDateInput, fmtMoney, fmtDate, calcAgeYears, calcExperience } from '../../state/utils';
+import { uid, todayISO, parseDateInput, fmtMoney, fmtDate, calcAgeYears, calcExperience, calcExperienceMonths } from '../../state/utils';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -52,6 +53,7 @@ beforeEach(() => {
   fmtDate.mockImplementation((iso) => iso);
   calcAgeYears.mockReturnValue(10);
   calcExperience.mockReturnValue('1 год');
+  calcExperienceMonths.mockReturnValue(12);
   global.confirm = jest.fn(() => true);
   window.alert = jest.fn();
 });
