@@ -193,7 +193,7 @@ export default function VirtualizedTable<T>({
             ref={node => {
               tableRef.current = node;
             }}
-            className="w-full text-sm"
+            className="w-full min-w-[1200px] text-sm"
           >
             {header}
             {children}
@@ -252,7 +252,7 @@ export default function VirtualizedTable<T>({
               ref={node => {
                 tableRef.current = node;
               }}
-              className="w-full text-sm"
+              className="w-full min-w-[1200px] text-sm"
             >
               {header}
               <tbody>{items.map(item => renderRow(item, {}))}</tbody>
