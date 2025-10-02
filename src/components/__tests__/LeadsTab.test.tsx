@@ -22,6 +22,13 @@ jest.mock('../../state/utils', () => ({
   fmtDate: (iso: string) => iso,
 }));
 
+jest.mock('../../state/reserve', () => ({
+  __esModule: true,
+  isReserveArea: () => false,
+  ensureReserveAreaIncluded: (areas: string[]) => areas,
+  RESERVE_AREA_NAME: 'резерв',
+}));
+
 import LeadsTab from '../LeadsTab';
 import QuickAddModal from '../QuickAddModal';
 import { commitDBUpdate } from '../../state/appState';

@@ -34,9 +34,25 @@ jest.mock('../../state/utils', () => ({
   calcExperience: jest.fn(),
 }));
 
+jest.mock('../../state/reserve', () => ({
+  __esModule: true,
+  isReserveArea: jest.fn(() => false),
+  ensureReserveAreaIncluded: jest.fn(v => v),
+  RESERVE_AREA_NAME: 'резерв',
+}));
+
 import GroupsTab from '../GroupsTab';
 import { commitDBUpdate } from '../../state/appState';
-import { uid, todayISO, parseDateInput, fmtMoney, fmtDate, calcAgeYears, calcExperience } from '../../state/utils';
+import {
+  uid,
+  todayISO,
+  parseDateInput,
+  fmtMoney,
+  fmtDate,
+  calcAgeYears,
+  calcExperience,
+} from '../../state/utils';
+import { isReserveArea } from '../../state/reserve';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -52,6 +68,7 @@ beforeEach(() => {
   fmtDate.mockImplementation((iso) => iso);
   calcAgeYears.mockReturnValue(10);
   calcExperience.mockReturnValue('1 год');
+  isReserveArea.mockImplementation(area => area?.trim().toLowerCase() === 'резерв');
   global.confirm = jest.fn(() => true);
   window.alert = jest.fn();
 });
@@ -209,6 +226,22 @@ test('filters clients by selected month', async () => {
     expect(screen.getByRole('row', { name: /Февраль/ })).toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /Март/ })).not.toBeInTheDocument();
   });
+});
+
+test('hides clients assigned to reserve area', () => {
+  const db = makeDB();
+  db.settings.areas = [...db.settings.areas, 'резерв'];
+  db.settings.groups = [...db.settings.groups, 'ReserveGroup'];
+  db.schedule.push({ id: 'slot-res', area: 'резерв', group: 'ReserveGroup', coachId: 's1', weekday: 4, time: '15:00', location: '' });
+  db.clients = [
+    makeClient({ id: 'regular', firstName: 'Обычный', area: 'Area1', group: 'Group1' }),
+    makeClient({ id: 'reserve', firstName: 'Резерв', area: 'резерв', group: 'ReserveGroup' }),
+  ];
+
+  renderGroups(db, makeUI(), { initialArea: 'резерв', initialGroup: 'ReserveGroup' });
+
+  expect(screen.queryByText('Резерв')).not.toBeInTheDocument();
+  expect(screen.getByText('Найдено: 0')).toBeInTheDocument();
 });
 
 test('update: edits client name', async () => {

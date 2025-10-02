@@ -19,6 +19,13 @@ jest.mock('../../state/utils', () => ({
   calcExperience: () => 0,
 }));
 
+jest.mock('../../state/reserve', () => ({
+  __esModule: true,
+  isReserveArea: () => false,
+  ensureReserveAreaIncluded: (areas: string[]) => areas,
+  RESERVE_AREA_NAME: 'резерв',
+}));
+
 jest.mock('../VirtualizedTable', () => (props) => <table>{props.children}</table>);
 
 import ScheduleTab from '../ScheduleTab';

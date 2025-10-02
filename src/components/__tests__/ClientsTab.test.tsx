@@ -26,6 +26,13 @@ jest.mock('../../state/utils', () => ({
   calcExperience: jest.fn(),
 }));
 
+jest.mock('../../state/reserve', () => ({
+  __esModule: true,
+  isReserveArea: jest.fn(() => false),
+  ensureReserveAreaIncluded: jest.fn(v => v),
+  RESERVE_AREA_NAME: 'резерв',
+}));
+
 import ClientsTab from '../ClientsTab';
 import { commitDBUpdate } from '../../state/appState';
 import { uid, todayISO, fmtMoney, fmtDate, parseDateInput, calcAgeYears, calcExperience } from '../../state/utils';

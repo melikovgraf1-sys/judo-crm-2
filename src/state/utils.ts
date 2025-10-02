@@ -44,3 +44,5 @@ export const calcExperience = (iso: string) => {
   const rest = months % 12;
   return `${years} г.${rest ? ` ${rest} мес.` : ""}`;
 };
+
+export { RESERVE_AREA_NAME, ensureReserveAreaIncluded, isReserveArea } from "./reserve";

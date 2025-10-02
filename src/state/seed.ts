@@ -1,4 +1,5 @@
 import { rnd, uid, todayISO } from "./utils";
+import { RESERVE_AREA_NAME } from "./reserve";
 import type {
   Area,
   Client,
@@ -17,7 +18,8 @@ import { clientRequiresManualRemainingLessons } from "./lessons";
 import { SUBSCRIPTION_PLANS } from "./payments";
 
 export function makeSeedDB(): DB {
-  const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
+  const activeAreas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
+  const areas: Area[] = [...activeAreas, RESERVE_AREA_NAME];
   const groups: Group[] = [
     "4–6",
     "6–9",
@@ -28,9 +30,9 @@ export function makeSeedDB(): DB {
     "доп. группа",
   ];
   const staff: StaffMember[] = [
-    { id: uid(), role: "Администратор", name: "Админ", areas, groups },
-    { id: uid(), role: "Менеджер", name: "Марина", areas, groups },
-    { id: uid(), role: "Менеджер", name: "Илья", areas, groups },
+    { id: uid(), role: "Администратор", name: "Админ", areas: activeAreas, groups },
+    { id: uid(), role: "Менеджер", name: "Марина", areas: activeAreas, groups },
+    { id: uid(), role: "Менеджер", name: "Илья", areas: activeAreas, groups },
     {
       id: uid(),
       role: "Тренер",
@@ -97,7 +99,7 @@ export function makeSeedDB(): DB {
     const fn = firstNames[rnd(0, firstNames.length - 1)];
     const ln = lastNames[rnd(0, lastNames.length - 1)];
     const gender: Gender = Math.random() < 0.5 ? "м" : "ж";
-    const area = areas[rnd(0, areas.length - 1)];
+    const area = activeAreas[rnd(0, activeAreas.length - 1)];
     const group = groups[rnd(0, groups.length - 1)];
     const subscriptionPlan = SUBSCRIPTION_PLANS[rnd(0, SUBSCRIPTION_PLANS.length - 1)].value;
     const planMeta = SUBSCRIPTION_PLANS.find(option => option.value === subscriptionPlan);
