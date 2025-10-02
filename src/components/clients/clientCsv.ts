@@ -556,7 +556,7 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
   };
 }
 
-const MERGEABLE_FIELDS: Array<keyof Omit<Client, "id">> = [
+const MERGEABLE_FIELDS = [
   "lastName",
   "parentName",
   "phone",
@@ -564,14 +564,16 @@ const MERGEABLE_FIELDS: Array<keyof Omit<Client, "id">> = [
   "telegram",
   "instagram",
   "coachId",
-];
+] as const satisfies ReadonlyArray<keyof Omit<Client, "id">>;
+
+type MergeableField = (typeof MERGEABLE_FIELDS)[number];
 
 function mergeClientData(target: Client, source: Omit<Client, "id">) {
   for (const field of MERGEABLE_FIELDS) {
     const current = target[field];
     const incoming = source[field];
     if ((current == null || current === "") && incoming) {
-      target[field] = incoming as Client[typeof field];
+      target[field] = incoming as Client[MergeableField];
     }
   }
 }
