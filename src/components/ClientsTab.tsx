@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction, ChangeEvent } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
+import Modal from "./Modal";
 import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
@@ -12,6 +13,12 @@ import {
   exportClientsToCsv,
   parseClientsCsv,
 } from "./clients/clientCsv";
+import {
+  findClientDuplicates,
+  type ClientDuplicateMatch,
+  type DuplicateField,
+  type DuplicateMatchDetail,
+} from "../state/clients";
 import type { Client, ClientFormValues, DB, TaskItem, UIState } from "../types";
 
 type ClientsTabProps = {
@@ -20,9 +27,35 @@ type ClientsTabProps = {
   ui: UIState;
 };
 
+type DuplicatePromptState = {
+  prepared: Omit<Client, "id">;
+  matches: ClientDuplicateMatch[];
+};
+
+const DUPLICATE_FIELD_LABELS: Record<DuplicateField, string> = {
+  fullName: "Имя и фамилия",
+  parentName: "Родитель",
+  phone: "Телефон",
+  whatsApp: "WhatsApp",
+  telegram: "Telegram",
+  instagram: "Instagram",
+};
+
+const formatClientName = (client: { firstName: string; lastName?: string }): string =>
+  [client.firstName, client.lastName].filter(Boolean).join(" ").trim();
+
+const describeDuplicateMatch = (detail: DuplicateMatchDetail): string => {
+  const label = DUPLICATE_FIELD_LABELS[detail.field];
+  if (!detail.value) {
+    return label;
+  }
+  return `${label}: ${detail.value}`;
+};
+
 export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
+  const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicatePromptState | null>(null);
   const [query, setQuery] = useState(ui.search);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -56,6 +89,32 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     setModalOpen(true);
   };
 
+  const commitNewClient = async (prepared: Omit<Client, "id">) => {
+    const client: Client = {
+      id: uid(),
+      ...prepared,
+      coachId: prepared.coachId ?? db.staff.find(staffMember => staffMember.role === "Тренер")?.id,
+    };
+    const next = {
+      ...db,
+      clients: [client, ...db.clients],
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Создан клиент ${client.firstName}`, when: todayISO() },
+      ],
+    };
+    const ok = await commitDBUpdate(next, setDB);
+    if (!ok) {
+      window.alert(
+        "Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.",
+      );
+      setDB(next);
+    }
+    setModalOpen(false);
+    setEditing(null);
+    setDuplicatePrompt(null);
+  };
+
   const saveClient = async (data: ClientFormValues) => {
     const prepared = transformClientFormValues(data, editing);
     if (editing) {
@@ -76,25 +135,35 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
         window.alert("Не удалось синхронизировать изменения клиента. Они сохранены локально, проверьте доступ к базе данных.");
         setDB(next);
       }
-    } else {
-      const client: Client = {
-        id: uid(),
-        ...prepared,
-        coachId: db.staff.find(staffMember => staffMember.role === "Тренер")?.id,
-      };
-      const next = {
-        ...db,
-        clients: [client, ...db.clients],
-        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${client.firstName}`, when: todayISO() }],
-      };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert("Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.");
-        setDB(next);
-      }
+      setModalOpen(false);
+      setEditing(null);
+      setDuplicatePrompt(null);
+      return;
     }
-    setModalOpen(false);
-    setEditing(null);
+    const duplicates = findClientDuplicates(db, prepared);
+    if (duplicates.length) {
+      setDuplicatePrompt({ prepared, matches: duplicates });
+      return;
+    }
+
+    await commitNewClient(prepared);
+  };
+
+  const handleDuplicateCancel = () => {
+    setDuplicatePrompt(null);
+  };
+
+  const handleDuplicateOpen = (client: Client) => {
+    setDuplicatePrompt(null);
+    setEditing(client);
+    setModalOpen(true);
+  };
+
+  const handleDuplicateCreate = async () => {
+    if (!duplicatePrompt) return;
+    const { prepared } = duplicatePrompt;
+    setDuplicatePrompt(null);
+    await commitNewClient(prepared);
   };
 
   const createPaymentTask = async (client: Client) => {
@@ -168,7 +237,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
       }
 
       if (result.clients.length) {
-        const { next } = appendImportedClients(db, result.clients);
+        const { next, summary } = appendImportedClients(db, result.clients);
         const ok = await commitDBUpdate(next, setDB);
         if (!ok) {
           window.alert(
@@ -176,9 +245,25 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           );
           setDB(next);
         }
-        messages.push(`Импортировано клиентов: ${result.clients.length}`);
+        messages.push(`Импортировано клиентов: ${summary.added}`);
+        if (summary.merged) {
+          messages.push(`Объединено строк: ${summary.merged}`);
+        }
+        if (summary.skipped) {
+          messages.push(`Пропущено дублей: ${summary.skipped}`);
+        }
         if (result.skipped) {
           messages.push(`Пропущено строк: ${result.skipped}`);
+        }
+        if (summary.duplicates.length) {
+          messages.push("Возможные дубликаты:");
+          for (const entry of summary.duplicates) {
+            const reasonText = entry.matches.length
+              ? ` (${entry.matches.map(describeDuplicateMatch).join("; ")})`
+              : "";
+            const action = entry.type === "existing" ? "уже в базе" : "объединено с другой строкой";
+            messages.push(`- ${formatClientName(entry.client)} — ${action}${reasonText}`);
+          }
         }
       } else if (!result.errors.length) {
         messages.push("Подходящих строк не найдено");
@@ -272,10 +357,100 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           onClose={() => {
             setModalOpen(false);
             setEditing(null);
+            setDuplicatePrompt(null);
           }}
         />
       )}
+      {duplicatePrompt && (
+        <DuplicateWarningModal
+          candidate={duplicatePrompt.prepared}
+          matches={duplicatePrompt.matches}
+          onCancel={handleDuplicateCancel}
+          onCreateAnyway={handleDuplicateCreate}
+          onOpenExisting={handleDuplicateOpen}
+        />
+      )}
     </div>
+  );
+}
+
+type DuplicateWarningModalProps = {
+  candidate: Omit<Client, "id">;
+  matches: ClientDuplicateMatch[];
+  onCancel: () => void;
+  onCreateAnyway: () => void;
+  onOpenExisting: (client: Client) => void;
+};
+
+function DuplicateWarningModal({
+  candidate,
+  matches,
+  onCancel,
+  onCreateAnyway,
+  onOpenExisting,
+}: DuplicateWarningModalProps) {
+  const name = formatClientName(candidate);
+  const candidateLabel = name ? `клиента ${name}` : "нового клиента";
+  return (
+    <Modal size="lg" onClose={onCancel}>
+      <div className="space-y-4">
+        <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">Найдены возможные дубликаты</div>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Для {candidateLabel} найдены совпадения в базе. Вы можете отменить создание, открыть существующую запись
+          или сохранить нового клиента.
+        </p>
+        <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+          {matches.map(match => (
+            <div
+              key={match.client.id}
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-medium text-slate-800 dark:text-slate-100">
+                    {formatClientName(match.client) || "Без имени"}
+                  </div>
+                  {match.matches.length ? (
+                    <ul className="mt-1 list-disc space-y-1 text-sm text-slate-600 dark:text-slate-300 pl-4">
+                      {match.matches.map(detail => (
+                        <li key={`${match.client.id}-${detail.field}`}>{describeDuplicateMatch(detail)}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                      Совпадения без указанных контактов
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenExisting(match.client)}
+                  className="shrink-0 rounded-lg border border-emerald-500 px-3 py-1 text-sm text-emerald-600 hover:bg-emerald-50 dark:border-emerald-400 dark:text-emerald-300 dark:hover:bg-slate-700"
+                >
+                  Открыть
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Отменить
+          </button>
+          <button
+            type="button"
+            onClick={onCreateAnyway}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
+          >
+            Создать всё равно
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
