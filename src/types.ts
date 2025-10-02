@@ -12,6 +12,8 @@ export type PaymentMethod = "наличные" | "перевод";
 
 export type PaymentStatus = "ожидание" | "действует" | "задолженность";
 
+export type SubscriptionPlan = "monthly" | "half-month" | "discount" | "single";
+
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
 
 export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты";
@@ -50,6 +52,7 @@ export interface Client {
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
   status: ClientStatus;
+  subscriptionPlan?: SubscriptionPlan;
   payDate?: string; // ISO
   payAmount?: number;
   remainingLessons?: number;
@@ -73,6 +76,7 @@ export interface ClientFormValues {
   payMethod: PaymentMethod;
   payStatus: PaymentStatus;
   status: ClientStatus;
+  subscriptionPlan: SubscriptionPlan;
   payDate: string;
   payAmount: string;
   remainingLessons: string;
@@ -120,6 +124,7 @@ export interface Lead {
   instagram?: string;
   source: ContactChannel;
   stage: LeadStage;
+  subscriptionPlan?: SubscriptionPlan;
   notes?: string;
   managerId?: string;
   createdAt: string;
@@ -153,6 +158,7 @@ export interface LeadFormValues {
   area: Area;
   group: Group;
   stage: LeadStage;
+  subscriptionPlan: SubscriptionPlan;
   birthDate: string;
   startDate: string;
   notes: string;

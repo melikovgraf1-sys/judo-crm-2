@@ -14,6 +14,7 @@ import type {
   PerformanceEntry,
 } from "../types";
 import { requiresManualRemainingLessons } from "./lessons";
+import { SUBSCRIPTION_PLANS } from "./payments";
 
 export function makeSeedDB(): DB {
   const areas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
@@ -99,6 +100,8 @@ export function makeSeedDB(): DB {
     const area = areas[rnd(0, areas.length - 1)];
     const group = groups[rnd(0, groups.length - 1)];
     const manual = requiresManualRemainingLessons(group);
+    const subscriptionPlan = SUBSCRIPTION_PLANS[rnd(0, SUBSCRIPTION_PLANS.length - 1)].value;
+    const planMeta = SUBSCRIPTION_PLANS.find(option => option.value === subscriptionPlan);
     const start = new Date();
     start.setMonth(start.getMonth() - rnd(0, 6));
     return {
@@ -116,8 +119,9 @@ export function makeSeedDB(): DB {
       payMethod: "перевод",
       payStatus: "действует",
       status: "действующий",
+      subscriptionPlan,
       payDate: start.toISOString(),
-      payAmount: rnd(50, 100),
+      payAmount: planMeta?.amount ?? rnd(50, 100),
       remainingLessons: manual ? rnd(4, 12) : undefined,
     } as Client;
   });

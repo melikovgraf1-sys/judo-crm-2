@@ -20,6 +20,7 @@ describe("transformClientFormValues", () => {
     payMethod: "перевод",
     payStatus: "ожидание",
     status: "действующий",
+    subscriptionPlan: "monthly",
     payDate: "2024-01-10",
     payAmount: "",
     remainingLessons: "",
