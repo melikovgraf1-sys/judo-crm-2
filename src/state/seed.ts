@@ -1,4 +1,4 @@
-import { rnd, uid, todayISO } from "./utils";
+import { RESERVE_AREA_NAME, rnd, uid, todayISO } from "./utils";
 import type {
   Area,
   Client,
