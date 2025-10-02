@@ -69,14 +69,44 @@ describe("computeAnalyticsSnapshot with period", () => {
     changelog: [],
   });
 
-  it("filters clients and attendance by month", () => {
+  it("counts all athletes active within the period", () => {
     const db = buildDB();
     const period: PeriodFilter = { year: 2024, month: 1 };
     const snapshot = computeAnalyticsSnapshot(db, "all", period);
 
-    expect(snapshot.metrics.athletes.values.actual).toBe(1);
-    expect(snapshot.metrics.revenue.values.actual).toBe(60);
-    expect(snapshot.athleteStats.total).toBe(1);
+    expect(snapshot.metrics.athletes.values.actual).toBe(2);
+    expect(snapshot.metrics.athletes.values.forecast).toBe(2);
+    expect(snapshot.metrics.revenue.values.actual).toBe(130);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(130);
+    expect(snapshot.athleteStats.total).toBe(2);
     expect(snapshot.athleteStats.attendanceRate).toBe(100);
+  });
+
+  it("excludes clients whose start date is after the period", () => {
+    const db = buildDB();
+    db.clients.push({
+      id: "c3",
+      firstName: "Вика",
+      lastName: "Сидорова",
+      phone: "",
+      channel: "Telegram",
+      birthDate: "2016-01-01T00:00:00.000Z",
+      gender: "ж",
+      area: "Area1",
+      group: "Group1",
+      startDate: "2024-03-01T00:00:00.000Z",
+      payMethod: "перевод",
+      payStatus: "действует",
+      status: "новый",
+      payDate: "2024-03-05T00:00:00.000Z",
+      payAmount: 80,
+      remainingLessons: 0,
+    });
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.athletes.values.forecast).toBe(2);
+    expect(snapshot.metrics.athletes.values.actual).toBe(2);
   });
 });
