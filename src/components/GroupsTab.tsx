@@ -25,7 +25,6 @@ import {
 } from "../state/period";
 import { matchesClientAgeExperience, parseAgeExperienceFilter } from "../utils/clientFilters";
 
-
 export default function GroupsTab({
   db,
   setDB,
@@ -230,7 +229,7 @@ export default function GroupsTab({
     };
 
     const nextTasks = [task, ...db.tasks];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks);
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, db.tasksArchive);
     const next = {
       ...db,
       tasks: nextTasks,

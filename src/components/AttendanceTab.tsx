@@ -10,6 +10,7 @@ import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea, clientRequiresManualRemainingLessons } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
+import { isReserveArea } from "../state/areas";
 import type {
   Area,
   AttendanceEntry,
@@ -19,6 +20,7 @@ import type {
   DB,
   Group,
 } from "../types";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { usePersistentTableSettings } from "../utils/tableSettings";
 import { matchesClientAgeExperience, parseAgeExperienceFilter } from "../utils/clientFilters";
 
@@ -53,8 +55,9 @@ export default function AttendanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
-  const [area, setArea] = useState<Area | null>(null);
-  const [group, setGroup] = useState<Group | null>(null);
+  const storedSelection = useMemo(() => readDailySelection("attendance"), []);
+  const [area, setArea] = useState<Area | null>(storedSelection.area);
+  const [group, setGroup] = useState<Group | null>(storedSelection.group);
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
   const [month, setMonth] = useState(() => todayISO().slice(0, 7));
@@ -86,6 +89,14 @@ export default function AttendanceTab({
       setGroup(null);
     }
   }, [area, availableGroups, group]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("attendance", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("attendance");
+    }
+  }, [area, group]);
 
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
   const selectedMonthDate = useMemo(() => {
@@ -131,6 +142,7 @@ export default function AttendanceTab({
       .filter(client => client.area === area && client.group === group)
       .filter(client => matchesClientAgeExperience(client, ageExperienceFilter));
   }, [ageExperienceFilter, area, db.clients, group]);
+
 
   type ColumnConfig = {
     id: string;

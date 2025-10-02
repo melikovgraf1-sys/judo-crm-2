@@ -6,7 +6,7 @@ import { compareValues, toggleSort } from "../tableUtils";
 import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
 import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
+import type { AttendanceEntry, Client, ClientStatus, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
 
 type Props = {
@@ -152,8 +152,18 @@ export default function ClientTable({
       id: "status",
       label: "Статус",
       width: "minmax(140px, max-content)",
-      renderCell: client => client.status ?? "—",
-      sortValue: client => client.status ?? "",
+      renderCell: client => {
+        if (!client.status) {
+          return "—";
+        }
+        const isCanceled = client.status === "отмена";
+        return (
+          <span className={isCanceled ? "font-medium text-rose-500 dark:text-rose-400" : undefined}>
+            {client.status}
+          </span>
+        );
+      },
+      sortValue: client => getStatusSortValue(client.status),
     },
     {
       id: "payStatus",
@@ -374,3 +384,19 @@ export default function ClientTable({
     </div>
   );
 }
+const STATUS_ORDER: ClientStatus[] = [
+  "отмена",
+  "новый",
+  "продлившийся",
+  "вернувшийся",
+  "действующий",
+];
+
+const getStatusSortValue = (status?: ClientStatus | null): number => {
+  if (!status) {
+    return STATUS_ORDER.length;
+  }
+  const index = STATUS_ORDER.indexOf(status);
+  return index === -1 ? STATUS_ORDER.length : index;
+};
+

@@ -73,7 +73,7 @@ export default function ClientFilters({
       <div className="flex flex-wrap gap-2 items-center">
         <Chip active={area === null} onClick={() => { setArea(null); setGroup(null); }}>Сбросить район</Chip>
         {db.settings.areas.map(a => (
-          <Chip key={a} active={area === a} onClick={() => { setArea(a); setGroup(null); }}>{a}</Chip>
+          <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>
         ))}
         <div className="flex-1" />
         <button

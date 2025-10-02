@@ -57,8 +57,13 @@ export function getDefaultPayAmount(group: string): number | null {
   return 55;
 }
 
-export function derivePaymentStatus(client: Client, tasks: TaskItem[]): PaymentStatus {
-  const relatedTasks = tasks.filter(
+export function derivePaymentStatus(
+  client: Client,
+  tasks: TaskItem[],
+  archivedTasks: TaskItem[] = [],
+): PaymentStatus {
+  const relevantTasks = tasks.concat(archivedTasks.filter(task => task.status === "done"));
+  const relatedTasks = relevantTasks.filter(
     task =>
       task.topic === "оплата" &&
       task.assigneeType === "client" &&
@@ -76,9 +81,13 @@ export function derivePaymentStatus(client: Client, tasks: TaskItem[]): PaymentS
   return "действует";
 }
 
-export function applyPaymentStatusRules(clients: Client[], tasks: TaskItem[]): Client[] {
+export function applyPaymentStatusRules(
+  clients: Client[],
+  tasks: TaskItem[],
+  archivedTasks: TaskItem[] = [],
+): Client[] {
   return clients.map(client => {
-    const nextStatus = derivePaymentStatus(client, tasks);
+    const nextStatus = derivePaymentStatus(client, tasks, archivedTasks);
     const withPayStatus =
       client.payStatus === nextStatus ? client : { ...client, payStatus: nextStatus };
     return applyClientStatusAutoTransition(withPayStatus);

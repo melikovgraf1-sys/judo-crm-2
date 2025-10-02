@@ -162,7 +162,7 @@ export default function App() {
               path="/tasks"
               element={
                 can(ui.role, "tasks") ? (
-                  <TasksTab db={db} setDB={setDB} />
+                  <TasksTab db={db} setDB={setDB} currency={ui.currency} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

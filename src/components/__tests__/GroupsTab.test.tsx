@@ -213,6 +213,22 @@ test('filters clients by selected month', async () => {
   });
 });
 
+test('hides clients assigned to reserve area', () => {
+  const db = makeDB();
+  db.settings.areas = [...db.settings.areas, 'резерв'];
+  db.settings.groups = [...db.settings.groups, 'ReserveGroup'];
+  db.schedule.push({ id: 'slot-res', area: 'резерв', group: 'ReserveGroup', coachId: 's1', weekday: 4, time: '15:00', location: '' });
+  db.clients = [
+    makeClient({ id: 'regular', firstName: 'Обычный', area: 'Area1', group: 'Group1' }),
+    makeClient({ id: 'reserve', firstName: 'Резерв', area: 'резерв', group: 'ReserveGroup' }),
+  ];
+
+  renderGroups(db, makeUI(), { initialArea: 'резерв', initialGroup: 'ReserveGroup' });
+
+  expect(screen.queryByText('Резерв')).not.toBeInTheDocument();
+  expect(screen.getByText('Найдено: 0')).toBeInTheDocument();
+});
+
 test('update: edits client name', async () => {
   const db = makeDB();
   db.clients = [

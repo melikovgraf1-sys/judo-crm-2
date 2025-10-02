@@ -10,6 +10,7 @@ import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
+import { isReserveArea } from "../state/areas";
 import type {
   Area,
   Client,
@@ -19,7 +20,13 @@ import type {
   Group,
   PerformanceEntry,
 } from "../types";
-import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
+import {
+  readDailyPeriod,
+  readDailySelection,
+  writeDailyPeriod,
+  writeDailySelection,
+  clearDailySelection,
+} from "../state/filterPersistence";
 import {
   MONTH_OPTIONS,
   collectAvailableYears,
@@ -43,8 +50,9 @@ export default function PerformanceTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
-  const [area, setArea] = useState<Area | null>(null);
-  const [group, setGroup] = useState<Group | null>(null);
+  const storedSelection = useMemo(() => readDailySelection("performance"), []);
+  const [area, setArea] = useState<Area | null>(storedSelection.area);
+  const [group, setGroup] = useState<Group | null>(storedSelection.group);
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
   const persistedPeriod = useMemo(() => readDailyPeriod("performance"), []);
@@ -86,6 +94,14 @@ export default function PerformanceTab({
   useEffect(() => {
     writeDailyPeriod("performance", period.month, period.year);
   }, [period]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("performance", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("performance");
+    }
+  }, [area, group]);
 
   const todayStr = useMemo(() => todayISO().slice(0, 10), []);
 
