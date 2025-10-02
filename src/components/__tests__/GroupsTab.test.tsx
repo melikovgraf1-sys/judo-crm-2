@@ -35,6 +35,7 @@ jest.mock('../../state/utils', () => ({
   isReserveArea: jest.fn(() => false),
   ensureReserveAreaIncluded: jest.fn(v => v),
   RESERVE_AREA_NAME: 'резерв',
+
 }));
 
 import GroupsTab from '../GroupsTab';

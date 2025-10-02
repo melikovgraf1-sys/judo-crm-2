@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import type { Currency, DB } from "../types";
+import type { Area, Currency, DB } from "../types";
 import { commitDBUpdate } from "../state/appState";
 import {
   METRIC_LABELS,
@@ -14,7 +14,13 @@ import {
   type MetricKey,
   type ProjectionKey,
 } from "../state/analytics";
-import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
+import {
+  readDailyPeriod,
+  readDailySelection,
+  writeDailyPeriod,
+  writeDailySelection,
+  clearDailySelection,
+} from "../state/filterPersistence";
 import { MONTH_OPTIONS, collectAvailableYears, formatMonthInput, getDefaultPeriod, type PeriodFilter } from "../state/period";
 
 type Props = {
@@ -28,7 +34,14 @@ const METRIC_ORDER: MetricKey[] = ["revenue", "profit", "fill", "athletes"];
 
 export default function AnalyticsTab({ db, setDB, currency }: Props) {
   const areas = useMemo(() => getAnalyticsAreas(db), [db]);
-  const [area, setArea] = useState<AreaScope>(areas[0] ?? "all");
+  const storedSelection = useMemo(() => readDailySelection("analytics"), []);
+  const [area, setArea] = useState<AreaScope>(() => {
+    const storedArea = storedSelection.area as Area | null;
+    if (storedArea && areas.includes(storedArea)) {
+      return storedArea;
+    }
+    return areas[0] ?? "all";
+  });
   const [rentInput, setRentInput] = useState("0");
   const [coachSalaryInput, setCoachSalaryInput] = useState("0");
   const persistedPeriod = useMemo(() => readDailyPeriod("analytics"), []);
@@ -43,6 +56,14 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   useEffect(() => {
     writeDailyPeriod("analytics", period.month, period.year);
   }, [period]);
+
+  useEffect(() => {
+    if (area === "all") {
+      clearDailySelection("analytics");
+    } else {
+      writeDailySelection("analytics", area, null);
+    }
+  }, [area]);
 
   const monthValue = formatMonthInput(period);
   const baseYears = useMemo(() => collectAvailableYears(db), [db]);
@@ -67,7 +88,13 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
 
   useEffect(() => {
     if (!areas.includes(area)) {
-      setArea(areas[0] ?? "all");
+      const fallback = areas[0] ?? "all";
+      setArea(fallback);
+      if (fallback === "all") {
+        clearDailySelection("analytics");
+      } else {
+        writeDailySelection("analytics", fallback, null);
+      }
     }
   }, [area, areas]);
 

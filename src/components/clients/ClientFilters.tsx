@@ -18,6 +18,14 @@ type Props = {
   year: number,
   onYearChange: (value: number) => void,
   yearOptions: number[],
+  ageMin: string,
+  onAgeMinChange: (value: string) => void,
+  ageMax: string,
+  onAgeMaxChange: (value: string) => void,
+  experienceMin: string,
+  onExperienceMinChange: (value: string) => void,
+  experienceMax: string,
+  onExperienceMaxChange: (value: string) => void,
 };
 
 function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
@@ -51,13 +59,21 @@ export default function ClientFilters({
   year,
   onYearChange,
   yearOptions,
+  ageMin,
+  onAgeMinChange,
+  ageMax,
+  onAgeMaxChange,
+  experienceMin,
+  onExperienceMinChange,
+  experienceMax,
+  onExperienceMaxChange,
 }: Props) {
   return (
     <>
       <div className="flex flex-wrap gap-2 items-center">
         <Chip active={area === null} onClick={() => { setArea(null); setGroup(null); }}>Сбросить район</Chip>
         {db.settings.areas.map(a => (
-          <Chip key={a} active={area === a} onClick={() => { setArea(a); setGroup(null); }}>{a}</Chip>
+          <Chip key={a} active={area === a} onClick={() => setArea(a)}>{a}</Chip>
         ))}
         <div className="flex-1" />
         <button
@@ -123,6 +139,42 @@ export default function ClientFilters({
         <div className="text-xs text-slate-500">
           {area && group ? `Найдено: ${listLength}` : "Выберите район и группу"}
         </div>
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        <input
+          type="number"
+          min={0}
+          placeholder="Возраст от"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={ageMin}
+          onChange={event => onAgeMinChange(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          placeholder="Возраст до"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={ageMax}
+          onChange={event => onAgeMaxChange(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          placeholder="Опыт от (лет)"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={experienceMin}
+          onChange={event => onExperienceMinChange(event.target.value)}
+        />
+        <input
+          type="number"
+          min={0}
+          step="0.1"
+          placeholder="Опыт до (лет)"
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={experienceMax}
+          onChange={event => onExperienceMaxChange(event.target.value)}
+        />
       </div>
     </>
   );

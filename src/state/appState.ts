@@ -8,6 +8,7 @@ import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { ensureReserveAreaIncluded, todayISO, uid } from "./utils";
 import { DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
+import { ensureReserveAreaIncluded } from "./areas";
 import type {
   AttendanceEntry,
   Area,
