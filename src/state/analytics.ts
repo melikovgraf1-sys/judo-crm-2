@@ -1,5 +1,5 @@
 import { getDefaultPayAmount } from "./payments";
-import { isAttendanceInPeriod, isClientInPeriod, matchesPeriod, type PeriodFilter } from "./period";
+import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
 import type { Area, Client, Currency, DB, Lead, LeadLifecycleEvent } from "../types";
 
 export type AreaScope = Area | "all";
@@ -192,7 +192,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
   }
 
   const relevantAreaSet = new Set(relevantAreas);
-  const clients = db.clients.filter(client => {
+  const periodClients = db.clients.filter(client => {
     const inScope = area === "all" ? relevantAreaSet.has(client.area) : client.area === area;
     if (!inScope) {
       return false;
@@ -200,17 +200,17 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     if (!period) {
       return true;
     }
-    return isClientInPeriod(client, period);
+    return isClientActiveInPeriod(client, period);
   });
-  const rosterClients = clients.filter(client => client.status !== "отмена");
-  const actualClients = clients.filter(client => client.payStatus === "действует");
+  const rosterClients = periodClients.filter(client => client.status !== "отмена");
+  const actualClients = rosterClients.filter(client => client.payStatus === "действует");
 
   const capacity = relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
   const rent = rentForAreas(db, relevantAreas);
   const coachSalary = coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce((sum, client) => sum + getClientAmount(client), 0);
-  const forecastRevenue = clients.reduce((sum, client) => sum + getClientAmount(client), 0);
+  const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientAmount(client), 0);
   const maxRevenue = relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
 
   const totalExpenses = rent + coachSalary;
@@ -220,7 +220,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
   const maxProfit = maxRevenue - totalExpenses;
 
   const actualFill = capacity ? (actualClients.length / capacity) * 100 : 0;
-  const forecastFill = capacity ? (clients.length / capacity) * 100 : 0;
+  const forecastFill = capacity ? (rosterClients.length / capacity) * 100 : 0;
 
   const metrics: AnalyticsSnapshot["metrics"] = {
     revenue: {
@@ -254,14 +254,14 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
       unit: METRIC_UNITS.athletes,
       values: {
         actual: actualClients.length,
-        forecast: clients.length,
-        remaining: Math.max(0, clients.length - actualClients.length),
+        forecast: rosterClients.length,
+        remaining: Math.max(0, rosterClients.length - actualClients.length),
         target: Math.max(0, capacity - actualClients.length),
       },
     },
   };
 
-  const clientIds = new Set(clients.map(client => client.id));
+  const clientIds = new Set(rosterClients.map(client => client.id));
   const attendanceEntries = db.attendance.filter(entry => {
     if (!clientIds.has(entry.clientId)) {
       return false;
@@ -277,11 +277,11 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
 
   const athleteStats: AthleteStats = {
     total: rosterClients.length,
-    new: clients.filter(client => client.status === "новый").length,
-    firstRenewals: clients.filter(client => client.status === "продлившийся").length,
-    canceled: clients.filter(client => client.status === "отмена").length,
-    returned: clients.filter(client => client.status === "вернувшийся").length,
-    dropIns: clients.filter(client => (client.remainingLessons ?? 0) > 0).length,
+    new: rosterClients.filter(client => client.status === "новый").length,
+    firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
+    canceled: periodClients.filter(client => client.status === "отмена").length,
+    returned: rosterClients.filter(client => client.status === "вернувшийся").length,
+    dropIns: rosterClients.filter(client => (client.remainingLessons ?? 0) > 0).length,
     attendanceRate: ensureNumber(attendanceRate),
   };
 
