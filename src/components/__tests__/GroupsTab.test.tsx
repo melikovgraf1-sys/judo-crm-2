@@ -38,13 +38,6 @@ jest.mock('../../state/utils', () => ({
 
 }));
 
-jest.mock('../../state/reserve', () => ({
-  __esModule: true,
-  isReserveArea: jest.fn(() => false),
-  ensureReserveAreaIncluded: jest.fn(v => v),
-  RESERVE_AREA_NAME: 'резерв',
-}));
-
 import GroupsTab from '../GroupsTab';
 import { commitDBUpdate } from '../../state/appState';
 import {
@@ -55,8 +48,8 @@ import {
   fmtDate,
   calcAgeYears,
   calcExperience,
+  isReserveArea,
 } from '../../state/utils';
-import { isReserveArea } from '../../state/reserve';
 
 beforeEach(() => {
   jest.clearAllMocks();

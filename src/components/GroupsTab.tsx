@@ -4,8 +4,7 @@ import Breadcrumbs from "./Breadcrumbs";
 import ClientFilters from "./clients/ClientFilters";
 import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
-import { fmtMoney, todayISO, uid } from "../state/utils";
-import { isReserveArea } from "../state/reserve";
+import { fmtMoney, isReserveArea, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import {
   applyPaymentStatusRules,
