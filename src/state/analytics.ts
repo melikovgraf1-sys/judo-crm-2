@@ -42,11 +42,23 @@ const METRIC_UNITS: Record<MetricKey, Unit> = {
 
 const FAVORITE_SEPARATOR = "::";
 
-export type AnalyticsFavorite = {
-  area: AreaScope;
-  metric: MetricKey;
-  projection: ProjectionKey;
-};
+export type AnalyticsFavorite =
+  | {
+      kind: "metric";
+      area: AreaScope;
+      metric: MetricKey;
+      projection: ProjectionKey;
+    }
+  | {
+      kind: "athlete";
+      area: AreaScope;
+      metric: AthleteMetricKey;
+    }
+  | {
+      kind: "lead";
+      area: AreaScope;
+      metric: LeadMetricKey;
+    };
 
 export type MetricSnapshot = {
   unit: Unit;
@@ -69,6 +81,37 @@ export type LeadStats = {
   canceled: number;
 };
 
+export type AthleteMetricKey = keyof AthleteStats;
+export type LeadMetricKey = keyof LeadStats;
+
+export const ATHLETE_METRIC_KEYS: AthleteMetricKey[] = [
+  "total",
+  "new",
+  "firstRenewals",
+  "canceled",
+  "returned",
+  "dropIns",
+  "attendanceRate",
+];
+
+export const LEAD_METRIC_KEYS: LeadMetricKey[] = ["created", "converted", "canceled"];
+
+export const ATHLETE_METRIC_LABELS: Record<AthleteMetricKey, string> = {
+  total: "Кол-во спортсменов",
+  new: "Кол-во новых спортсменов",
+  firstRenewals: "Кол-во первых продлений",
+  canceled: "Кол-во отмененных клиентов",
+  returned: "Кол-во возвращенных клиентов",
+  dropIns: "Кол-во разовых",
+  attendanceRate: "Посещаемость",
+};
+
+export const LEAD_METRIC_LABELS: Record<LeadMetricKey, string> = {
+  created: "Новые лиды",
+  converted: "Оплаченные лиды",
+  canceled: "Отмененные лиды",
+};
+
 export type AnalyticsSnapshot = {
   area: AreaScope;
   metrics: Record<MetricKey, MetricSnapshot>;
@@ -81,20 +124,58 @@ export type AnalyticsSnapshot = {
 
 export function encodeFavorite(favorite: AnalyticsFavorite): string {
   const areaPart = favorite.area === "all" ? "*" : encodeURIComponent(favorite.area);
-  return [areaPart, favorite.metric, favorite.projection].join(FAVORITE_SEPARATOR);
+  switch (favorite.kind) {
+    case "metric":
+      return [areaPart, favorite.metric, favorite.projection].join(FAVORITE_SEPARATOR);
+    case "athlete":
+      return ["athlete", areaPart, favorite.metric].join(FAVORITE_SEPARATOR);
+    case "lead":
+      return ["lead", areaPart, favorite.metric].join(FAVORITE_SEPARATOR);
+    default: {
+      const exhaustiveCheck: never = favorite;
+      return exhaustiveCheck;
+    }
+  }
 }
 
 export function decodeFavorite(id: string): AnalyticsFavorite | null {
   const parts = id.split(FAVORITE_SEPARATOR);
-  if (parts.length !== 3) {
+  if (!parts.length) {
     return null;
   }
-  const [areaPart, metric, projection] = parts as [string, MetricKey, ProjectionKey];
-  if (!METRIC_LABELS[metric] || !PROJECTION_LABELS[projection]) {
-    return null;
+  if (parts[0] === "metric" && parts.length === 4) {
+    const [, areaPart, metric, projection] = parts as ["metric", string, MetricKey, ProjectionKey];
+    if (!METRIC_LABELS[metric] || !PROJECTION_LABELS[projection]) {
+      return null;
+    }
+    const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+    return { kind: "metric", area, metric, projection };
   }
-  const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
-  return { area, metric, projection };
+  if (parts[0] === "athlete" && parts.length === 3) {
+    const [, areaPart, metric] = parts as ["athlete", string, AthleteMetricKey];
+    if (!ATHLETE_METRIC_LABELS[metric]) {
+      return null;
+    }
+    const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+    return { kind: "athlete", area, metric };
+  }
+  if (parts[0] === "lead" && parts.length === 3) {
+    const [, areaPart, metric] = parts as ["lead", string, LeadMetricKey];
+    if (!LEAD_METRIC_LABELS[metric]) {
+      return null;
+    }
+    const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+    return { kind: "lead", area, metric };
+  }
+  if (parts.length === 3) {
+    const [areaPart, metric, projection] = parts as [string, MetricKey, ProjectionKey];
+    if (!METRIC_LABELS[metric] || !PROJECTION_LABELS[projection]) {
+      return null;
+    }
+    const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+    return { kind: "metric", area, metric, projection };
+  }
+  return null;
 }
 
 const ensureNumber = (value: number) => (Number.isFinite(value) ? value : 0);
@@ -371,11 +452,46 @@ export function formatMetricValue(value: number, unit: Unit, currency: Currency)
   }
 }
 
+export function formatAthleteMetricValue(key: AthleteMetricKey, stats: AthleteStats): string {
+  const value = stats[key];
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  if (key === "attendanceRate") {
+    return `${formatNumber("ru-RU", { maximumFractionDigits: 1 }).format(value)}%`;
+  }
+  return formatNumber("ru-RU", { maximumFractionDigits: 0 }).format(value);
+}
+
+export function formatLeadMetricValue(key: LeadMetricKey, stats: LeadStats): string {
+  const value = stats[key];
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  return formatNumber("ru-RU", { maximumFractionDigits: 0 }).format(value);
+}
+
 const METRIC_ACCENTS: Record<MetricKey, FavoriteSummary["accent"]> = {
   revenue: "sky",
   profit: "green",
   fill: "slate",
   athletes: "sky",
+};
+
+const ATHLETE_METRIC_ACCENTS: Record<AthleteMetricKey, FavoriteSummary["accent"]> = {
+  total: "sky",
+  new: "sky",
+  firstRenewals: "green",
+  canceled: "slate",
+  returned: "green",
+  dropIns: "slate",
+  attendanceRate: "green",
+};
+
+const LEAD_METRIC_ACCENTS: Record<LeadMetricKey, FavoriteSummary["accent"]> = {
+  created: "sky",
+  converted: "green",
+  canceled: "slate",
 };
 
 export function buildFavoriteSummaries(db: DB, currency: Currency, period?: PeriodFilter): FavoriteSummary[] {
@@ -390,15 +506,29 @@ export function buildFavoriteSummaries(db: DB, currency: Currency, period?: Peri
       continue;
     }
     const snapshot = computeAnalyticsSnapshot(db, decoded.area, period);
-    const metric = snapshot.metrics[decoded.metric];
-    if (!metric) {
+    const areaLabel = decoded.area === "all" ? "Все районы" : decoded.area;
+    if (decoded.kind === "metric") {
+      const metric = snapshot.metrics[decoded.metric];
+      if (!metric) {
+        continue;
+      }
+      const value = metric.values[decoded.projection];
+      const formatted = formatMetricValue(value, metric.unit, currency);
+      const title = `${PROJECTION_LABELS[decoded.projection]} · ${METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
+      summaries.push({ id, title, value: formatted, accent: METRIC_ACCENTS[decoded.metric] });
       continue;
     }
-    const value = metric.values[decoded.projection];
-    const formatted = formatMetricValue(value, metric.unit, currency);
-    const areaLabel = decoded.area === "all" ? "Все районы" : decoded.area;
-    const title = `${PROJECTION_LABELS[decoded.projection]} · ${METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
-    summaries.push({ id, title, value: formatted, accent: METRIC_ACCENTS[decoded.metric] });
+    if (decoded.kind === "athlete") {
+      const formatted = formatAthleteMetricValue(decoded.metric, snapshot.athleteStats);
+      const title = `Спортсмены · ${ATHLETE_METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
+      summaries.push({ id, title, value: formatted, accent: ATHLETE_METRIC_ACCENTS[decoded.metric] });
+      continue;
+    }
+    if (decoded.kind === "lead") {
+      const formatted = formatLeadMetricValue(decoded.metric, snapshot.leadStats);
+      const title = `Лиды · ${LEAD_METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
+      summaries.push({ id, title, value: formatted, accent: LEAD_METRIC_ACCENTS[decoded.metric] });
+    }
   }
   return summaries;
 }

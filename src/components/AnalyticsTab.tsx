@@ -4,12 +4,19 @@ import Breadcrumbs from "./Breadcrumbs";
 import type { Area, Currency, DB } from "../types";
 import { commitDBUpdate } from "../state/appState";
 import {
+  ATHLETE_METRIC_KEYS,
+  ATHLETE_METRIC_LABELS,
+  LEAD_METRIC_KEYS,
+  LEAD_METRIC_LABELS,
   METRIC_LABELS,
   PROJECTION_LABELS,
   computeAnalyticsSnapshot,
   encodeFavorite,
+  formatAthleteMetricValue,
+  formatLeadMetricValue,
   formatMetricValue,
   getAnalyticsAreas,
+  type AnalyticsFavorite,
   type AreaScope,
   type MetricKey,
   type ProjectionKey,
@@ -174,15 +181,15 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   );
 
   const toggleFavorite = useCallback(
-    async (metric: MetricKey, projection: ProjectionKey) => {
-      const id = encodeFavorite({ area, metric, projection });
+    async (favorite: AnalyticsFavorite) => {
+      const id = encodeFavorite(favorite);
       const isFavorite = favorites.includes(id);
       let nextFavorites: string[];
       if (isFavorite) {
         nextFavorites = favorites.filter(fav => fav !== id);
       } else {
-        if (favorites.length >= 4) {
-          window.alert("Можно закрепить не более 4 показателей для дашборда.");
+        if (favorites.length >= 16) {
+          window.alert("Можно закрепить не более 16 показателей для дашборда.");
           return;
         }
         nextFavorites = [...favorites, id];
@@ -196,7 +203,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         setDB(next);
       }
     },
-    [area, db, favorites, setDB],
+    [db, favorites, setDB],
   );
 
   const format = useCallback(
@@ -211,66 +218,22 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   );
 
   const athleteMetrics = useMemo(
-    () => [
-      {
-        key: "total",
-        label: "Кол-во спортсменов",
-        value: snapshot.athleteStats.total.toLocaleString("ru-RU"),
-      },
-      {
-        key: "new",
-        label: "Кол-во новых спортсменов",
-        value: snapshot.athleteStats.new.toLocaleString("ru-RU"),
-      },
-      {
-        key: "firstRenewals",
-        label: "Кол-во первых продлений",
-        value: snapshot.athleteStats.firstRenewals.toLocaleString("ru-RU"),
-      },
-      {
-        key: "canceled",
-        label: "Кол-во отмененных клиентов",
-        value: snapshot.athleteStats.canceled.toLocaleString("ru-RU"),
-      },
-      {
-        key: "returned",
-        label: "Кол-во возвращенных клиентов",
-        value: snapshot.athleteStats.returned.toLocaleString("ru-RU"),
-      },
-      {
-        key: "dropIns",
-        label: "Кол-во разовых",
-        value: snapshot.athleteStats.dropIns.toLocaleString("ru-RU"),
-      },
-      {
-        key: "attendanceRate",
-        label: "Посещаемость",
-        value: `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(
-          snapshot.athleteStats.attendanceRate,
-        )}%`,
-      },
-    ],
+    () =>
+      ATHLETE_METRIC_KEYS.map(key => ({
+        key,
+        label: ATHLETE_METRIC_LABELS[key],
+        value: formatAthleteMetricValue(key, snapshot.athleteStats),
+      })),
     [snapshot.athleteStats],
   );
 
   const leadMetrics = useMemo(
-    () => [
-      {
-        key: "created",
-        label: "Новые лиды",
-        value: snapshot.leadStats.created.toLocaleString("ru-RU"),
-      },
-      {
-        key: "converted",
-        label: "Оплаченные лиды",
-        value: snapshot.leadStats.converted.toLocaleString("ru-RU"),
-      },
-      {
-        key: "canceled",
-        label: "Отмененные лиды",
-        value: snapshot.leadStats.canceled.toLocaleString("ru-RU"),
-      },
-    ],
+    () =>
+      LEAD_METRIC_KEYS.map(key => ({
+        key,
+        label: LEAD_METRIC_LABELS[key],
+        value: formatLeadMetricValue(key, snapshot.leadStats),
+      })),
     [snapshot.leadStats],
   );
 
@@ -294,7 +257,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
           ))}
         </select>
         <span className="text-xs text-slate-500 dark:text-slate-400">
-          Добавьте до четырёх показателей в избранное, чтобы видеть их на дашборде.
+          Добавьте до шестнадцати показателей в избранное, чтобы видеть их на дашборде.
         </span>
         <div className="grow" />
         <label htmlFor="analytics-month" className="text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -360,7 +323,8 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
                       {METRIC_LABELS[metric]}
                     </th>
                     {PROJECTION_ORDER.map(projection => {
-                      const id = encodeFavorite({ area, metric, projection });
+                      const favorite = { kind: "metric" as const, area, metric, projection };
+                      const id = encodeFavorite(favorite);
                       const starred = favorites.includes(id);
                       return (
                         <td key={projection} className="px-4 py-3">
@@ -369,7 +333,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
                               type="button"
                               aria-pressed={starred}
                               aria-label={starred ? "Убрать из избранного" : "Добавить в избранное"}
-                              onClick={() => toggleFavorite(metric, projection)}
+                              onClick={() => toggleFavorite(favorite)}
                               className={`text-lg leading-none transition-colors ${
                                 starred
                                   ? "text-amber-500 hover:text-amber-600"
@@ -453,17 +417,41 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
           <h2 className="text-base font-semibold text-slate-700 dark:text-slate-100">Спортсмены</h2>
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {athleteMetrics.map(item => (
-            <div
-              key={item.key}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-            >
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {item.label}
+          {athleteMetrics.map(item => {
+            const favorite = { kind: "athlete" as const, area, metric: item.key };
+            const id = encodeFavorite(favorite);
+            const starred = favorites.includes(id);
+            return (
+              <div
+                key={item.key}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {item.label}
+                  </div>
+                  <button
+                    type="button"
+                    className={`text-base leading-none transition-colors ${
+                      starred
+                        ? "text-amber-500 hover:text-amber-600"
+                        : "text-slate-300 hover:text-amber-400 dark:text-slate-600"
+                    }`}
+                    aria-label={
+                      starred
+                        ? "Убрать показатель спортсменов из избранного"
+                        : "Добавить показатель спортсменов в избранное"
+                    }
+                    aria-pressed={starred}
+                    onClick={() => toggleFavorite(favorite)}
+                  >
+                    {starred ? "★" : "☆"}
+                  </button>
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
               </div>
-              <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -472,17 +460,41 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
           <h2 className="text-base font-semibold text-slate-700 dark:text-slate-100">Лиды</h2>
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
-          {leadMetrics.map(item => (
-            <div
-              key={item.key}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-            >
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {item.label}
+          {leadMetrics.map(item => {
+            const favorite = { kind: "lead" as const, area, metric: item.key };
+            const id = encodeFavorite(favorite);
+            const starred = favorites.includes(id);
+            return (
+              <div
+                key={item.key}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {item.label}
+                  </div>
+                  <button
+                    type="button"
+                    className={`text-base leading-none transition-colors ${
+                      starred
+                        ? "text-amber-500 hover:text-amber-600"
+                        : "text-slate-300 hover:text-amber-400 dark:text-slate-600"
+                    }`}
+                    aria-label={
+                      starred
+                        ? "Убрать показатель лидов из избранного"
+                        : "Добавить показатель лидов в избранное"
+                    }
+                    aria-pressed={starred}
+                    onClick={() => toggleFavorite(favorite)}
+                  >
+                    {starred ? "★" : "☆"}
+                  </button>
+                </div>
+                <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
               </div>
-              <div className="mt-2 text-2xl font-semibold text-slate-800 dark:text-slate-100">{item.value}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>
