@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import { fmtMoney, fmtDate } from "../state/utils";
+import { fmtDate } from "../state/utils";
 import { buildFavoriteSummaries } from "../state/analytics";
-import type { Currency, DB, LeadStage, TaskItem, UIState } from "../types";
+import type { DB, LeadStage, TaskItem, UIState } from "../types";
 import { readDailyPeriod, writeDailyPeriod } from "../state/filterPersistence";
 import {
   MONTH_OPTIONS,
@@ -10,7 +10,6 @@ import {
   filterLeadsByPeriod,
   formatMonthInput,
   getDefaultPeriod,
-  isClientInPeriod,
   type PeriodFilter,
 } from "../state/period";
 
@@ -69,12 +68,6 @@ export default function Dashboard({ db, ui }: DashboardProps) {
   }, [availableYears, period.year]);
 
   const currency = ui.currency;
-  const periodClients = useMemo(() => db.clients.filter(client => isClientInPeriod(client, period)), [db.clients, period]);
-  const totalClients = periodClients.length;
-  const activeClients = useMemo(
-    () => periodClients.filter(c => c.payStatus === "действует").length,
-    [periodClients],
-  );
   const leadStages: LeadStage[] = [
     "Очередь",
     "Задержка",
@@ -96,12 +89,6 @@ export default function Dashboard({ db, ui }: DashboardProps) {
     [db.tasks]
   );
 
-  const revenueEUR = activeClients * 55;
-  const rate = (cur: Currency) => (cur === "EUR" ? 1 : cur === "TRY" ? db.settings.currencyRates.TRY : db.settings.currencyRates.RUB);
-  const revenue = revenueEUR * rate(currency);
-
-  const totalLimit = Object.values(db.settings.limits).reduce((a, b) => a + b, 0);
-  const fillPct = totalLimit ? Math.round((activeClients / totalLimit) * 100) : 0;
   const favoriteCards = useMemo(() => buildFavoriteSummaries(db, currency, period), [db, currency, period]);
 
   const handleMonthChange = (value: string) => {
@@ -160,19 +147,20 @@ export default function Dashboard({ db, ui }: DashboardProps) {
           ))}
         </select>
       </div>
-      {favoriteCards.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {favoriteCards.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {favoriteCards.map(card => (
             <MetricCard key={card.id} title={card.title} value={card.value} accent={card.accent} />
           ))}
         </div>
+      ) : (
+        <div className="rounded-3xl border border-slate-200/70 bg-white/80 p-6 text-sm text-slate-600 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/70 dark:text-slate-300">
+          <p className="font-medium">Добавьте избранные показатели в аналитике, чтобы увидеть их здесь.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            В разделе «Аналитика» нажмите на звёздочки у нужных показателей, спортсменов или лидов. На дашборде отобразится до 16 выбранных карточек.
+          </p>
+        </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard title="Ученики всего" value={String(totalClients)} accent="sky" />
-        <MetricCard title="Активные (действует)" value={String(activeClients)} accent="green" />
-        <MetricCard title="Выручка (прибл.)" value={fmtMoney(revenue, currency)} accent="sky" />
-        <MetricCard title="Заполняемость" value={`${fillPct}%`} accent={fillPct >= 80 ? "green" : "slate"} />
-      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/70">
           <div className="flex items-center justify-between gap-2">
@@ -181,11 +169,11 @@ export default function Dashboard({ db, ui }: DashboardProps) {
               <p className="text-xs text-slate-500 dark:text-slate-400">Сфокусируйтесь на этапах, где нужны действия</p>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-nowrap gap-3 overflow-x-auto pb-2">
             {leadStages.map(stage => (
               <div
                 key={stage}
-                className="relative min-w-[140px] flex-1 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80 px-4 py-3 text-xs shadow-sm transition hover:-translate-y-[2px] hover:shadow-md dark:border-slate-800/60 dark:bg-slate-900/60"
+                className="relative min-w-[160px] flex-none overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80 px-4 py-3 text-xs shadow-sm transition hover:-translate-y-[2px] hover:shadow-md dark:border-slate-800/60 dark:bg-slate-900/60"
               >
                 <span className="text-slate-500 dark:text-slate-400">{stage}</span>
                 <span className="mt-2 block text-2xl font-semibold text-slate-900 dark:text-slate-100">
