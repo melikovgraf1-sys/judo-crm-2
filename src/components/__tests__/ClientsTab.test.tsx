@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 
@@ -153,5 +153,85 @@ test('create: adds client through modal', async () => {
   await userEvent.click(save);
 
   await waitFor(() => expect(screen.getByText('Всего клиентов: 1')).toBeInTheDocument());
+  expect(screen.getByText(/^Мария/)).toBeInTheDocument();
+});
+
+test('create: warns about duplicates and allows opening existing client', async () => {
+  const existing = makeClient({ id: 'c-existing', phone: '+7 (900) 123-45-67', firstName: 'Иван', lastName: 'Иванов' });
+
+  const Wrapper = () => {
+    const [state, setState] = React.useState({ ...makeDB(), clients: [existing] });
+    return <ClientsTab db={state} setDB={setState} ui={makeUI()} />;
+  };
+
+  render(<Wrapper />);
+
+  await userEvent.click(screen.getByText('+ Добавить клиента'));
+  const modal = screen.getByText('Новый клиент').parentElement!;
+  const firstName = modal.querySelector('input[name="firstName"]') ?? modal.querySelector('input');
+  const phone = modal.querySelector('input[name="phone"]');
+  const birthDate = modal.querySelector('input[name="birthDate"]');
+  const startDate = modal.querySelector('input[name="startDate"]');
+
+  await userEvent.clear(firstName!);
+  await userEvent.type(firstName!, 'Мария');
+  if (phone) await userEvent.type(phone, '8 900 123 45 67');
+  if (birthDate) fireEvent.change(birthDate, { target: { value: '2010-01-01' } });
+  if (startDate) fireEvent.change(startDate, { target: { value: '2024-01-01' } });
+
+  const save = screen.getByRole('button', { name: 'Сохранить' });
+  await waitFor(() => expect(save).toBeEnabled());
+  await userEvent.click(save);
+
+  const duplicateModal = await screen.findByText('Найдены возможные дубликаты');
+  expect(duplicateModal).toBeInTheDocument();
+  expect(within(duplicateModal.parentElement as HTMLElement).getByText('Иван Иванов')).toBeInTheDocument();
+
+  await act(async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Открыть' }));
+  });
+
+  await screen.findByText('Редактирование клиента');
+  expect(screen.queryByText('Найдены возможные дубликаты')).not.toBeInTheDocument();
+  const editModal = screen.getByText('Редактирование клиента').parentElement!;
+  const firstNameInput = within(editModal).getByDisplayValue('Иван');
+  expect(firstNameInput).toBeInTheDocument();
+});
+
+test('create: can proceed after duplicate warning', async () => {
+  const existing = makeClient({ id: 'c-existing', phone: '+7 (900) 123-45-67', firstName: 'Иван', lastName: 'Иванов' });
+
+  const Wrapper = () => {
+    const [state, setState] = React.useState({ ...makeDB(), clients: [existing] });
+    return <ClientsTab db={state} setDB={setState} ui={makeUI()} />;
+  };
+
+  render(<Wrapper />);
+
+  await userEvent.click(screen.getByText('+ Добавить клиента'));
+  const modal = screen.getByText('Новый клиент').parentElement!;
+  const firstName = modal.querySelector('input[name="firstName"]') ?? modal.querySelector('input');
+  const phone = modal.querySelector('input[name="phone"]');
+  const birthDate = modal.querySelector('input[name="birthDate"]');
+  const startDate = modal.querySelector('input[name="startDate"]');
+
+  await userEvent.clear(firstName!);
+  await userEvent.type(firstName!, 'Мария');
+  if (phone) await userEvent.type(phone, '+7 9001234567');
+  if (birthDate) fireEvent.change(birthDate, { target: { value: '2010-01-01' } });
+  if (startDate) fireEvent.change(startDate, { target: { value: '2024-01-01' } });
+
+  const save = screen.getByRole('button', { name: 'Сохранить' });
+  await waitFor(() => expect(save).toBeEnabled());
+  await userEvent.click(save);
+
+  await screen.findByText('Найдены возможные дубликаты');
+
+  await act(async () => {
+    await userEvent.click(screen.getByRole('button', { name: 'Создать всё равно' }));
+  });
+
+  await waitFor(() => expect(screen.getByText('Всего клиентов: 2')).toBeInTheDocument());
+  expect(screen.queryByText('Найдены возможные дубликаты')).not.toBeInTheDocument();
   expect(screen.getByText(/^Мария/)).toBeInTheDocument();
 });
