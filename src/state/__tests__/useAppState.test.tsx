@@ -25,7 +25,7 @@ jest.mock('../../firebase', () => ({
 }));
 
 import { commitDBUpdate, LS_KEYS, LOCAL_ONLY_MESSAGE, useAppState } from '../appState';
-import { RESERVE_AREA_NAME } from '../utils';
+import { RESERVE_AREA_NAME } from '../reserve';
 import { makeSeedDB } from '../seed';
 
 describe('useAppState with local persistence', () => {

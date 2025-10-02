@@ -13,6 +13,10 @@ jest.mock('../../state/utils', () => ({
   fmtDate: (iso: string) => new Intl.DateTimeFormat('ru-RU').format(new Date(iso)),
   uid: () => 'uid',
   todayISO: () => '2025-01-01T00:00:00.000Z',
+}));
+
+jest.mock('../../state/reserve', () => ({
+  __esModule: true,
   isReserveArea: () => false,
   ensureReserveAreaIncluded: (areas: string[]) => areas,
   RESERVE_AREA_NAME: 'резерв',
