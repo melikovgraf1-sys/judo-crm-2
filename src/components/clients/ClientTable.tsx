@@ -71,9 +71,9 @@ export default function ClientTable({
     {
       id: "name",
       label: "Имя",
-      width: "minmax(160px, max-content)",
+      width: "minmax(220px, 2fr)",
       renderCell: client => (
-        <span className="font-medium text-slate-800 transition-colors duration-150 group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-300">
+        <span className="block max-w-full break-words font-medium text-slate-800 transition-colors duration-150 group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-300">
           {client.firstName} {client.lastName}
         </span>
       ),
