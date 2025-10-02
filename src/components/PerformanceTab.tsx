@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import VirtualizedTable from "./VirtualizedTable";
 import ClientDetailsModal from "./clients/ClientDetailsModal";
 import ClientForm from "./clients/ClientForm";
 import ColumnSettings from "./ColumnSettings";
-import { compareValues, toggleSort, type SortState } from "./tableUtils";
+import { compareValues, toggleSort } from "./tableUtils";
 import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea } from "../state/lessons";
@@ -25,10 +25,13 @@ import {
   collectAvailableYears,
   formatMonthInput,
   getDefaultPeriod,
-  isClientInPeriod,
   isPerformanceInPeriod,
   type PeriodFilter,
 } from "../state/period";
+import { usePersistentTableSettings } from "../utils/tableSettings";
+
+const DEFAULT_VISIBLE_COLUMNS = ["name", "area", "group", "mark"];
+const TABLE_SETTINGS_KEY = "performance";
 
 export default function PerformanceTab({
   db,
@@ -43,8 +46,6 @@ export default function PerformanceTab({
   const [group, setGroup] = useState<Group | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
   const [editing, setEditing] = useState<Client | null>(null);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(["name", "area", "group", "mark"]);
-  const [sort, setSort] = useState<SortState | null>(null);
   const persistedPeriod = useMemo(() => readDailyPeriod("performance"), []);
   const [period, setPeriod] = useState<PeriodFilter>(() => {
     const fallback = getDefaultPeriod();
@@ -130,7 +131,7 @@ export default function PerformanceTab({
     setPeriod(prev => ({ year: nextYear, month: prev.month }));
   };
 
-  const toggle = async (clientId: string) => {
+  const toggle = useCallback(async (clientId: string) => {
     const mark = todayMarks.get(clientId);
     if (mark) {
       const updated = { ...mark, successful: !mark.successful };
@@ -155,7 +156,7 @@ export default function PerformanceTab({
         window.alert("Не удалось сохранить отметку успеваемости. Проверьте доступ к базе данных.");
       }
     }
-  };
+  }, [db, setDB, todayMarks]);
 
   const columns: ColumnConfig[] = useMemo(() => {
     return [
@@ -216,7 +217,14 @@ export default function PerformanceTab({
         },
       },
     ];
-  }, [todayMarks]);
+  }, [todayMarks, toggle]);
+
+  const columnIds = useMemo(() => columns.map(column => column.id), [columns]);
+  const { visibleColumns, setVisibleColumns, sort, setSort } = usePersistentTableSettings(
+    TABLE_SETTINGS_KEY,
+    columnIds,
+    DEFAULT_VISIBLE_COLUMNS,
+  );
 
   const activeColumns = useMemo(
     () => columns.filter(column => visibleColumns.includes(column.id)),
