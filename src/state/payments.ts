@@ -1,4 +1,5 @@
 import type { Client, PaymentStatus, SubscriptionPlan, TaskItem } from "../types";
+import { applyClientStatusAutoTransition } from "./clientLifecycle";
 
 export const SUBSCRIPTION_PLANS: { value: SubscriptionPlan; label: string; amount: number | null }[] = [
   { value: "monthly", label: "Месячный абонемент", amount: 55 },
@@ -78,9 +79,8 @@ export function derivePaymentStatus(client: Client, tasks: TaskItem[]): PaymentS
 export function applyPaymentStatusRules(clients: Client[], tasks: TaskItem[]): Client[] {
   return clients.map(client => {
     const nextStatus = derivePaymentStatus(client, tasks);
-    if (client.payStatus === nextStatus) {
-      return client;
-    }
-    return { ...client, payStatus: nextStatus };
+    const withPayStatus =
+      client.payStatus === nextStatus ? client : { ...client, payStatus: nextStatus };
+    return applyClientStatusAutoTransition(withPayStatus);
   });
 }

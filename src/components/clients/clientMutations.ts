@@ -5,7 +5,7 @@ import {
   subscriptionPlanAllowsCustomAmount,
   subscriptionPlanRequiresManualRemainingLessons,
 } from "../../state/payments";
-import { parseDateInput } from "../../state/utils";
+import { parseDateInput, todayISO } from "../../state/utils";
 import { requiresManualRemainingLessons } from "../../state/lessons";
 import type { Client, ClientFormValues, Group, SubscriptionPlan } from "../../types";
 
@@ -68,6 +68,9 @@ export function transformClientFormValues(
     }
   }
 
+  const statusChanged = !editing || editing.status !== base.status;
+  const statusUpdatedAt = statusChanged ? todayISO() : editing?.statusUpdatedAt;
+
   return {
     ...base,
     subscriptionPlan,
@@ -79,6 +82,7 @@ export function transformClientFormValues(
     ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
     ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
     ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
+    ...(statusUpdatedAt ? { statusUpdatedAt } : {}),
     birthDate: parseDateInput(data.birthDate),
     startDate: parseDateInput(data.startDate),
     payDate: parseDateInput(data.payDate),
