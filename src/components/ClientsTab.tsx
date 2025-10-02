@@ -39,6 +39,8 @@ const DUPLICATE_FIELD_LABELS: Record<DuplicateField, string> = {
   whatsApp: "WhatsApp",
   telegram: "Telegram",
   instagram: "Instagram",
+  area: "Район",
+  group: "Группа",
 };
 
 const formatClientName = (client: { firstName: string; lastName?: string }): string =>
@@ -52,10 +54,16 @@ const describeDuplicateMatch = (detail: DuplicateMatchDetail): string => {
   return `${label}: ${detail.value}`;
 };
 
+type DuplicatePair = {
+  clients: [Client, Client];
+  matches: DuplicateMatchDetail[];
+};
+
 export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicatePromptState | null>(null);
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const [query, setQuery] = useState(ui.search);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -79,6 +87,51 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     });
   }, [db.clients, search]);
 
+  const duplicatePairs = useMemo(() => {
+    const map = new Map<
+      string,
+      { ids: [string, string]; matches: Map<DuplicateField, DuplicateMatchDetail> }
+    >();
+    const clientMap = new Map(db.clients.map(client => [client.id, client]));
+
+    for (const client of db.clients) {
+      const matches = findClientDuplicates(db, client, { excludeId: client.id });
+      for (const match of matches) {
+        const [firstId, secondId] = [client.id, match.client.id].sort();
+        const key = `${firstId}:${secondId}`;
+        let entry = map.get(key);
+        if (!entry) {
+          entry = { ids: [firstId, secondId], matches: new Map() };
+          map.set(key, entry);
+        }
+        for (const detail of match.matches) {
+          if (!entry.matches.has(detail.field)) {
+            entry.matches.set(detail.field, detail);
+          }
+        }
+      }
+    }
+
+    return Array.from(map.values())
+      .map(entry => {
+        const first = clientMap.get(entry.ids[0]);
+        const second = clientMap.get(entry.ids[1]);
+        if (!first || !second) {
+          return null;
+        }
+        return {
+          clients: [first, second] as [Client, Client],
+          matches: Array.from(entry.matches.values()),
+        };
+      })
+      .filter((entry): entry is DuplicatePair => entry !== null)
+      .sort((a, b) => {
+        const nameA = formatClientName(a.clients[0]).toLowerCase();
+        const nameB = formatClientName(b.clients[0]).toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+  }, [db]);
+
   const openAddModal = () => {
     setEditing(null);
     setModalOpen(true);
@@ -87,6 +140,11 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   const startEdit = (client: Client) => {
     setEditing(client);
     setModalOpen(true);
+  };
+
+  const startDuplicateEdit = (client: Client) => {
+    setDuplicatesOpen(false);
+    startEdit(client);
   };
 
   const commitNewClient = async (prepared: Omit<Client, "id">) => {
@@ -215,6 +273,10 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     }
   };
 
+  const removeDuplicateClient = async (id: string) => {
+    await removeClient(id);
+  };
+
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -317,6 +379,12 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
             + Добавить клиента
           </button>
           <button
+            onClick={() => setDuplicatesOpen(true)}
+            className="px-3 py-2 rounded-lg border border-amber-500 text-amber-600 text-sm hover:bg-amber-50 dark:border-amber-400 dark:text-amber-300 dark:hover:bg-slate-800"
+          >
+            Проверить дубликаты
+          </button>
+          <button
             onClick={handleExport}
             className="px-3 py-2 rounded-lg border border-sky-600 text-sky-600 text-sm hover:bg-sky-50 dark:border-sky-500 dark:text-sky-300 dark:hover:bg-slate-800"
           >
@@ -368,6 +436,14 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
           onCancel={handleDuplicateCancel}
           onCreateAnyway={handleDuplicateCreate}
           onOpenExisting={handleDuplicateOpen}
+        />
+      )}
+      {duplicatesOpen && (
+        <DuplicateManagerModal
+          duplicates={duplicatePairs}
+          onClose={() => setDuplicatesOpen(false)}
+          onEdit={startDuplicateEdit}
+          onRemove={removeDuplicateClient}
         />
       )}
     </div>
@@ -447,6 +523,91 @@ function DuplicateWarningModal({
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400"
           >
             Создать всё равно
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+type DuplicateManagerModalProps = {
+  duplicates: DuplicatePair[];
+  onClose: () => void;
+  onEdit: (client: Client) => void;
+  onRemove: (id: string) => void;
+};
+
+function DuplicateManagerModal({ duplicates, onClose, onEdit, onRemove }: DuplicateManagerModalProps) {
+  return (
+    <Modal size="xl" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">Проверка дублей клиентов</div>
+        {duplicates.length === 0 ? (
+          <div className="text-sm text-slate-600 dark:text-slate-300">
+            Дубликаты клиентов не найдены. Попробуйте позже, если данные обновятся.
+          </div>
+        ) : (
+          <div className="space-y-4 max-h-[28rem] overflow-y-auto pr-1">
+            {duplicates.map(entry => {
+              const [first, second] = entry.clients;
+              return (
+                <div
+                  key={`${first.id}-${second.id}`}
+                  className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-3"
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {[first, second].map(client => (
+                      <div key={client.id} className="space-y-2">
+                        <div className="font-medium text-slate-800 dark:text-slate-100">
+                          {formatClientName(client) || "Без имени"}
+                        </div>
+                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                          Телефон: {client.phone?.trim() || "—"}
+                        </div>
+                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                          Район: {client.area || "—"}
+                        </div>
+                        <div className="text-sm text-slate-600 dark:text-slate-300">
+                          Группа: {client.group || "—"}
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => onEdit(client)}
+                            className="rounded-lg border border-sky-600 px-3 py-1 text-sm text-sky-600 hover:bg-sky-50 dark:border-sky-500 dark:text-sky-300 dark:hover:bg-slate-700"
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRemove(client.id)}
+                            className="rounded-lg border border-rose-500 px-3 py-1 text-sm text-rose-600 hover:bg-rose-50 dark:border-rose-400 dark:text-rose-300 dark:hover:bg-slate-700"
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {entry.matches.length > 0 && (
+                    <ul className="list-disc space-y-1 pl-4 text-sm text-slate-600 dark:text-slate-300">
+                      {entry.matches.map(detail => (
+                        <li key={`${first.id}-${second.id}-${detail.field}`}>{describeDuplicateMatch(detail)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+          >
+            Закрыть
           </button>
         </div>
       </div>
