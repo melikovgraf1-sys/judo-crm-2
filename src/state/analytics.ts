@@ -31,7 +31,7 @@ export const PROJECTION_LABELS: Record<ProjectionKey, string> = {
   actual: "Фактические",
   forecast: "Прогноз",
   remaining: "Остаток",
-  target: "До цели",
+  target: "Цель",
 };
 
 const METRIC_UNITS: Record<MetricKey, Unit> = {
@@ -321,7 +321,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
         actual: ensureNumber(actualRevenue),
         forecast: ensureNumber(forecastRevenue),
         remaining: Math.max(0, ensureNumber(forecastRevenue - actualRevenue)),
-        target: Math.max(0, ensureNumber(maxRevenue - actualRevenue)),
+        target: ensureNumber(maxRevenue),
       },
     },
     profit: {
@@ -330,7 +330,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
         actual: ensureNumber(actualProfit),
         forecast: ensureNumber(forecastProfit),
         remaining: Math.max(0, ensureNumber(forecastProfit - actualProfit)),
-        target: Math.max(0, ensureNumber(maxProfit - actualProfit)),
+        target: ensureNumber(maxProfit),
       },
     },
     fill: {
@@ -339,7 +339,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
         actual: ensureNumber(actualFill),
         forecast: ensureNumber(forecastFill),
         remaining: Math.max(0, ensureNumber(forecastFill - actualFill)),
-        target: capacity ? Math.max(0, 100 - ensureNumber(actualFill)) : 0,
+        target: capacity ? 100 : 0,
       },
     },
     athletes: {
@@ -348,7 +348,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
         actual: actualClients.length,
         forecast: rosterClients.length,
         remaining: Math.max(0, rosterClients.length - actualClients.length),
-        target: Math.max(0, capacity - actualClients.length),
+        target: capacity,
       },
     },
   };
