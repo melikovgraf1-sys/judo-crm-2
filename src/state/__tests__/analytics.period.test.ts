@@ -109,4 +109,15 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.athletes.values.forecast).toBe(2);
     expect(snapshot.metrics.athletes.values.actual).toBe(2);
   });
+
+  it("uses maximum values for target projections", () => {
+    const db = buildDB();
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.revenue.values.target).toBe(550);
+    expect(snapshot.metrics.profit.values.target).toBe(400);
+    expect(snapshot.metrics.fill.values.target).toBe(100);
+    expect(snapshot.metrics.athletes.values.target).toBe(10);
+  });
 });
