@@ -3,11 +3,12 @@ import Modal from "../Modal";
 import { calcAgeYears, calcExperience, fmtDate, fmtMoney } from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
+import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot, Settings } from "../../types";
 
 interface Props {
   client: Client;
   currency: Currency;
+  currencyRates: Settings["currencyRates"];
   schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
@@ -19,6 +20,7 @@ interface Props {
 export default function ClientDetailsModal({
   client,
   currency,
+  currencyRates,
   schedule,
   attendance,
   performance,
@@ -109,7 +111,7 @@ export default function ClientDetailsModal({
             <InfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
             <InfoRow
               label="Сумма оплаты"
-              value={client.payAmount != null ? fmtMoney(client.payAmount, currency) : "—"}
+              value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
             />
             <InfoRow label="Остаток занятий" value={remaining != null ? String(remaining) : "—"} />
           </div>

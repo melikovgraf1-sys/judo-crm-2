@@ -254,7 +254,9 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
     const titleParts = [
       `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
       client.parentName ? `родитель: ${client.parentName}` : null,
-      client.payAmount != null ? `сумма: ${fmtMoney(client.payAmount, ui.currency)}` : null,
+      client.payAmount != null
+        ? `сумма: ${fmtMoney(client.payAmount, ui.currency, db.settings.currencyRates)}`
+        : null,
       client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
     ].filter(Boolean);
 
@@ -506,6 +508,7 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
         <ClientTable
           list={list}
           currency={ui.currency}
+          currencyRates={db.settings.currencyRates}
           onEdit={startEdit}
           onRemove={removeClient}
           onCreateTask={createPaymentTask}

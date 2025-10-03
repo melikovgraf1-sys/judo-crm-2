@@ -24,6 +24,7 @@ jest.mock('../../state/utils', () => ({
   parseDateInput: jest.fn(),
   calcAgeYears: jest.fn(),
   calcExperience: jest.fn(),
+  calcExperienceMonths: jest.fn(),
   isReserveArea: jest.fn(() => false),
   ensureReserveAreaIncluded: jest.fn(v => v),
   RESERVE_AREA_NAME: 'резерв',

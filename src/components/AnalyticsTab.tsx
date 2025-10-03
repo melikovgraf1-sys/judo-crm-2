@@ -41,6 +41,7 @@ const METRIC_ORDER: MetricKey[] = ["revenue", "profit", "fill", "athletes"];
 
 export default function AnalyticsTab({ db, setDB, currency }: Props) {
   const areas = useMemo(() => getAnalyticsAreas(db), [db]);
+  const currencyRates = db.settings.currencyRates;
   const storedSelection = useMemo(() => readDailySelection("analytics"), []);
   const [area, setArea] = useState<AreaScope>(() => {
     const storedArea = storedSelection.area as Area | null;
@@ -212,9 +213,19 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
       if (!entry) {
         return "—";
       }
-      return formatMetricValue(entry.values[projection], entry.unit, currency);
+      return formatMetricValue(entry.values[projection], entry.unit, currency, currencyRates);
     },
-    [currency, snapshot.metrics],
+    [currency, currencyRates, snapshot.metrics],
+  );
+
+  const formattedRent = useMemo(
+    () => formatMetricValue(snapshot.rent, "money", currency, currencyRates),
+    [snapshot.rent, currency, currencyRates],
+  );
+
+  const formattedCoachSalary = useMemo(
+    () => formatMetricValue(snapshot.coachSalary, "money", currency, currencyRates),
+    [snapshot.coachSalary, currency, currencyRates],
   );
 
   const athleteMetrics = useMemo(
@@ -363,11 +374,10 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
             Вместимость выбранного направления: <strong>{snapshot.capacity || "—"}</strong>
           </span>
           <span>
-            Аренда (EUR): <strong>{snapshot.rent.toLocaleString("ru-RU", { maximumFractionDigits: 0 })}</strong>
+            Аренда: <strong>{formattedRent}</strong>
           </span>
           <span>
-            Зарплата тренера (EUR):{' '}
-            <strong>{snapshot.coachSalary.toLocaleString("ru-RU", { maximumFractionDigits: 0 })}</strong>
+            Зарплата тренера: <strong>{formattedCoachSalary}</strong>
           </span>
         </div>
         {area !== "all" && (
