@@ -25,7 +25,6 @@ import {
 } from "../state/period";
 
 import { isReserveArea } from "../state/areas";
-import { parseAgeExperienceFilter } from "../utils/clientFilters";
 
 export default function GroupsTab({
   db,
@@ -63,21 +62,6 @@ export default function GroupsTab({
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
-  const [ageMin, setAgeMin] = useState("");
-  const [ageMax, setAgeMax] = useState("");
-  const [experienceMin, setExperienceMin] = useState("");
-  const [experienceMax, setExperienceMax] = useState("");
-  const ageExperienceFilter = useMemo(
-    () =>
-      parseAgeExperienceFilter({
-        minAgeText: ageMin,
-        maxAgeText: ageMax,
-        minExperienceYearsText: experienceMin,
-        maxExperienceYearsText: experienceMax,
-      }),
-    [ageMin, ageMax, experienceMin, experienceMax],
-  );
-
   useEffect(() => {
     writeDailyPeriod("groups", period.month, period.year);
   }, [period]);
@@ -280,14 +264,6 @@ export default function GroupsTab({
         year={period.year}
         onYearChange={handleYearChange}
         yearOptions={yearOptions}
-        ageMin={ageMin}
-        onAgeMinChange={setAgeMin}
-        ageMax={ageMax}
-        onAgeMaxChange={setAgeMax}
-        experienceMin={experienceMin}
-        onExperienceMinChange={setExperienceMin}
-        experienceMax={experienceMax}
-        onExperienceMaxChange={setExperienceMax}
       />
       <div>
         <ClientTable
