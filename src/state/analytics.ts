@@ -1,4 +1,5 @@
 import { getDefaultPayAmount } from "./payments";
+import { convertMoney } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
 import type { Area, Client, Currency, DB, Lead, LeadLifecycleEvent } from "../types";
 
@@ -438,13 +439,20 @@ function formatNumber(locale: string, options: Intl.NumberFormatOptions): Intl.N
   return fmt;
 }
 
-export function formatMetricValue(value: number, unit: Unit, currency: Currency): string {
+export function formatMetricValue(
+  value: number,
+  unit: Unit,
+  currency: Currency,
+  rates: DB["settings"]["currencyRates"],
+): string {
   if (!Number.isFinite(value)) {
     return "—";
   }
   switch (unit) {
     case "money":
-      return formatNumber("ru-RU", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+      return formatNumber("ru-RU", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+        convertMoney(value, currency, rates),
+      );
     case "percent":
       return `${formatNumber("ru-RU", { maximumFractionDigits: 1 }).format(value)}%`;
     default:
@@ -500,6 +508,7 @@ export function buildFavoriteSummaries(db: DB, currency: Currency, period?: Peri
     return [];
   }
   const summaries: FavoriteSummary[] = [];
+  const rates = db.settings.currencyRates;
   for (const id of favorites) {
     const decoded = decodeFavorite(id);
     if (!decoded) {
@@ -513,7 +522,7 @@ export function buildFavoriteSummaries(db: DB, currency: Currency, period?: Peri
         continue;
       }
       const value = metric.values[decoded.projection];
-      const formatted = formatMetricValue(value, metric.unit, currency);
+      const formatted = formatMetricValue(value, metric.unit, currency, rates);
       const title = `${PROJECTION_LABELS[decoded.projection]} · ${METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
       summaries.push({ id, title, value: formatted, accent: METRIC_ACCENTS[decoded.metric] });
       continue;

@@ -1,4 +1,4 @@
-import type { Area, Currency } from "../types";
+import type { Currency, Settings } from "../types";
 
 export const rnd = (min: number, max: number) =>
   Math.floor(Math.random() * (max - min + 1)) + min;
@@ -15,8 +15,21 @@ export const todayISO = () => {
 export const fmtDate = (iso: string) =>
   new Intl.DateTimeFormat("ru-RU").format(new Date(iso));
 
-export const fmtMoney = (v: number, c: Currency) =>
-  new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(v);
+export const convertMoney = (
+  value: number,
+  currency: Currency,
+  rates: Settings["currencyRates"],
+): number => {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+  const rate = currency === "EUR" ? 1 : rates?.[currency];
+  const multiplier = typeof rate === "number" && Number.isFinite(rate) ? rate : 1;
+  return value * multiplier;
+};
+
+export const fmtMoney = (v: number, c: Currency, rates: Settings["currencyRates"]) =>
+  new Intl.NumberFormat("ru-RU", { style: "currency", currency: c }).format(convertMoney(v, c, rates));
 
 export const parseDateInput = (value: string) => {
   if (!value) return "";

@@ -477,6 +477,7 @@ export default function PerformanceTab({
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          currencyRates={db.settings.currencyRates}
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}

@@ -6,12 +6,21 @@ import { compareValues, toggleSort } from "../tableUtils";
 import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
 import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { AttendanceEntry, Client, ClientStatus, Currency, PerformanceEntry, ScheduleSlot } from "../../types";
+import type {
+  AttendanceEntry,
+  Client,
+  ClientStatus,
+  Currency,
+  PerformanceEntry,
+  ScheduleSlot,
+  Settings,
+} from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
 
 type Props = {
   list: Client[];
   currency: Currency;
+  currencyRates: Settings["currencyRates"];
   onEdit: (c: Client) => void;
   onRemove: (id: string) => void;
   onCreateTask: (client: Client) => void;
@@ -55,6 +64,7 @@ const TABLE_SETTINGS_KEY = "clients";
 export default function ClientTable({
   list,
   currency,
+  currencyRates,
   onEdit,
   onRemove,
   onCreateTask,
@@ -200,7 +210,7 @@ export default function ClientTable({
       id: "payAmount",
       label: "Сумма оплаты",
       width: "minmax(130px, max-content)",
-      renderCell: client => (client.payAmount != null ? fmtMoney(client.payAmount, currency) : "—"),
+      renderCell: client => (client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"),
       sortValue: client => client.payAmount ?? 0,
     },
     {
@@ -250,7 +260,7 @@ export default function ClientTable({
         </>
       ),
     },
-  ], [billingPeriod, currency, onCreateTask, onRemove, remainingMap]);
+  ], [billingPeriod, currency, currencyRates, onCreateTask, onRemove, remainingMap]);
 
   const columnIds = useMemo(() => columns.map(column => column.id), [columns]);
   const { visibleColumns, setVisibleColumns, sort, setSort } = usePersistentTableSettings(
@@ -373,6 +383,7 @@ export default function ClientTable({
         <ClientDetailsModal
           client={selected}
           currency={currency}
+          currencyRates={currencyRates}
           schedule={schedule}
           attendance={attendance}
           performance={performance}

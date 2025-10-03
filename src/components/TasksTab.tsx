@@ -277,6 +277,7 @@ export default function TasksTab({
         <ClientDetailsModal
           client={clientToView}
           currency={currency}
+          currencyRates={db.settings.currencyRates}
           schedule={schedule}
           attendance={attendance}
           performance={performance}
