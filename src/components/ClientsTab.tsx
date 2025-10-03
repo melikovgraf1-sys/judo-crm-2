@@ -27,6 +27,7 @@ type ClientsTabProps = {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
   ui: UIState;
+  setUI: Dispatch<SetStateAction<UIState>>;
 };
 
 type DuplicatePromptState = {
@@ -61,7 +62,7 @@ type DuplicatePair = {
   matches: DuplicateMatchDetail[];
 };
 
-export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
+export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicatePromptState | null>(null);
@@ -72,6 +73,21 @@ export default function ClientsTab({ db, setDB, ui }: ClientsTabProps) {
   useEffect(() => {
     setQuery(ui.search);
   }, [ui.search]);
+
+  useEffect(() => {
+    const pendingId = ui.pendingClientId;
+    if (!pendingId) {
+      return;
+    }
+
+    const nextEditing =
+      pendingId === "new" ? null : db.clients.find(entry => entry.id === pendingId) ?? null;
+
+    setEditing(nextEditing);
+    setModalOpen(true);
+
+    setUI(prev => (prev.pendingClientId === pendingId ? { ...prev, pendingClientId: null } : prev));
+  }, [db.clients, setUI, ui.pendingClientId]);
 
   const search = query.trim().toLowerCase();
   const list = useMemo(() => {

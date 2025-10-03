@@ -132,7 +132,7 @@ export default function App() {
               path="/clients"
               element={
                 can(ui.role, "manage_clients") ? (
-                  <ClientsTab db={db} setDB={setDB} ui={ui} />
+                  <ClientsTab db={db} setDB={setDB} ui={ui} setUI={setUI} />
                 ) : (
                   <Navigate to="/dashboard" replace />
                 )

@@ -93,6 +93,7 @@ const makeUI = (overrides = {}) => ({
   currency: 'EUR',
   search: '',
   theme: 'light',
+  pendingClientId: null,
   ...overrides,
 });
 
@@ -128,7 +129,7 @@ test('search filters clients by full name', async () => {
     makeClient({ id: 'c2', firstName: 'Пётр', lastName: 'Сидоров' }),
   ];
 
-  render(<ClientsTab db={db} setDB={() => {}} ui={makeUI()} />);
+  render(<ClientsTab db={db} setDB={() => {}} ui={makeUI()} setUI={() => {}} />);
   expect(screen.getByText('Всего клиентов: 2')).toBeInTheDocument();
   expect(screen.getByText('Иван Иванов')).toBeInTheDocument();
   expect(screen.getByText('Пётр Сидоров')).toBeInTheDocument();
@@ -143,7 +144,7 @@ test('search filters clients by full name', async () => {
 test('create: adds client through modal', async () => {
   const Wrapper = () => {
     const [state, setState] = React.useState(makeDB());
-    return <ClientsTab db={state} setDB={setState} ui={makeUI()} />;
+    return <ClientsTab db={state} setDB={setState} ui={makeUI()} setUI={() => {}} />;
   };
 
   render(<Wrapper />);
@@ -174,7 +175,7 @@ test('create: warns about duplicates and allows opening existing client', async 
 
   const Wrapper = () => {
     const [state, setState] = React.useState({ ...makeDB(), clients: [existing] });
-    return <ClientsTab db={state} setDB={setState} ui={makeUI()} />;
+    return <ClientsTab db={state} setDB={setState} ui={makeUI()} setUI={() => {}} />;
   };
 
   render(<Wrapper />);
@@ -216,7 +217,7 @@ test('create: can proceed after duplicate warning', async () => {
 
   const Wrapper = () => {
     const [state, setState] = React.useState({ ...makeDB(), clients: [existing] });
-    return <ClientsTab db={state} setDB={setState} ui={makeUI()} />;
+    return <ClientsTab db={state} setDB={setState} ui={makeUI()} setUI={() => {}} />;
   };
 
   render(<Wrapper />);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
@@ -228,6 +228,7 @@ const defaultUI: UIState = {
   currency: "EUR",
   search: "",
   theme: "light",
+  pendingClientId: null,
 };
 
 export function can(
@@ -339,6 +340,7 @@ export function useAppState(): AppState {
   const [quickOpen, setQuickOpen] = useState(false);
   const [isLocalOnly, setIsLocalOnly] = useState<boolean>(() => !firestore);
   const location = useLocation();
+  const navigate = useNavigate();
   const localOnlyToastShownRef = useRef(false);
 
   const loginUser = useCallback<Required<AppState>["loginUser"]>(
@@ -592,6 +594,8 @@ export function useAppState(): AppState {
     const next = { ...db, clients: [c, ...db.clients] };
     if (await commitDBUpdate(next, setDB)) {
       setQuickOpen(false);
+      setUI(prev => ({ ...prev, pendingClientId: c.id }));
+      navigate("/clients");
       push("Клиент создан", "success");
     } else {
       push("Не удалось сохранить клиента", "error");

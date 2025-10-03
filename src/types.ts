@@ -218,6 +218,7 @@ export interface UIState {
   currency: Currency;
   search: string;
   theme: "light" | "dark";
+  pendingClientId: string | null;
 }
 
 export type TabKey =

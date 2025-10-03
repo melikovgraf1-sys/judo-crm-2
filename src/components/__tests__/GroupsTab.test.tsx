@@ -111,6 +111,7 @@ const makeUI = () => ({
   currency: 'EUR',
   search: '',
   theme: 'light',
+  pendingClientId: null,
 });
 
 const renderGroups = (db = makeDB(), ui = makeUI(), initialFilters = {}) => {
