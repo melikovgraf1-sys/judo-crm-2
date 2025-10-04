@@ -353,6 +353,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             <input
               type="number"
               inputMode="decimal"
+              step={0.5}
               className={fieldClass}
               {...register("payAmount")}
               disabled={!canEditPayAmount && defaultPayAmount != null}
@@ -369,6 +370,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             <input
               type="number"
               inputMode="decimal"
+              step={0.5}
               className={fieldClass}
               {...register("payActual")}
               placeholder="Укажите сумму"
