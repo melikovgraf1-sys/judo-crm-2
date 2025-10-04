@@ -21,6 +21,7 @@ describe("computeAnalyticsSnapshot with period", () => {
         status: "действующий",
         payDate: "2024-01-10T00:00:00.000Z",
         payAmount: 60,
+        payActual: 60,
         remainingLessons: 0,
       },
       {
@@ -39,6 +40,7 @@ describe("computeAnalyticsSnapshot with period", () => {
         status: "действующий",
         payDate: "2023-12-05T00:00:00.000Z",
         payAmount: 70,
+        payActual: 70,
         remainingLessons: 0,
       },
     ],
@@ -100,6 +102,7 @@ describe("computeAnalyticsSnapshot with period", () => {
       status: "новый",
       payDate: "2024-03-05T00:00:00.000Z",
       payAmount: 80,
+      payActual: 0,
       remainingLessons: 0,
     });
 

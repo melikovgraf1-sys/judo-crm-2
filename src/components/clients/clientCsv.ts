@@ -39,6 +39,7 @@ export const CLIENT_CSV_HEADERS = [
   "subscriptionPlan",
   "payDate",
   "payAmount",
+  "payActual",
   "remainingLessons",
   "statusUpdatedAt",
 ] as const;
@@ -92,6 +93,9 @@ const HEADER_ALIASES: HeaderAliasMap = {
   "дата_оплаты": "payDate",
   payamount: "payAmount",
   "сумма": "payAmount",
+  payactual: "payActual",
+  "факт": "payActual",
+  "факт_оплаты": "payActual",
   remaininglessons: "remainingLessons",
   "оставшиеся_занятия": "remainingLessons",
   statusupdatedat: "statusUpdatedAt",
@@ -307,6 +311,7 @@ function clientToRow(client: Client): (string | number | null | undefined)[] {
     client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
     client.payDate ? client.payDate.slice(0, 10) : "",
     client.payAmount != null ? client.payAmount : "",
+    client.payActual != null ? client.payActual : "",
     client.remainingLessons != null ? client.remainingLessons : "",
     client.statusUpdatedAt ? client.statusUpdatedAt.slice(0, 10) : "",
   ];
@@ -342,6 +347,7 @@ export function buildClientCsvTemplate(): string {
     "monthly",
     "2024-09-10",
     "12000",
+    "",
     "",
     "2024-10-10",
   ];
@@ -516,6 +522,15 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       }
     }
 
+    const payActualRaw = normalizeNumberString(record.payActual);
+    if (payActualRaw) {
+      const parsedActual = Number.parseFloat(payActualRaw);
+      if (Number.isNaN(parsedActual) || !Number.isFinite(parsedActual)) {
+        errors.push(`Строка ${lineNumber}: неверное значение payActual "${record.payActual}"`);
+        hasError = true;
+      }
+    }
+
     const remainingRaw = normalizeIntString(record.remainingLessons);
     if (remainingRaw) {
       const parsedRemaining = Number.parseInt(remainingRaw, 10);
@@ -559,6 +574,7 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       subscriptionPlan,
       payDate: payDate ?? "",
       payAmount: payAmountRaw,
+      payActual: payActualRaw,
       remainingLessons: remainingRaw,
     };
 

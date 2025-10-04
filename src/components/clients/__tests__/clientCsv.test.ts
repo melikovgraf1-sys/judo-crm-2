@@ -56,6 +56,7 @@ const baseCandidate = (): Omit<Client, 'id'> => ({
   subscriptionPlan: 'monthly',
   payDate: '2024-01-10T00:00:00.000Z',
   payAmount: 100,
+  payActual: 100,
   remainingLessons: 5,
 });
 
@@ -90,6 +91,7 @@ describe('appendImportedClients', () => {
       subscriptionPlan: 'monthly',
       payDate: '2024-01-10T00:00:00.000Z',
       payAmount: 120,
+      payActual: 120,
       remainingLessons: 8,
     };
 
@@ -108,6 +110,7 @@ describe('appendImportedClients', () => {
         lastName: 'Сидоров',
         telegram: '@petr',
         payAmount: 150,
+        payActual: 150,
       },
       {
         ...baseCandidate(),
@@ -116,6 +119,7 @@ describe('appendImportedClients', () => {
         telegram: 'https://t.me/petr',
         instagram: 'https://instagram.com/petr',
         payAmount: 160,
+        payActual: 160,
       },
     ];
 

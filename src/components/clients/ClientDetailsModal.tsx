@@ -113,6 +113,10 @@ export default function ClientDetailsModal({
               label="Сумма оплаты"
               value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
             />
+            <InfoRow
+              label="Факт оплаты"
+              value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
+            />
             <InfoRow label="Остаток занятий" value={remaining != null ? String(remaining) : "—"} />
           </div>
         )}

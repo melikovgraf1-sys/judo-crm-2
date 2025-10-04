@@ -23,14 +23,16 @@ describe("transformClientFormValues", () => {
     subscriptionPlan: "monthly",
     payDate: "2024-01-10",
     payAmount: "",
+    payActual: "",
     remainingLessons: "",
   };
 
-  it("omits payAmount and remainingLessons when not provided", () => {
+  it("omits payAmount, payActual and remainingLessons when not provided", () => {
     const data: ClientFormValues = {
       ...baseFormValues,
       group: "взрослые",
       payAmount: "",
+      payActual: "",
       remainingLessons: "",
       whatsApp: "",
     };
@@ -38,6 +40,7 @@ describe("transformClientFormValues", () => {
     const result = transformClientFormValues(data);
 
     expect(result).not.toHaveProperty("payAmount");
+    expect(result).not.toHaveProperty("payActual");
     expect(result).not.toHaveProperty("remainingLessons");
   });
 
@@ -46,6 +49,7 @@ describe("transformClientFormValues", () => {
       ...baseFormValues,
       group: "индивидуальные",
       payAmount: "150",
+      payActual: "120",
       remainingLessons: "8",
       telegram: "@client",
     };
@@ -54,6 +58,7 @@ describe("transformClientFormValues", () => {
 
     expect(result).toMatchObject({
       payAmount: 150,
+      payActual: 120,
       remainingLessons: 8,
       telegram: "@client",
     });
@@ -77,6 +82,7 @@ describe("transformClientFormValues", () => {
       ...baseFormValues,
       group: "взрослые",
       payAmount: "",
+      payActual: "",
     };
 
     const editing: Client = {
@@ -87,5 +93,22 @@ describe("transformClientFormValues", () => {
     const result = transformClientFormValues(data, editing);
 
     expect(result).toHaveProperty("payAmount", 100);
+  });
+
+  it("allows clearing payActual when editing", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      group: "индивидуальные",
+      payActual: "",
+    };
+
+    const editing: Client = {
+      id: "client-2",
+      ...transformClientFormValues({ ...baseFormValues, payActual: "200", group: "индивидуальные" }),
+    };
+
+    const result = transformClientFormValues(data, editing);
+
+    expect(result).not.toHaveProperty("payActual");
   });
 });
