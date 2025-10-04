@@ -69,6 +69,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     payDate: todayISO().slice(0, 10),
     parentName: "",
     payAmount: String(getDefaultPayAmount(db.settings.groups[0]) ?? ""),
+    payActual: "",
     remainingLessons: "",
     subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
   }), [db.settings.areas, db.settings.groups, firstAreaWithSchedule, firstGroupForArea]);
@@ -125,6 +126,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         payDate: editing.payDate?.slice(0, 10) ?? "",
         parentName: editing.parentName ?? "",
         payAmount: editing.payAmount != null ? String(editing.payAmount) : String(getDefaultPayAmount(editing.group) ?? ""),
+        payActual: editing.payActual != null ? String(editing.payActual) : "",
         remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
         subscriptionPlan: editing.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
       };
@@ -361,6 +363,16 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
                 {payAmountLockedByPlan ? "Сумма выбрана формой абонемента" : "Сумма фиксирована для этой группы"}
               </span>
             )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Факт оплаты, €</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              className={fieldClass}
+              {...register("payActual")}
+              placeholder="Укажите сумму"
+            />
           </div>
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Остаток занятий</label>

@@ -46,6 +46,7 @@ export function transformClientFormValues(
 ): Omit<Client, "id"> {
   const {
     payAmount: payAmountRaw,
+    payActual: payActualRaw,
     remainingLessons: remainingLessonsRaw,
     subscriptionPlan,
     lastName,
@@ -57,6 +58,17 @@ export function transformClientFormValues(
     ...base
   } = data;
   const resolvedPayAmount = resolvePayAmount(payAmountRaw, base.group, subscriptionPlan, editing?.payAmount);
+  const resolvedPayActual = (() => {
+    const normalized = payActualRaw.trim();
+    if (!normalized.length) {
+      return undefined;
+    }
+    const parsed = Number.parseFloat(normalized);
+    if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
+      return undefined;
+    }
+    return parsed;
+  })();
   let resolvedRemaining: number | undefined;
   if (
     requiresManualRemainingLessons(base.group) ||
@@ -81,6 +93,7 @@ export function transformClientFormValues(
     ...(telegram.trim() ? { telegram: telegram.trim() } : {}),
     ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
     ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
+    ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
     ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
     ...(statusUpdatedAt ? { statusUpdatedAt } : {}),
     birthDate: parseDateInput(data.birthDate),
