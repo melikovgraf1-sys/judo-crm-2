@@ -125,6 +125,7 @@ export function makeSeedDB(): DB {
       subscriptionPlan,
       payDate: start.toISOString(),
       payAmount: planMeta?.amount ?? rnd(50, 100),
+      payActual: planMeta?.amount ?? rnd(40, 100),
       remainingLessons: manual ? rnd(4, 12) : undefined,
     } as Client;
   });

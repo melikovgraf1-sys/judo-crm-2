@@ -56,6 +56,7 @@ export interface Client {
   subscriptionPlan?: SubscriptionPlan;
   payDate?: string; // ISO
   payAmount?: number;
+  payActual?: number;
   remainingLessons?: number;
   // Автополя (рассчитываются на лету)
 }
@@ -80,6 +81,7 @@ export interface ClientFormValues {
   subscriptionPlan: SubscriptionPlan;
   payDate: string;
   payAmount: string;
+  payActual: string;
   remainingLessons: string;
 }
 

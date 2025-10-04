@@ -162,6 +162,9 @@ export default function GroupsTab({
       if (!Object.prototype.hasOwnProperty.call(prepared, "payAmount")) {
         delete updated.payAmount;
       }
+      if (!Object.prototype.hasOwnProperty.call(prepared, "payActual")) {
+        delete updated.payActual;
+      }
       if (!Object.prototype.hasOwnProperty.call(prepared, "remainingLessons")) {
         delete updated.remainingLessons;
       }

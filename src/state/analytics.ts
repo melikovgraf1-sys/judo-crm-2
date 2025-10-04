@@ -242,8 +242,12 @@ function deriveGroupPrice(db: DB, group: string): number {
   return total / relevant.length;
 }
 
-function getClientAmount(client: Client): number {
+function getClientForecastAmount(client: Client): number {
   return ensureNumber(client.payAmount ?? getDefaultPayAmount(client.group) ?? 0);
+}
+
+function getClientActualAmount(client: Client): number {
+  return ensureNumber(client.payActual ?? 0);
 }
 
 function capacityForArea(db: DB, area: Area): number {
@@ -301,8 +305,8 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
   const rent = rentForAreas(db, relevantAreas);
   const coachSalary = coachSalaryForAreas(db, relevantAreas);
 
-  const actualRevenue = actualClients.reduce((sum, client) => sum + getClientAmount(client), 0);
-  const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientAmount(client), 0);
+  const actualRevenue = actualClients.reduce((sum, client) => sum + getClientActualAmount(client), 0);
+  const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientForecastAmount(client), 0);
   const maxRevenue = relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
 
   const totalExpenses = rent + coachSalary;
