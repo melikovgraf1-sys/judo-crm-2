@@ -214,6 +214,13 @@ export default function ClientTable({
       sortValue: client => client.payAmount ?? 0,
     },
     {
+      id: "payActual",
+      label: "Факт оплаты",
+      width: "minmax(130px, max-content)",
+      renderCell: client => (client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"),
+      sortValue: client => client.payActual ?? 0,
+    },
+    {
       id: "payDate",
       label: "Дата оплаты",
       width: "minmax(140px, max-content)",

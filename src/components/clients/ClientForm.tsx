@@ -19,7 +19,7 @@ import {
   estimateGroupRemainingLessonsByParams,
   requiresManualRemainingLessons,
 } from "../../state/lessons";
-import type { Area, DB, Client, ClientFormValues, Group } from "../../types";
+import type { Area, DB, Client, ClientFormValues, Group, SubscriptionPlan } from "../../types";
 
 type Props = {
   db: DB,
@@ -164,16 +164,25 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
   const canEditPayAmount = groupAllowsCustom || planAllowsCustom;
   const defaultPayAmount = getDefaultPayAmount(selectedGroup);
   const prevGroupRef = useRef<string | null>(null);
+  const prevPlanRef = useRef<SubscriptionPlan | null>(null);
   const prevAreaRef = useRef<string | null>(null);
 
   useEffect(() => {
     const previousGroup = prevGroupRef.current;
+    const previousPlan = prevPlanRef.current;
     prevGroupRef.current = selectedGroup ?? null;
+    prevPlanRef.current = subscriptionPlan;
+
+    const groupChanged = previousGroup !== null && previousGroup !== selectedGroup;
+    const planChanged = previousPlan !== null && previousPlan !== subscriptionPlan;
 
     if (subscriptionPlanAmount != null && !groupAllowsCustom) {
       const targetValue = String(subscriptionPlanAmount);
-      if (currentPayAmount !== targetValue) {
-        setValue("payAmount", targetValue, { shouldDirty: true, shouldValidate: false });
+      if ((groupChanged || planChanged || !currentPayAmount) && currentPayAmount !== targetValue) {
+        setValue("payAmount", targetValue, {
+          shouldDirty: groupChanged || planChanged,
+          shouldValidate: false,
+        });
       }
       return;
     }
@@ -184,16 +193,21 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
 
     if (!groupAllowsCustom && !planAllowsCustom && defaultPayAmount != null) {
       const targetValue = String(defaultPayAmount);
-      if (currentPayAmount !== targetValue) {
-        setValue("payAmount", targetValue, { shouldDirty: true, shouldValidate: false });
+      if ((groupChanged || planChanged || !currentPayAmount) && currentPayAmount !== targetValue) {
+        setValue("payAmount", targetValue, {
+          shouldDirty: groupChanged || planChanged,
+          shouldValidate: false,
+        });
       }
       return;
     }
 
     if (groupAllowsCustom && defaultPayAmount != null && !planAllowsCustom) {
-      const switchedGroup = previousGroup !== selectedGroup;
-      if (!currentPayAmount || switchedGroup) {
-        setValue("payAmount", String(defaultPayAmount), { shouldDirty: false, shouldValidate: false });
+      if (!currentPayAmount || groupChanged || planChanged) {
+        setValue("payAmount", String(defaultPayAmount), {
+          shouldDirty: groupChanged || planChanged,
+          shouldValidate: false,
+        });
       }
     }
   }, [
@@ -203,6 +217,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     planAllowsCustom,
     selectedGroup,
     setValue,
+    subscriptionPlan,
     subscriptionPlanAmount,
   ]);
 
