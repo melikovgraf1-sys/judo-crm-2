@@ -168,17 +168,44 @@ export default function LeadsTab({
                 {({ index, style }: ListChildComponentProps) => {
                   const l = leads[index];
                   return (
-                    <div key={l.id} style={style} className="p-2 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800">
-                      <button
-                        onClick={() => setOpen(l)}
-                        className="w-full text-left text-sm font-medium transition-colors duration-150 hover:text-sky-600 hover:underline dark:hover:text-sky-300"
-                      >
+                    <div
+                      key={l.id}
+                      style={style}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setOpen(l)}
+                      onKeyDown={event => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setOpen(l);
+                        }
+                      }}
+                      aria-label={l.name}
+                      className="group p-2 rounded-xl border border-slate-200 bg-slate-50 transition hover:border-sky-200 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-700 dark:hover:bg-slate-700 cursor-pointer"
+                    >
+                      <div className="text-sm font-medium text-slate-800 transition-colors duration-150 group-hover:text-sky-600 dark:text-slate-100 dark:group-hover:text-sky-300">
                         {l.name}
-                      </button>
+                      </div>
                       <div className="text-xs text-slate-500">{l.source}{formatLeadContactSummary(l)}</div>
                       <div className="flex gap-1 mt-2">
-                        <button onClick={() => move(l.id, -1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">◀</button>
-                        <button onClick={() => move(l.id, +1)} className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800">▶</button>
+                        <button
+                          onClick={event => {
+                            event.stopPropagation();
+                            void move(l.id, -1);
+                          }}
+                          className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          ◀
+                        </button>
+                        <button
+                          onClick={event => {
+                            event.stopPropagation();
+                            void move(l.id, +1);
+                          }}
+                          className="px-2 py-1 text-xs rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                        >
+                          ▶
+                        </button>
                       </div>
                     </div>
                   );
