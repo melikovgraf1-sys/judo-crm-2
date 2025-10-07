@@ -42,6 +42,7 @@ export interface Client {
   whatsApp?: string;
   telegram?: string;
   instagram?: string;
+  comment?: string;
   channel: ContactChannel;
   birthDate: string; // ISO
   gender: Gender;
@@ -68,6 +69,7 @@ export interface ClientFormValues {
   whatsApp: string;
   telegram: string;
   instagram: string;
+  comment: string;
   channel: ContactChannel;
   birthDate: string;
   parentName: string;

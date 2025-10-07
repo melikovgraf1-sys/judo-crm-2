@@ -57,6 +57,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     whatsApp: "",
     telegram: "",
     instagram: "",
+    comment: "",
     gender: "м",
     area: firstAreaWithSchedule ?? db.settings.areas[0],
     group: firstGroupForArea(firstAreaWithSchedule ?? db.settings.areas[0]),
@@ -80,6 +81,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     whatsApp: yup.string().trim(),
     telegram: yup.string().trim(),
     instagram: yup.string().trim(),
+    comment: yup.string().trim(),
     birthDate: yup
       .string()
       .required("Дата рождения обязательна")
@@ -114,6 +116,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         whatsApp: editing.whatsApp ?? "",
         telegram: editing.telegram ?? "",
         instagram: editing.instagram ?? "",
+        comment: editing.comment ?? "",
         gender: editing.gender,
         area: editing.area,
         group: editing.group,
@@ -282,6 +285,14 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Instagram</label>
             <input className={fieldClass} {...register("instagram")} />
+          </div>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label className={labelClass}>Комментарий</label>
+            <textarea
+              className={`${fieldClass} min-h-[96px] resize-y`}
+              {...register("comment")}
+              placeholder="Свободные примечания"
+            />
           </div>
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Канал</label>

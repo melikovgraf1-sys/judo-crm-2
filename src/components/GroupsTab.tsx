@@ -168,6 +168,9 @@ export default function GroupsTab({
       if (!Object.prototype.hasOwnProperty.call(prepared, "remainingLessons")) {
         delete updated.remainingLessons;
       }
+      if (!Object.prototype.hasOwnProperty.call(prepared, "comment")) {
+        delete updated.comment;
+      }
       const next = {
         ...db,
         clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),

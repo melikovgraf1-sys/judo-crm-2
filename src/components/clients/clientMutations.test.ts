@@ -10,6 +10,7 @@ describe("transformClientFormValues", () => {
     whatsApp: "",
     telegram: "",
     instagram: "",
+    comment: "",
     channel: "Telegram",
     birthDate: "2010-01-01",
     parentName: "",
@@ -77,6 +78,17 @@ describe("transformClientFormValues", () => {
     expect(result).toMatchObject({ remainingLessons: 3, subscriptionPlan: "single" });
   });
 
+  it("trims comment when provided", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      comment: "  важная заметка  ",
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result).toMatchObject({ comment: "важная заметка" });
+  });
+
   it("preserves previous numeric payAmount when input is empty", () => {
     const data: ClientFormValues = {
       ...baseFormValues,
@@ -110,5 +122,21 @@ describe("transformClientFormValues", () => {
     const result = transformClientFormValues(data, editing);
 
     expect(result).not.toHaveProperty("payActual");
+  });
+
+  it("allows clearing comment when editing", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      comment: "",
+    };
+
+    const editing: Client = {
+      id: "client-3",
+      ...transformClientFormValues({ ...baseFormValues, comment: "предыдущая" }),
+    };
+
+    const result = transformClientFormValues(data, editing);
+
+    expect(result).not.toHaveProperty("comment");
   });
 });
