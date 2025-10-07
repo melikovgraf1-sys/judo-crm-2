@@ -13,15 +13,19 @@ import type { Area, Client, Currency, DB, Group, TaskItem } from "../types";
 type TaskSection = { key: string; label: string | null; tasks: TaskItem[] };
 const UNGROUPED_KEY = "__ungrouped__";
 
+const normalize = (value?: string | null) => value?.trim() ?? "";
+
 function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSection[] {
   const buckets = new Map<string, TaskItem[]>();
+  const labels = new Map<string, string>();
   const order: string[] = [];
 
   tasks.forEach(task => {
-    const trimmedGroup = task.group ? task.group.trim() : "";
-    const key = trimmedGroup ? trimmedGroup : UNGROUPED_KEY;
+    const normalizedGroup = normalize(task.group);
+    const key = normalizedGroup || UNGROUPED_KEY;
     if (!buckets.has(key)) {
       buckets.set(key, []);
+      labels.set(key, normalizedGroup || "Без группы");
       order.push(key);
     }
     buckets.get(key)!.push(task);
@@ -30,10 +34,16 @@ function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSec
   const sections: TaskSection[] = [];
 
   availableGroups.forEach(groupName => {
-    if (!buckets.has(groupName)) return;
-    sections.push({ key: groupName, label: groupName, tasks: buckets.get(groupName)! });
-    buckets.delete(groupName);
-    const idx = order.indexOf(groupName);
+    const normalizedGroup = normalize(groupName);
+    const key = normalizedGroup || UNGROUPED_KEY;
+    const tasksInBucket = buckets.get(key);
+    if (!tasksInBucket) return;
+
+    sections.push({ key, label: normalizedGroup || "Без группы", tasks: tasksInBucket });
+    buckets.delete(key);
+    labels.delete(key);
+
+    const idx = order.indexOf(key);
     if (idx !== -1) {
       order.splice(idx, 1);
     }
@@ -42,7 +52,8 @@ function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSec
   order.forEach(key => {
     const tasksInBucket = buckets.get(key);
     if (!tasksInBucket) return;
-    sections.push({ key, label: key === UNGROUPED_KEY ? "Без группы" : key, tasks: tasksInBucket });
+    const label = labels.get(key) ?? (key === UNGROUPED_KEY ? "Без группы" : key);
+    sections.push({ key, label, tasks: tasksInBucket });
   });
 
   return sections;
@@ -95,15 +106,20 @@ export default function TasksTab({
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
 
+  const normalizedAvailableGroups = useMemo(
+    () => new Set(availableGroups.map(normalize)),
+    [availableGroups],
+  );
+
   useEffect(() => {
     if (!area && group !== null) {
       setGroup(null);
       return;
     }
-    if (area && group && !availableGroups.includes(group)) {
+    if (area && group && !normalizedAvailableGroups.has(normalize(group))) {
       setGroup(null);
     }
-  }, [area, availableGroups, group]);
+  }, [area, group, normalizedAvailableGroups]);
 
   useEffect(() => {
     if (area || group) {
@@ -113,13 +129,16 @@ export default function TasksTab({
     }
   }, [area, group]);
 
+  const normalizedArea = useMemo(() => normalize(area), [area]);
+  const normalizedGroup = useMemo(() => normalize(group), [group]);
+
   const matchesFilter = useCallback(
     (task: TaskItem) => {
-      if (area && task.area !== area) return false;
-      if (group && task.group !== group) return false;
+      if (normalizedArea && normalize(task.area) !== normalizedArea) return false;
+      if (normalizedGroup && normalize(task.group) !== normalizedGroup) return false;
       return true;
     },
-    [area, group],
+    [normalizedArea, normalizedGroup],
   );
 
   const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
