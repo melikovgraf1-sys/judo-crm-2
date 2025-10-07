@@ -6,7 +6,49 @@ import ClientDetailsModal from "./clients/ClientDetailsModal";
 import { fmtDate, uid, todayISO } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
-import type { Currency, DB, TaskItem } from "../types";
+import type { Client, Currency, DB, TaskItem } from "../types";
+
+const HALF_MONTH_RENEWAL_DAYS = 14;
+
+const advanceHalfMonthPayDate = (client: Client): Client | null => {
+  if (client.subscriptionPlan !== "half-month") {
+    return null;
+  }
+  if (!client.payDate) {
+    return null;
+  }
+  const currentPayDate = new Date(client.payDate);
+  if (Number.isNaN(currentPayDate.getTime())) {
+    return null;
+  }
+  const nextPayDate = new Date(currentPayDate);
+  nextPayDate.setUTCDate(nextPayDate.getUTCDate() + HALF_MONTH_RENEWAL_DAYS);
+  return { ...client, payDate: nextPayDate.toISOString() };
+};
+
+export const resolveClientsAfterTaskCompletion = (
+  clients: Client[],
+  task: TaskItem,
+): Client[] => {
+  if (task.status !== "done") {
+    return clients;
+  }
+  if (task.topic !== "оплата") {
+    return clients;
+  }
+  if (task.assigneeType !== "client" || !task.assigneeId) {
+    return clients;
+  }
+  const index = clients.findIndex(client => client.id === task.assigneeId);
+  if (index < 0) {
+    return clients;
+  }
+  const updated = advanceHalfMonthPayDate(clients[index]);
+  if (!updated) {
+    return clients;
+  }
+  return clients.map((client, idx) => (idx === index ? updated : client));
+};
 
 export default function TasksTab({
   db,
@@ -30,8 +72,8 @@ export default function TasksTab({
         .sort((a, b) => +new Date(b.due) - +new Date(a.due)),
     [db.tasksArchive],
   );
-  const recalcClients = (tasks: TaskItem[], archive: TaskItem[]) =>
-    applyPaymentStatusRules(db.clients, tasks, archive);
+  const recalcClients = (tasks: TaskItem[], archive: TaskItem[], clients: Client[] = db.clients) =>
+    applyPaymentStatusRules(clients, tasks, archive);
 
   const complete = async (id: string) => {
     const task = db.tasks.find(t => t.id === id);
@@ -40,11 +82,12 @@ export default function TasksTab({
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== id);
     const nextArchive = [completed, ...db.tasksArchive];
+    const clientsBeforeRecalc = resolveClientsAfterTaskCompletion(db.clients, completed);
     const next: DB = {
       ...db,
       tasks: nextTasks,
       tasksArchive: nextArchive,
-      clients: recalcClients(nextTasks, nextArchive),
+      clients: recalcClients(nextTasks, nextArchive, clientsBeforeRecalc),
     };
     const result = await commitDBUpdate(next, setDB);
     if (!result.ok) {
