@@ -86,6 +86,16 @@ export default function GroupsTab({
     }
   }, [area, availableGroups, group]);
 
+  useEffect(() => {
+    if (!area || group || !availableGroups.length) {
+      return;
+    }
+    if (isReserveArea(area)) {
+      return;
+    }
+    setGroup(availableGroups[0] ?? null);
+  }, [area, availableGroups, group]);
+
   const list = useMemo(() => {
     if (!area || !group) {
       return [];

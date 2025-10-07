@@ -76,6 +76,16 @@ export default function PerformanceTab({
   }, [area, availableGroups, group]);
 
   useEffect(() => {
+    if (!area || group || !availableGroups.length) {
+      return;
+    }
+    if (isReserveArea(area)) {
+      return;
+    }
+    setGroup(availableGroups[0] ?? null);
+  }, [area, availableGroups, group]);
+
+  useEffect(() => {
     writeDailyPeriod("performance", period.month, period.year);
   }, [period]);
 
