@@ -85,11 +85,14 @@ export function applyPaymentStatusRules(
   clients: Client[],
   tasks: TaskItem[],
   archivedTasks: TaskItem[] = [],
+  updates: Partial<Record<string, Partial<Client>>> = {},
 ): Client[] {
   return clients.map(client => {
-    const nextStatus = derivePaymentStatus(client, tasks, archivedTasks);
+    const patch = updates[client.id];
+    const base = patch ? { ...client, ...patch } : client;
+    const nextStatus = derivePaymentStatus(base, tasks, archivedTasks);
     const withPayStatus =
-      client.payStatus === nextStatus ? client : { ...client, payStatus: nextStatus };
+      base.payStatus === nextStatus ? base : { ...base, payStatus: nextStatus };
     return applyClientStatusAutoTransition(withPayStatus);
   });
 }
