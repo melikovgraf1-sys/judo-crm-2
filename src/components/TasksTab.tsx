@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
@@ -6,49 +6,9 @@ import ClientDetailsModal from "./clients/ClientDetailsModal";
 import { fmtDate, uid, todayISO } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
-import type { Client, Currency, DB, TaskItem } from "../types";
-
-const HALF_MONTH_RENEWAL_DAYS = 14;
-
-const advanceHalfMonthPayDate = (client: Client): Client | null => {
-  if (client.subscriptionPlan !== "half-month") {
-    return null;
-  }
-  if (!client.payDate) {
-    return null;
-  }
-  const currentPayDate = new Date(client.payDate);
-  if (Number.isNaN(currentPayDate.getTime())) {
-    return null;
-  }
-  const nextPayDate = new Date(currentPayDate);
-  nextPayDate.setUTCDate(nextPayDate.getUTCDate() + HALF_MONTH_RENEWAL_DAYS);
-  return { ...client, payDate: nextPayDate.toISOString() };
-};
-
-export const resolveClientsAfterTaskCompletion = (
-  clients: Client[],
-  task: TaskItem,
-): Client[] => {
-  if (task.status !== "done") {
-    return clients;
-  }
-  if (task.topic !== "оплата") {
-    return clients;
-  }
-  if (task.assigneeType !== "client" || !task.assigneeId) {
-    return clients;
-  }
-  const index = clients.findIndex(client => client.id === task.assigneeId);
-  if (index < 0) {
-    return clients;
-  }
-  const updated = advanceHalfMonthPayDate(clients[index]);
-  if (!updated) {
-    return clients;
-  }
-  return clients.map((client, idx) => (idx === index ? updated : client));
-};
+import { buildGroupsByArea } from "../state/lessons";
+import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
+import type { Area, Currency, DB, Group, TaskItem } from "../types";
 
 export default function TasksTab({
   db,
@@ -59,21 +19,58 @@ export default function TasksTab({
   setDB: Dispatch<SetStateAction<DB>>;
   currency: Currency;
 }) {
+  const storedFilters = useMemo(() => readDailySelection("tasks"), []);
+  const [area, setArea] = useState<Area | null>(storedFilters.area);
+  const [group, setGroup] = useState<Group | null>(storedFilters.group);
   const [edit, setEdit] = useState<TaskItem | null>(null);
   const [showArchive, setShowArchive] = useState(false);
   const [viewClientId, setViewClientId] = useState<string | null>(null);
 
-  const archiveCount = db.tasksArchive.length;
+  const schedule = db.schedule ?? [];
+  const groupsByArea = useMemo(() => buildGroupsByArea(schedule), [schedule]);
+  const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
+  const availableGroups = useMemo(() => {
+    if (!area) return [];
+    return groupsByArea.get(area) ?? [];
+  }, [area, groupsByArea]);
+
+  useEffect(() => {
+    if (!area && group !== null) {
+      setGroup(null);
+      return;
+    }
+    if (area && group && !availableGroups.includes(group)) {
+      setGroup(null);
+    }
+  }, [area, availableGroups, group]);
+
+  useEffect(() => {
+    if (area || group) {
+      writeDailySelection("tasks", area ?? null, group ?? null);
+    } else {
+      clearDailySelection("tasks");
+    }
+  }, [area, group]);
+
+  const matchesFilter = (task: TaskItem) => {
+    if (area && task.area !== area) return false;
+    if (group && task.group !== group) return false;
+    return true;
+  };
+
   const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
+  const visibleActiveTasks = useMemo(() => activeTasks.filter(matchesFilter), [activeTasks, area, group]);
+  const filteredArchive = useMemo(() => db.tasksArchive.filter(matchesFilter), [db.tasksArchive, area, group]);
   const sortedArchive = useMemo(
     () =>
-      db.tasksArchive
+      filteredArchive
         .slice()
         .sort((a, b) => +new Date(b.due) - +new Date(a.due)),
-    [db.tasksArchive],
+    [filteredArchive],
   );
-  const recalcClients = (tasks: TaskItem[], archive: TaskItem[], clients: Client[] = db.clients) =>
-    applyPaymentStatusRules(clients, tasks, archive);
+  const archiveCount = sortedArchive.length;
+  const recalcClients = (tasks: TaskItem[], archive: TaskItem[]) =>
+    applyPaymentStatusRules(db.clients, tasks, archive);
 
   const complete = async (id: string) => {
     const task = db.tasks.find(t => t.id === id);
@@ -169,7 +166,6 @@ export default function TasksTab({
   };
 
   const clientToView = viewClientId ? db.clients.find(client => client.id === viewClientId) ?? null : null;
-  const schedule = db.schedule ?? [];
   const attendance = db.attendance ?? [];
   const performance = db.performance ?? [];
 
@@ -177,9 +173,36 @@ export default function TasksTab({
     <>
       <div className="space-y-3">
         <Breadcrumbs items={["Задачи"]} />
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+            value={area ?? ""}
+            onChange={event => setArea(event.target.value ? (event.target.value as Area) : null)}
+          >
+            <option value="">Выберите район</option>
+            {areaOptions.map(option => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <select
+            className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+            value={group ?? ""}
+            onChange={event => setGroup(event.target.value ? (event.target.value as Group) : null)}
+            disabled={!area}
+          >
+            <option value="">Выберите группу</option>
+            {availableGroups.map(option => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
         <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Задача</button>
         <ul className="space-y-2">
-          {activeTasks.map(t => (
+          {visibleActiveTasks.map(t => (
             <li
               key={t.id}
               role="button"
