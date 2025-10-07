@@ -79,11 +79,12 @@ export default function TasksTab({
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== id);
     const nextArchive = [completed, ...db.tasksArchive];
+    const clientsBeforeRecalc = resolveClientsAfterTaskCompletion(db.clients, completed);
     const next: DB = {
       ...db,
       tasks: nextTasks,
       tasksArchive: nextArchive,
-      clients: recalcClients(nextTasks, nextArchive),
+      clients: recalcClients(nextTasks, nextArchive, clientsBeforeRecalc),
     };
     const result = await commitDBUpdate(next, setDB);
     if (!result.ok) {

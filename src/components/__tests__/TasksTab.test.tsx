@@ -21,7 +21,7 @@ jest.mock('../../state/reserve', () => ({
   ensureReserveAreaIncluded: (areas: string[]) => areas,
   RESERVE_AREA_NAME: 'резерв',
 }));
-import TasksTab from '../TasksTab';
+import TasksTab, { resolveClientsAfterTaskCompletion } from '../TasksTab';
 import { commitDBUpdate } from '../../state/appState';
 
 function setup(initialTasks, overrides = {}) {
