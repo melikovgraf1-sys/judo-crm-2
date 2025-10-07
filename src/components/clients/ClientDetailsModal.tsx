@@ -91,33 +91,43 @@ export default function ClientDetailsModal({
         </div>
 
         {section === "info" && (
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
-            <InfoRow label="Телефон" value={client.phone || "—"} />
-            <InfoRow label="WhatsApp" value={client.whatsApp || "—"} />
-            <InfoRow label="Telegram" value={client.telegram || "—"} />
-            <InfoRow label="Instagram" value={client.instagram || "—"} />
-            <InfoRow label="Канал" value={client.channel} />
-            <InfoRow label="Родитель" value={client.parentName || "—"} />
-            <InfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />
-            <InfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
-            <InfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
-            <InfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
-            <InfoRow label="Статус" value={client.status ?? "—"} />
-            <InfoRow label="Статус оплаты" value={client.payStatus} />
-            <InfoRow
-              label="Форма абонемента"
-              value={client.subscriptionPlan ? getSubscriptionPlanMeta(client.subscriptionPlan)?.label ?? "—" : "—"}
-            />
-            <InfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
-            <InfoRow
-              label="Сумма оплаты"
-              value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
-            />
-            <InfoRow
-              label="Факт оплаты"
-              value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
-            />
-            <InfoRow label="Остаток занятий" value={remaining != null ? String(remaining) : "—"} />
+          <div className="space-y-2">
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <InfoRow label="Телефон" value={client.phone || "—"} />
+              <InfoRow label="WhatsApp" value={client.whatsApp || "—"} />
+              <InfoRow label="Telegram" value={client.telegram || "—"} />
+              <InfoRow label="Instagram" value={client.instagram || "—"} />
+              <InfoRow label="Канал" value={client.channel} />
+              <InfoRow label="Родитель" value={client.parentName || "—"} />
+              <InfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />
+              <InfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
+              <InfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
+              <InfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
+              <InfoRow label="Статус" value={client.status ?? "—"} />
+              <InfoRow label="Статус оплаты" value={client.payStatus} />
+              <InfoRow
+                label="Форма абонемента"
+                value={client.subscriptionPlan ? getSubscriptionPlanMeta(client.subscriptionPlan)?.label ?? "—" : "—"}
+              />
+              <InfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
+              <InfoRow
+                label="Сумма оплаты"
+                value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
+              />
+              <InfoRow
+                label="Факт оплаты"
+                value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
+              />
+              <InfoRow label="Остаток занятий" value={remaining != null ? String(remaining) : "—"} />
+            </div>
+            {client.comment ? (
+              <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Комментарий
+                </span>
+                <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{client.comment}</p>
+              </div>
+            ) : null}
           </div>
         )}
 

@@ -206,6 +206,9 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
       if (!Object.prototype.hasOwnProperty.call(prepared, "remainingLessons")) {
         delete updated.remainingLessons;
       }
+      if (!Object.prototype.hasOwnProperty.call(prepared, "comment")) {
+        delete updated.comment;
+      }
       const finalClient = applyClientStatusAutoTransition(updated);
       const next = {
         ...db,

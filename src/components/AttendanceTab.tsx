@@ -383,6 +383,9 @@ export default function AttendanceTab({
     if (!editing) return;
     const prepared = transformClientFormValues(values, editing);
     const updated: Client = { ...editing, ...prepared };
+    if (!Object.prototype.hasOwnProperty.call(prepared, "comment")) {
+      delete updated.comment;
+    }
     const next = {
       ...db,
       clients: db.clients.map(client => (client.id === editing.id ? updated : client)),

@@ -55,6 +55,7 @@ export function transformClientFormValues(
     whatsApp,
     telegram,
     instagram,
+    comment,
     ...base
   } = data;
   const resolvedPayAmount = resolvePayAmount(payAmountRaw, base.group, subscriptionPlan, editing?.payAmount);
@@ -82,6 +83,7 @@ export function transformClientFormValues(
 
   const statusChanged = !editing || editing.status !== base.status;
   const statusUpdatedAt = statusChanged ? todayISO() : editing?.statusUpdatedAt;
+  const normalizedComment = comment.trim();
 
   return {
     ...base,
@@ -92,6 +94,7 @@ export function transformClientFormValues(
     ...(whatsApp.trim() ? { whatsApp: whatsApp.trim() } : {}),
     ...(telegram.trim() ? { telegram: telegram.trim() } : {}),
     ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
+    ...(normalizedComment ? { comment: normalizedComment } : {}),
     ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
     ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
     ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
