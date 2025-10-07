@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { TAB_TITLES } from "../components/Tabs";
 import { useToasts } from "../components/Toasts";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, runTransaction, setDoc } from "firebase/firestore";
 import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { todayISO, uid } from "./utils";
@@ -37,6 +37,10 @@ export const LS_KEYS = {
 };
 
 export const LOCAL_ONLY_EVENT = "judo-crm/local-only";
+
+export const DB_CONFLICT_EVENT = "judo-crm/db-conflict";
+
+const DB_CONFLICT_MESSAGE = "Данные в базе были изменены в другом месте. Обновляем локальную копию.";
 
 export const LOCAL_ONLY_MESSAGE =
   "Данные сейчас сохраняются только в этом браузере — синхронизация с Firebase отключена, поэтому содержимое может отличаться в других окнах.";
@@ -125,8 +129,13 @@ function normalizeDB(value: unknown): DB | null {
   }
 
   const raw = value as Partial<DB>;
+  const revision =
+    typeof raw.revision === "number" && Number.isFinite(raw.revision) && raw.revision >= 0
+      ? Math.floor(raw.revision)
+      : 0;
 
   return {
+    revision,
     clients: ensureObjectArray<Client>(raw.clients),
     attendance: ensureObjectArray<AttendanceEntry>(raw.attendance),
     performance: ensureObjectArray<PerformanceEntry>(raw.performance),
@@ -176,11 +185,23 @@ function sanitizeForFirestore<T>(value: T): T {
   }
 }
 
-export async function saveDB(dbData: DB): Promise<boolean> {
+class RevisionConflictError extends Error {
+  constructor(message: string = "Revision conflict") {
+    super(message);
+    this.name = "RevisionConflictError";
+  }
+}
+
+export type CommitDBResult =
+  | { ok: true; db: DB }
+  | { ok: false; reason: "conflict" }
+  | { ok: false; reason: "error" };
+
+export async function saveDB(dbData: DB): Promise<CommitDBResult> {
   if (!firestore) {
     console.warn("Firestore not initialized. Changes cannot be synchronized.");
     writeLocalDB(dbData);
-    return true;
+    return { ok: true, db: dbData };
   }
 
   let signedIn = false;
@@ -192,33 +213,57 @@ export async function saveDB(dbData: DB): Promise<boolean> {
 
   const ref = doc(firestore, "app", "main");
   try {
-    const payload = sanitizeForFirestore(dbData);
-    await setDoc(ref, payload);
+    const updated = await runTransaction(firestore, async transaction => {
+      const snap = await transaction.get(ref);
+      const remote = snap.exists() ? normalizeDB(snap.data()) : null;
+      const remoteRevision = remote?.revision ?? 0;
+      const expectedRevision = dbData.revision ?? 0;
+
+      if (snap.exists() && remoteRevision !== expectedRevision) {
+        throw new RevisionConflictError(
+          `Remote revision ${remoteRevision} does not match local ${expectedRevision}`,
+        );
+      }
+
+      const nextRevision = Math.max(remoteRevision, expectedRevision) + 1;
+      const payload = sanitizeForFirestore({ ...dbData, revision: nextRevision });
+      transaction.set(ref, payload);
+      return { ...dbData, revision: nextRevision };
+    });
     if (!signedIn) {
       console.warn("Saved DB without confirmed Firebase authentication. Check security rules if data is missing remotely.");
     }
-    writeLocalDB(dbData);
-    return true;
+    writeLocalDB(updated);
+    return { ok: true, db: updated };
   } catch (err) {
+    if (err instanceof RevisionConflictError) {
+      console.warn("Database revision conflict detected", err);
+      return { ok: false, reason: "conflict" };
+    }
+
     console.error("Failed to save DB", err);
     writeLocalDB(dbData);
     if (typeof window !== "undefined" && "dispatchEvent" in window) {
       window.dispatchEvent(new CustomEvent(LOCAL_ONLY_EVENT));
     }
     console.warn(LOCAL_ONLY_MESSAGE);
-    return false;
+    return { ok: false, reason: "error" };
   }
 }
 
 export async function commitDBUpdate(
   next: DB,
   setDB: Dispatch<SetStateAction<DB>>,
-): Promise<boolean> {
-  const persisted = await saveDB(next);
-  if (persisted) {
+): Promise<CommitDBResult> {
+  const result = await saveDB(next);
+  if (result.ok) {
+    setDB(result.db);
+  } else if (result.reason === "error") {
     setDB(next);
+  } else if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(DB_CONFLICT_EVENT));
   }
-  return persisted;
+  return result;
 }
 
 const defaultUI: UIState = {
@@ -414,6 +459,45 @@ export function useAppState(): AppState {
       window.removeEventListener(LOCAL_ONLY_EVENT, handler);
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return () => undefined;
+    }
+
+    const handler = async () => {
+      push(DB_CONFLICT_MESSAGE, "warning");
+
+      if (firestore) {
+        try {
+          const ref = doc(firestore, "app", "main");
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            const data = normalizeDB(snap.data());
+            if (data) {
+              writeLocalDB(data);
+              setDB(data);
+              setIsLocalOnly(false);
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Failed to reload Firestore data after conflict", err);
+          push("Не удалось загрузить данные из Firebase", "error");
+        }
+      }
+
+      const local = readLocalDB();
+      if (local) {
+        setDB(local);
+      }
+    };
+
+    window.addEventListener(DB_CONFLICT_EVENT, handler as EventListener);
+    return () => {
+      window.removeEventListener(DB_CONFLICT_EVENT, handler as EventListener);
+    };
+  }, [push, setDB, setIsLocalOnly]);
 
   useEffect(() => {
     if (isLocalOnly) {

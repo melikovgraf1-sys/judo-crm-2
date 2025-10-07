@@ -1,6 +1,6 @@
 // @ts-nocheck
 import '@testing-library/jest-dom';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 const mockPush = jest.fn();
 
@@ -9,6 +9,7 @@ jest.mock(
   () => ({
     __esModule: true,
     useLocation: () => ({ pathname: '/' }),
+    useNavigate: () => jest.fn(),
   }),
   { virtual: true },
 );
@@ -24,7 +25,7 @@ jest.mock('../../firebase', () => ({
   ensureSignedIn: jest.fn().mockResolvedValue(false),
 }));
 
-import { commitDBUpdate, LS_KEYS, LOCAL_ONLY_MESSAGE, useAppState } from '../appState';
+import { commitDBUpdate, DB_CONFLICT_EVENT, LS_KEYS, LOCAL_ONLY_MESSAGE, useAppState } from '../appState';
 import { RESERVE_AREA_NAME } from '../reserve';
 import { makeSeedDB } from '../seed';
 
@@ -52,12 +53,12 @@ describe('useAppState with local persistence', () => {
       ],
     };
 
-    let persisted = false;
+    let persisted;
     await act(async () => {
       persisted = await commitDBUpdate(next, result.current.setDB);
     });
 
-    expect(persisted).toBe(true);
+    expect(persisted).toEqual({ ok: true, db: next });
     expect(result.current.db).toEqual(next);
 
     const stored = localStorage.getItem(LS_KEYS.db);
@@ -94,5 +95,34 @@ describe('useAppState with local persistence', () => {
     await act(async () => {});
 
     expect(result.current.db.settings.areas).toContain(RESERVE_AREA_NAME);
+});
+
+  it('reloads data and shows a warning toast on DB conflict', async () => {
+    const { result } = renderHook(() => useAppState());
+
+    await act(async () => {});
+
+    const updated = {
+      ...result.current.db,
+      revision: result.current.db.revision + 1,
+      changelog: [
+        ...result.current.db.changelog,
+        { id: 'conflict-entry', who: 'Тест', what: 'Конфликт ревизии', when: new Date().toISOString() },
+      ],
+    };
+
+    localStorage.setItem(LS_KEYS.db, JSON.stringify(updated));
+    mockPush.mockClear();
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(DB_CONFLICT_EVENT));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.db).toEqual(updated);
+    });
+
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining('Обновляем локальную копию'), 'warning');
   });
 });

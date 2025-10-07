@@ -49,10 +49,12 @@ export default function LeadsTab({
     const updatedLead: Lead = { ...current, stage: nextStage, updatedAt: todayISO() };
 
     const next = { ...db, leads: db.leads.map(x => (x.id === id ? updatedLead : x)) };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось обновить статус лида. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось обновить статус лида. Изменение сохранено локально, проверьте доступ к базе данных.");
+      }
+      return;
     }
   };
 
@@ -92,10 +94,12 @@ export default function LeadsTab({
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён лид ${nextLead.name}`, when: todayISO() }],
     };
 
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.");
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось синхронизировать изменения лида. Они сохранены локально, проверьте доступ к базе данных.");
+      }
+      return;
     }
   };
 
@@ -112,10 +116,12 @@ export default function LeadsTab({
         { id: uid(), who: "UI", what: `Лид ${lead.name} конвертирован в клиента ${newClient.firstName}`, when: todayISO() },
       ],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось обновить лида. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось обновить лида. Изменение сохранено локально, проверьте доступ к базе данных.");
+      }
+      return;
     }
   };
 
@@ -129,10 +135,12 @@ export default function LeadsTab({
       leadHistory: [resolution, ...db.leadHistory.filter(entry => entry.leadId !== lead.id)],
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Лид ${lead.name} перенесён в архив`, when: todayISO() }],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось переместить лида в архив. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось переместить лида в архив. Изменение сохранено локально, проверьте доступ к базе данных.");
+      }
+      return;
     }
   };
 
@@ -143,8 +151,8 @@ export default function LeadsTab({
       leads: db.leads.filter(l => l.id !== lead.id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён лид ${lead.id}`, when: todayISO() }],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить лида. Проверьте доступ к базе данных.");
     }
   };

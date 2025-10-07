@@ -33,8 +33,8 @@ export default function ScheduleTab({
       if (!(key in nextLimits)) nextLimits[key] = 0;
     }
     const next = { ...db, settings: { ...db.settings, areas: nextAreas, limits: nextLimits } };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось добавить район. Проверьте доступ к базе данных.");
     }
   };
@@ -63,8 +63,8 @@ export default function ScheduleTab({
       settings: { ...db.settings, areas: renamedAreas, limits: renamedLimits },
       schedule: db.schedule.map(s => s.area === oldName ? { ...s, area: name } : s),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось переименовать район. Проверьте доступ к базе данных.");
     }
   };
@@ -81,8 +81,8 @@ export default function ScheduleTab({
       settings: { ...db.settings, areas: db.settings.areas.filter(a => a !== name), limits: filteredLimits },
       schedule: db.schedule.filter(s => s.area !== name),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить район. Проверьте доступ к базе данных.");
     }
   };
@@ -108,8 +108,8 @@ export default function ScheduleTab({
         ? db.settings
         : { ...db.settings, groups: [...db.settings.groups, group] },
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось добавить слот расписания. Проверьте доступ к базе данных.");
     }
   };
@@ -127,16 +127,16 @@ export default function ScheduleTab({
         ? db.settings
         : { ...db.settings, groups: [...db.settings.groups, group] },
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось обновить слот расписания. Проверьте доступ к базе данных.");
     }
   };
   const deleteSlot = async (id: string) => {
     if (!window.confirm("Удалить группу?")) return;
     const next = { ...db, schedule: db.schedule.filter(x => x.id !== id) };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить слот расписания. Проверьте доступ к базе данных.");
     }
   };

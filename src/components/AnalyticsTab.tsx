@@ -146,12 +146,14 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         [field]: { ...(currentMap ?? {}), [area]: value },
       } as DB["settings"];
       const next = { ...db, settings: nextSettings };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert(
-          "Не удалось сохранить значение. Изменение сохранено локально, проверьте подключение к базе данных.",
-        );
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось сохранить значение. Изменение сохранено локально, проверьте подключение к базе данных.",
+          );
+        }
+        return;
       }
     },
     [area, db, setDB],
@@ -196,12 +198,14 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         nextFavorites = [...favorites, id];
       }
       const next = { ...db, settings: { ...db.settings, analyticsFavorites: nextFavorites } };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert(
-          "Не удалось обновить избранные показатели. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось обновить избранные показатели. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
       }
     },
     [db, favorites, setDB],

@@ -137,9 +137,11 @@ export default function SettingsTab({
       },
     };
 
-    const ok = await commitDBUpdate(updated, setDB);
-    if (!ok) {
-      window.alert("Не удалось сохранить курсы валют. Проверьте доступ к базе данных.");
+    const result = await commitDBUpdate(updated, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось сохранить курсы валют. Проверьте доступ к базе данных.");
+      }
       return;
     }
 
@@ -241,9 +243,11 @@ export default function SettingsTab({
               currencyRates: { EUR: 1, TRY: nextRates.eurTry, RUB: nextRates.eurRub },
             },
           };
-          const ok = await commitDBUpdate(updated, setDB);
-          if (!ok) {
-            console.error("Failed to update currency rates in Firestore");
+          const result = await commitDBUpdate(updated, setDB);
+          if (!result.ok) {
+            if (result.reason === "error") {
+              console.error("Failed to update currency rates in Firestore");
+            }
           } else {
             lastSavedRatesRef.current = { eurTry: nextRates.eurTry, eurRub: nextRates.eurRub };
           }
@@ -348,8 +352,8 @@ export default function SettingsTab({
                                 limits: { ...db.settings.limits, [key]: Number(e.target.value) },
                               },
                             };
-                            const ok = await commitDBUpdate(next, setDB);
-                            if (!ok) {
+                            const result = await commitDBUpdate(next, setDB);
+                            if (!result.ok && result.reason === "error") {
                               window.alert("Не удалось сохранить лимит. Проверьте доступ к базе данных.");
                             }
                           }}

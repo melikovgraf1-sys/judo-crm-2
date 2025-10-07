@@ -11,6 +11,7 @@ jest.mock("../../state/appState", () => ({
 }));
 
 const createDB = (): DB => ({
+  revision: 0,
   clients: [],
   attendance: [],
   performance: [],
@@ -42,7 +43,7 @@ describe("SettingsTab", () => {
   beforeEach(() => {
     fetchMock = jest.fn() as FetchMock;
     globalWithFetch.fetch = fetchMock as unknown as typeof fetch;
-    (commitDBUpdate as jest.Mock).mockResolvedValue(true);
+    (commitDBUpdate as jest.Mock).mockImplementation(async (next: DB) => ({ ok: true, db: next }));
   });
 
   afterEach(() => {

@@ -12,7 +12,7 @@ jest.mock('react-window', () => ({
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  commitDBUpdate: jest.fn().mockResolvedValue(true),
+  commitDBUpdate: jest.fn(),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -47,7 +47,7 @@ beforeEach(() => {
   window.localStorage.clear();
   commitDBUpdate.mockImplementation(async (next, setDB) => {
     setDB(next);
-    return true;
+    return { ok: true, db: next };
   });
   uid.mockReturnValue('uid-123');
   todayISO.mockReturnValue('2024-01-01T00:00:00.000Z');
@@ -62,6 +62,7 @@ beforeEach(() => {
 });
 
 const makeDB = () => ({
+  revision: 0,
   clients: [],
   attendance: [],
   performance: [],

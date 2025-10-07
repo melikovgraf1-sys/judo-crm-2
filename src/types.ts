@@ -199,6 +199,7 @@ export interface Settings {
 }
 
 export interface DB {
+  revision: number;
   clients: Client[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
