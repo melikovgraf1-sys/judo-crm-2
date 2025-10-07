@@ -173,10 +173,12 @@ export default function GroupsTab({
         clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
         changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
       };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert("Не удалось синхронизировать изменения клиента. Они сохранены локально, проверьте доступ к базе данных.");
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert("Не удалось синхронизировать изменения клиента. Они сохранены локально, проверьте доступ к базе данных.");
+        }
+        return;
       }
     } else {
       const c: Client = {
@@ -189,10 +191,14 @@ export default function GroupsTab({
         clients: [c, ...db.clients],
         changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
       };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert("Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.");
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
       }
     }
     setModalOpen(false);
@@ -231,8 +237,8 @@ export default function GroupsTab({
         { id: uid(), who: "UI", what: `Создана задача по оплате ${client.firstName}`, when: todayISO() },
       ],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось создать задачу. Проверьте доступ к базе данных.");
     }
   };
@@ -244,8 +250,8 @@ export default function GroupsTab({
       clients: db.clients.filter(c => c.id !== id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить клиента. Проверьте доступ к базе данных.");
     }
   };

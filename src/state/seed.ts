@@ -190,6 +190,7 @@ export function makeSeedDB(): DB {
   };
 
   return {
+    revision: 0,
     clients,
     attendance,
     performance,

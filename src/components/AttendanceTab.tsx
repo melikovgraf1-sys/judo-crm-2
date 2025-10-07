@@ -225,12 +225,14 @@ export default function AttendanceTab({
         attendance: db.attendance.filter(entry => entry.id !== mark.id),
         clients: db.clients,
       };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert(
-          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
       }
     } else if (mark) {
       const updated = { ...mark, came: false };
@@ -250,12 +252,14 @@ export default function AttendanceTab({
         attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
         clients: nextClients,
       };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert(
-          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
       }
     } else {
       const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
@@ -272,12 +276,13 @@ export default function AttendanceTab({
             return { ...c, remainingLessons: nextRemaining };
           });
       const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert(
-          "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
       }
     }
   }, [db, marksForSelectedDate, selectedDate, setDB]);
@@ -382,9 +387,11 @@ export default function AttendanceTab({
       ...db,
       clients: db.clients.map(client => (client.id === editing.id ? updated : client)),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось сохранить изменения клиента. Проверьте доступ к базе данных.");
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось сохранить изменения клиента. Проверьте доступ к базе данных.");
+      }
       return;
     }
     setEditing(null);

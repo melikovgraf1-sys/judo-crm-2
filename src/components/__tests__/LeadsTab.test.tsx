@@ -12,7 +12,7 @@ jest.mock('react-window', () => ({
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  commitDBUpdate: jest.fn().mockResolvedValue(true),
+  commitDBUpdate: jest.fn(),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -41,7 +41,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   commitDBUpdate.mockImplementation(async (next, setDB) => {
     setDB(next);
-    return true;
+    return { ok: true, db: next };
   });
   global.confirm = jest.fn(() => true);
   global.prompt = jest.fn();
@@ -49,6 +49,7 @@ beforeEach(() => {
 });
 
 const makeDB = () => ({
+  revision: 0,
   clients: [],
   attendance: [],
   schedule: [],
@@ -146,8 +147,8 @@ test('create: adds new lead via modal', async () => {
         updatedAt: todayISO(),
       };
       const next = { ...state, leads: [l, ...state.leads] };
-      const ok = await commitDBUpdate(next, setDB);
-      if (ok) {
+      const result = await commitDBUpdate(next, setDB);
+      if (result.ok) {
         setOpen(false);
       }
     };

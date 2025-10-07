@@ -179,12 +179,14 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
         { id: uid(), who: "UI", what: `Создан клиент ${client.firstName}`, when: todayISO() },
       ],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert(
-        "Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.",
-      );
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert(
+          "Не удалось синхронизировать нового клиента. Запись сохранена локально, проверьте доступ к базе данных.",
+        );
+      }
+      return;
     }
     setModalOpen(false);
     setEditing(null);
@@ -213,10 +215,14 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
           { id: uid(), who: "UI", what: `Обновлён клиент ${finalClient.firstName}`, when: todayISO() },
         ],
       };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
-        window.alert("Не удалось синхронизировать изменения клиента. Они сохранены локально, проверьте доступ к базе данных.");
-        setDB(next);
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok) {
+        if (result.reason === "error") {
+          window.alert(
+            "Не удалось синхронизировать изменения клиента. Они сохранены локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
       }
       setModalOpen(false);
       setEditing(null);
@@ -281,8 +287,8 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
         { id: uid(), who: "UI", what: `Создана задача по оплате ${client.firstName}`, when: todayISO() },
       ],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось создать задачу. Проверьте доступ к базе данных.");
     }
   };
@@ -294,8 +300,8 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
       clients: db.clients.filter(client => client.id !== id),
       changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }],
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить клиента. Проверьте доступ к базе данных.");
     }
   };
@@ -334,12 +340,14 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
 
         if (shouldReplace) {
           const { next, summary } = replaceImportedClients(db, result.clients);
-          const ok = await commitDBUpdate(next, setDB);
-          if (!ok) {
-            window.alert(
-              "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
-            );
-            setDB(next);
+          const resultCommit = await commitDBUpdate(next, setDB);
+          if (!resultCommit.ok) {
+            if (resultCommit.reason === "error") {
+              window.alert(
+                "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
+              );
+            }
+            return;
           }
           messages.push(`Заменено клиентов: ${summary.replaced}`);
           const removedClients = summary.previous - summary.replaced;
@@ -360,12 +368,14 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
           }
         } else {
           const { next, summary } = appendImportedClients(db, result.clients);
-          const ok = await commitDBUpdate(next, setDB);
-          if (!ok) {
-            window.alert(
-              "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
-            );
-            setDB(next);
+          const resultCommit = await commitDBUpdate(next, setDB);
+          if (!resultCommit.ok) {
+            if (resultCommit.reason === "error") {
+              window.alert(
+                "Не удалось синхронизировать импорт. Данные сохранены локально, проверьте доступ к базе данных.",
+              );
+            }
+            return;
           }
           messages.push(`Импортировано клиентов: ${summary.added}`);
           if (summary.merged) {

@@ -155,8 +155,8 @@ export default function PerformanceTab({
         ...db,
         performance: db.performance.map(entry => (entry.id === mark.id ? updated : entry)),
       };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok && result.reason === "error") {
         window.alert("Не удалось обновить отметку успеваемости. Проверьте доступ к базе данных.");
       }
     } else {
@@ -167,8 +167,8 @@ export default function PerformanceTab({
         successful: true,
       };
       const next = { ...db, performance: [entry, ...db.performance] };
-      const ok = await commitDBUpdate(next, setDB);
-      if (!ok) {
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok && result.reason === "error") {
         window.alert("Не удалось сохранить отметку успеваемости. Проверьте доступ к базе данных.");
       }
     }
@@ -273,9 +273,11 @@ export default function PerformanceTab({
       ...db,
       clients: db.clients.map(client => (client.id === editing.id ? updated : client)),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось сохранить изменения клиента. Проверьте доступ к базе данных.");
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось сохранить изменения клиента. Проверьте доступ к базе данных.");
+      }
       return;
     }
     setEditing(null);

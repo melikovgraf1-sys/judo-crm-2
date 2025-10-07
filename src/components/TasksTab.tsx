@@ -46,10 +46,12 @@ export default function TasksTab({
       tasksArchive: nextArchive,
       clients: recalcClients(nextTasks, nextArchive),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось обновить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось обновить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      }
+      return;
     }
   };
   const save = async () => {
@@ -61,10 +63,11 @@ export default function TasksTab({
       tasksArchive: db.tasksArchive,
       clients: recalcClients(nextTasks, db.tasksArchive),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
-      window.alert("Не удалось сохранить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok) {
+      if (result.reason === "error") {
+        window.alert("Не удалось сохранить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
+      }
       return;
     }
     setEdit(null);
@@ -78,10 +81,9 @@ export default function TasksTab({
       tasksArchive: db.tasksArchive,
       clients: recalcClients(nextTasks, db.tasksArchive),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось добавить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
     }
   };
   const remove = async (id: string) => {
@@ -95,10 +97,9 @@ export default function TasksTab({
       tasksArchive: nextArchive,
       clients: recalcClients(nextTasks, nextArchive),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
     }
   };
 
@@ -114,10 +115,9 @@ export default function TasksTab({
       tasksArchive: nextArchive,
       clients: recalcClients(nextTasks, nextArchive),
     };
-    const ok = await commitDBUpdate(next, setDB);
-    if (!ok) {
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
       window.alert("Не удалось восстановить задачу. Изменение сохранено локально, проверьте доступ к базе данных.");
-      setDB(next);
     }
   };
 

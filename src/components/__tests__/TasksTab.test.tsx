@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  commitDBUpdate: jest.fn().mockResolvedValue(true),
+  commitDBUpdate: jest.fn(),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -27,12 +27,28 @@ import { commitDBUpdate } from '../../state/appState';
 function setup(initialTasks, overrides = {}) {
   const Wrapper = () => {
     const [db, setDB] = React.useState({
+      revision: 0,
       tasks: initialTasks,
       tasksArchive: overrides.tasksArchive ?? [],
       clients: overrides.clients ?? [],
       attendance: overrides.attendance ?? [],
       performance: overrides.performance ?? [],
       schedule: overrides.schedule ?? [],
+      leads: [],
+      leadsArchive: [],
+      leadHistory: [],
+      staff: [],
+      settings: {
+        areas: [],
+        groups: [],
+        limits: {},
+        rentByAreaEUR: {},
+        coachSalaryByAreaEUR: {},
+        currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
+        coachPayFormula: '',
+        analyticsFavorites: [],
+      },
+      changelog: [],
     });
     return <TasksTab db={db} setDB={setDB} currency="RUB" />;
   };
@@ -48,7 +64,7 @@ describe('TasksTab CRUD operations', () => {
   beforeEach(() => {
     commitDBUpdate.mockImplementation(async (next, setDB) => {
       setDB(next);
-      return true;
+      return { ok: true, db: next };
     });
     window.confirm = jest.fn(() => true);
     window.alert = jest.fn();

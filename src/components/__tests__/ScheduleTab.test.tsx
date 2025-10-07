@@ -6,7 +6,7 @@ import '@testing-library/jest-dom';
 
 jest.mock('../../state/appState', () => ({
   __esModule: true,
-  commitDBUpdate: jest.fn().mockResolvedValue(true),
+  commitDBUpdate: jest.fn(),
 }));
 
 jest.mock('../../state/utils', () => ({
@@ -37,7 +37,7 @@ import { commitDBUpdate } from '../../state/appState';
 beforeEach(() => {
   commitDBUpdate.mockImplementation(async (next, setDB) => {
     setDB(next);
-    return true;
+    return { ok: true, db: next };
   });
   window.alert = jest.fn();
 });
@@ -45,14 +45,15 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   jest.restoreAllMocks();
-  commitDBUpdate.mockResolvedValue(true);
+  commitDBUpdate.mockReset();
 });
 
 function makeDb() {
   return {
+    revision: 0,
     clients: [],
     attendance: [],
-  schedule: [],
+    schedule: [],
   leads: [],
   leadsArchive: [],
   leadHistory: [],
@@ -67,6 +68,7 @@ function makeDb() {
       coachSalaryByAreaEUR: {},
       currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
       coachPayFormula: '',
+      analyticsFavorites: [],
     },
     changelog: [],
   };
