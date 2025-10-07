@@ -186,7 +186,7 @@ describe('useAppState with local persistence', () => {
     await act(async () => {});
 
     expect(result.current.db.settings.groups).toEqual([
-      '4–6',
+      '4–6 лет',
       '7–10 лет',
       '11 лет и старше',
       'взрослые',
@@ -195,7 +195,7 @@ describe('useAppState with local persistence', () => {
     ]);
     expect(result.current.db.clients[0].group).toBe('7–10 лет');
     expect(result.current.db.schedule[0].group).toBe('11 лет и старше');
-    expect(result.current.db.staff[0].groups).toEqual(['4–6', '7–10 лет', '11 лет и старше']);
+    expect(result.current.db.staff[0].groups).toEqual(['4–6 лет', '7–10 лет', '11 лет и старше']);
     expect(result.current.db.leads[0].group).toBe('11 лет и старше');
     expect(result.current.db.leadsArchive[0].group).toBe('7–10 лет');
     expect(result.current.db.leadHistory[0].group).toBe('11 лет и старше');

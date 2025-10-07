@@ -50,7 +50,7 @@ const DEFAULT_AREAS: Area[] = ["Махмутлар", "Центр", "Джикдж
 const DEFAULT_GROUP_LIMIT = 20;
 
 const GROUP_NAME_RULES: { pattern: RegExp; replacement: string }[] = [
-  { pattern: /^4\s*[-–]\s*6(\s*лет)?$/i, replacement: "4–6" },
+  { pattern: /^4\s*[-–]\s*6(\s*лет)?$/i, replacement: "4–6 лет" },
   { pattern: /^6\s*[-–]\s*9(\s*лет)?$/i, replacement: "7–10 лет" },
   { pattern: /^7\s*[-–]\s*10(\s*лет)?$/i, replacement: "7–10 лет" },
   { pattern: /^9\s*[-–]\s*14(\s*лет)?$/i, replacement: "11 лет и старше" },
@@ -128,7 +128,7 @@ function shallowEqualLimits(a: Settings["limits"], b: Settings["limits"]) {
 const DEFAULT_SETTINGS: Settings = {
   areas: DEFAULT_AREAS,
   groups: [
-    "4–6",
+    "4–6 лет",
     "7–10 лет",
     "11 лет и старше",
     "взрослые",
@@ -138,7 +138,7 @@ const DEFAULT_SETTINGS: Settings = {
   limits: Object.fromEntries(
     DEFAULT_AREAS.flatMap(area =>
       [
-        "4–6",
+        "4–6 лет",
         "7–10 лет",
         "11 лет и старше",
         "взрослые",
