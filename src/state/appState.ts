@@ -6,8 +6,8 @@ import { useToasts } from "../components/Toasts";
 import { doc, getDoc, onSnapshot, runTransaction, setDoc } from "firebase/firestore";
 import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
-import { todayISO, uid } from "./utils";
-import { DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
+import { fmtMoney, todayISO, uid } from "./utils";
+import { applyPaymentStatusRules, DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
 import { ensureReserveAreaIncluded } from "./areas";
 import type {
   AttendanceEntry,
@@ -379,6 +379,88 @@ export function useAppState(): AppState {
   const [db, setDB] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const [auth, setAuth] = usePersistentState<AuthState>(LS_KEYS.auth, makeDefaultAuthState(), 300);
+  const dbRef = useRef(db);
+  useEffect(() => {
+    dbRef.current = db;
+  }, [db]);
+  const uiRef = useRef(ui);
+  useEffect(() => {
+    uiRef.current = ui;
+  }, [ui]);
+  const ensurePaymentTasksForToday = useCallback(async () => {
+    const currentDB = dbRef.current;
+    const currentUI = uiRef.current;
+
+    if (!currentDB) {
+      return;
+    }
+
+    const timestamp = todayISO();
+    const today = typeof timestamp === "string" ? timestamp.slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+    const openPaymentAssignments = new Set(
+      currentDB.tasks
+        .filter(
+          task =>
+            task.status === "open" && task.topic === "оплата" && task.assigneeType === "client" && task.assigneeId,
+        )
+        .map(task => task.assigneeId as string),
+    );
+
+    const newTasks: TaskItem[] = [];
+    const changelogEntries: DB["changelog"] = [];
+
+    currentDB.clients.forEach(client => {
+      if (!client.payDate || client.payDate.slice(0, 10) !== today) {
+        return;
+      }
+
+      if (openPaymentAssignments.has(client.id)) {
+        return;
+      }
+
+      const titleParts = [
+        `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
+        client.parentName ? `родитель: ${client.parentName}` : null,
+        client.payAmount != null
+          ? `сумма: ${fmtMoney(client.payAmount, currentUI?.currency ?? "EUR", currentDB.settings.currencyRates)}`
+          : null,
+        client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
+      ].filter(Boolean);
+
+      newTasks.push({
+        id: uid(),
+        title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
+        due: client.payDate || timestamp,
+        status: "open",
+        topic: "оплата",
+        assigneeType: "client",
+        assigneeId: client.id,
+      });
+
+      changelogEntries.push({
+        id: uid(),
+        who: "Система",
+        what: `Создана задача по оплате ${client.firstName}`,
+        when: timestamp,
+      });
+    });
+
+    if (!newTasks.length) {
+      return;
+    }
+
+    const nextTasks = [...newTasks, ...currentDB.tasks];
+    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive);
+    const next: DB = {
+      ...currentDB,
+      tasks: nextTasks,
+      clients: nextClients,
+      changelog: [...currentDB.changelog, ...changelogEntries],
+    };
+
+    await commitDBUpdate(next, setDB);
+  }, [setDB]);
   const roles = ROLE_LIST;
   const currentUser = auth.users.find(user => user.id === auth.currentUserId) ?? null;
   const { toasts, push } = useToasts();
@@ -448,6 +530,49 @@ export function useAppState(): AppState {
     setQuickOpen(false);
     push("Вы вышли из аккаунта", "info");
   }, [setAuth, setQuickOpen, push]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const readCurrentTimestamp = () => {
+      const value = todayISO();
+      return typeof value === "string" ? value : new Date().toISOString();
+    };
+
+    let currentDay = readCurrentTimestamp().slice(0, 10);
+
+    const run = () => {
+      if (cancelled) {
+        return;
+      }
+      void ensurePaymentTasksForToday();
+    };
+
+    run();
+
+    const timer = window.setInterval(() => {
+      if (cancelled) {
+        return;
+      }
+      const nextDay = readCurrentTimestamp().slice(0, 10);
+      if (nextDay !== currentDay) {
+        currentDay = nextDay;
+        run();
+      }
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [ensurePaymentTasksForToday]);
+
+  useEffect(() => {
+    void ensurePaymentTasksForToday();
+  }, [db.clients, db.tasks, ensurePaymentTasksForToday]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
