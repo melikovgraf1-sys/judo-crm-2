@@ -21,7 +21,7 @@ jest.mock('../../state/reserve', () => ({
   ensureReserveAreaIncluded: (areas: string[]) => areas,
   RESERVE_AREA_NAME: 'резерв',
 }));
-import TasksTab from '../TasksTab';
+import TasksTab, { resolveClientsAfterTaskCompletion } from '../TasksTab';
 import { commitDBUpdate } from '../../state/appState';
 
 function setup(initialTasks, overrides = {}) {
@@ -68,6 +68,7 @@ describe('TasksTab CRUD operations', () => {
     });
     window.confirm = jest.fn(() => true);
     window.alert = jest.fn();
+    window.localStorage?.clear();
   });
 
   test('Read: renders initial tasks', () => {
@@ -143,5 +144,60 @@ describe('TasksTab CRUD operations', () => {
     setup(clientTask, { clients: [client] });
     await userEvent.click(screen.getByText('Оплата'));
     expect(screen.getByText('Открыть карточку клиента')).toBeInTheDocument();
+  });
+});
+
+
+describe('TasksTab filtering', () => {
+  beforeEach(() => {
+    commitDBUpdate.mockImplementation(async (next, setDB) => {
+      setDB(next);
+      return { ok: true, db: next };
+    });
+    window.localStorage?.clear();
+  });
+
+  const schedule = [
+    { id: 's1', area: 'Центр', group: 'Группа A', coachId: 'c', weekday: 1, time: '10:00', location: 'loc' },
+    { id: 's2', area: 'Юг', group: 'Группа B', coachId: 'c2', weekday: 2, time: '11:00', location: 'loc' },
+  ];
+
+  test('filters active tasks by area and group', async () => {
+    const tasks = [
+      { id: 't1', title: 'Центр A', due: '2025-01-01T00:00:00.000Z', status: 'open', area: 'Центр', group: 'Группа A' },
+      { id: 't2', title: 'Юг B', due: '2025-01-01T00:00:00.000Z', status: 'open', area: 'Юг', group: 'Группа B' },
+      { id: 't3', title: 'Без фильтра', due: '2025-01-01T00:00:00.000Z', status: 'open' },
+    ];
+    setup(tasks, { schedule });
+
+    const [areaSelect, groupSelect] = screen.getAllByRole('combobox');
+
+    await userEvent.selectOptions(areaSelect, 'Центр');
+    expect(screen.getByText('Центр A')).toBeInTheDocument();
+    expect(screen.queryByText('Юг B')).not.toBeInTheDocument();
+    expect(screen.queryByText('Без фильтра')).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(groupSelect, 'Группа A');
+    expect(screen.getByText('Центр A')).toBeInTheDocument();
+  });
+
+  test('filters archive tasks with the same selection', async () => {
+    const tasks = [
+      { id: 't1', title: 'Активная', due: '2025-01-01T00:00:00.000Z', status: 'open', area: 'Центр', group: 'Группа A' },
+    ];
+    const tasksArchive = [
+      { id: 'a1', title: 'Архив Центр', due: '2024-01-01T00:00:00.000Z', status: 'done', area: 'Центр', group: 'Группа A' },
+      { id: 'a2', title: 'Архив Юг', due: '2024-01-02T00:00:00.000Z', status: 'done', area: 'Юг', group: 'Группа B' },
+    ];
+
+    setup(tasks, { tasksArchive, schedule });
+
+    const [areaSelect, groupSelect] = screen.getAllByRole('combobox');
+    await userEvent.selectOptions(areaSelect, 'Центр');
+    await userEvent.selectOptions(groupSelect, 'Группа A');
+
+    await userEvent.click(screen.getByText('Архив задач'));
+    expect(screen.getByText('Архив Центр')).toBeInTheDocument();
+    expect(screen.queryByText('Архив Юг')).not.toBeInTheDocument();
   });
 });
