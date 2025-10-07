@@ -100,6 +100,23 @@ export default function GroupsTab({
     );
   }, [db.clients, area, group, pay, ui.search, search, period]);
 
+  const openPaymentTasks = useMemo(() => {
+    const map: Record<string, TaskItem> = {};
+    db.tasks.forEach(task => {
+      if (
+        task.status !== "done" &&
+        task.topic === "оплата" &&
+        task.assigneeType === "client" &&
+        task.assigneeId
+      ) {
+        const existing = map[task.assigneeId];
+        if (!existing || existing.due > task.due) {
+          map[task.assigneeId] = task;
+        }
+      }
+    });
+    return map;
+  }, [db.tasks]);
 
   const monthValue = formatMonthInput(period);
   const baseYears = useMemo(() => collectAvailableYears(db), [db]);
@@ -246,6 +263,35 @@ export default function GroupsTab({
     }
   };
 
+  const completePaymentTask = async (client: Client, task: TaskItem) => {
+    const completed: TaskItem = { ...task, status: "done" };
+    const nextTasks = db.tasks.filter(t => t.id !== task.id);
+    const nextArchive = [completed, ...db.tasksArchive];
+    const payActual = client.payAmount ?? client.payActual;
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
+      [client.id]: {
+        payStatus: "действует",
+        payActual: payActual ?? undefined,
+      },
+    });
+    const next = {
+      ...db,
+      tasks: nextTasks,
+      tasksArchive: nextArchive,
+      clients: nextClients,
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Задача по оплате ${client.firstName} выполнена`, when: todayISO() },
+      ],
+    };
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
+      window.alert(
+        "Не удалось обновить задачу оплаты. Изменение сохранено локально, проверьте доступ к базе данных.",
+      );
+    }
+  };
+
   const removeClient = async (id: string) => {
     if (!window.confirm("Удалить клиента?")) return;
     const next = {
@@ -287,6 +333,8 @@ export default function GroupsTab({
           onEdit={startEdit}
           onRemove={removeClient}
           onCreateTask={createPaymentTask}
+          openPaymentTasks={openPaymentTasks}
+          onCompletePaymentTask={completePaymentTask}
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}
