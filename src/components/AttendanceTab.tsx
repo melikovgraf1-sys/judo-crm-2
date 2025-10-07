@@ -26,6 +26,8 @@ import { usePersistentTableSettings } from "../utils/tableSettings";
 const DEFAULT_VISIBLE_COLUMNS = ["name", "area", "group", "mark"];
 const TABLE_SETTINGS_KEY = "attendance";
 
+const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
+
 const toMiddayISO = (value: string): string | null => {
   if (!value) return null;
   const [yearStr, monthStr, dayStr] = value.split("-");
@@ -162,7 +164,15 @@ export default function AttendanceTab({
       times.sort((a, b) => a.localeCompare(b));
     }
 
-    const result: { date: string; label: string; times: string[]; isToday: boolean }[] = [];
+    type ScheduleDay = {
+      date: string;
+      label: string;
+      times: string[];
+      isToday: boolean;
+      weekday: number;
+    };
+
+    const result: ScheduleDay[] = [];
     const cursor = new Date(selectedMonthDate.getTime());
     const monthIndex = cursor.getUTCMonth();
     while (cursor.getUTCMonth() === monthIndex) {
@@ -171,7 +181,7 @@ export default function AttendanceTab({
       if (times?.length) {
         const iso = cursor.toISOString().slice(0, 10);
         const label = cursor.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", weekday: "short" });
-        result.push({ date: iso, label, times, isToday: iso === todayStr });
+        result.push({ date: iso, label, times, isToday: iso === todayStr, weekday });
       }
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
@@ -180,6 +190,86 @@ export default function AttendanceTab({
 
     return result;
   }, [area, db.schedule, group, selectedMonthDate, todayStr]);
+
+  const scheduleByDate = useMemo(() => {
+    const map = new Map<string, (typeof scheduleDays)[number]>();
+    for (const day of scheduleDays) {
+      map.set(day.date, day);
+    }
+    return map;
+  }, [scheduleDays]);
+
+  const calendarCells = useMemo(() => {
+    if (!selectedMonthDate) return [] as Array<{
+      key: string;
+      date: string | null;
+      weekday: number;
+      day: number | null;
+      isToday: boolean;
+      times: string[];
+      monthLabel: string;
+    }>;
+
+    const year = selectedMonthDate.getUTCFullYear();
+    const monthIndex = selectedMonthDate.getUTCMonth();
+    const firstDay = createUTCDate(year, monthIndex, 1);
+    const daysInMonth = createUTCDate(year, monthIndex + 1, 0).getUTCDate();
+
+    const cells: {
+      key: string;
+      date: string | null;
+      weekday: number;
+      day: number | null;
+      isToday: boolean;
+      times: string[];
+      monthLabel: string;
+    }[] = [];
+
+    const leadingEmpty = isoWeekday(firstDay) - 1;
+    for (let i = 0; i < leadingEmpty; i += 1) {
+      cells.push({
+        key: `leading-${i}`,
+        date: null,
+        weekday: i + 1,
+        day: null,
+        isToday: false,
+        times: [],
+        monthLabel: "",
+      });
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const current = createUTCDate(year, monthIndex, day);
+      const iso = current.toISOString().slice(0, 10);
+      const weekday = isoWeekday(current);
+      const schedule = scheduleByDate.get(iso);
+      cells.push({
+        key: iso,
+        date: iso,
+        weekday,
+        day,
+        isToday: iso === todayStr,
+        times: schedule?.times ?? [],
+        monthLabel: current.toLocaleDateString("ru-RU", { month: "short" }),
+      });
+    }
+
+    const trailingEmpty = (7 - (cells.length % 7)) % 7;
+    for (let i = 0; i < trailingEmpty; i += 1) {
+      const weekday = ((cells.length + i) % 7) + 1;
+      cells.push({
+        key: `trailing-${i}`,
+        date: null,
+        weekday,
+        day: null,
+        isToday: false,
+        times: [],
+        monthLabel: "",
+      });
+    }
+
+    return cells;
+  }, [scheduleByDate, selectedMonthDate, todayStr]);
 
   const attendanceByDate = useMemo(() => {
     const grouped = new Map<string, AttendanceEntry[]>();
@@ -456,31 +546,74 @@ export default function AttendanceTab({
             <span>Расписание на {monthLabel || "выбранный месяц"}</span>
             <span className="text-slate-400">{scheduleDays.length} тренировок</span>
           </div>
-          <div className="flex flex-wrap gap-2 p-3">
-            {scheduleDays.length ? (
-              scheduleDays.map(day => {
-                const isSelected = day.date === selectedDate;
-                const baseTone = day.isToday
-                  ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-200"
-                  : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300";
-                const selectionRing = isSelected ? "ring-2 ring-sky-400 dark:ring-sky-300" : "";
-                return (
-                  <button
-                    key={day.date}
-                    type="button"
-                    className={`min-w-[120px] rounded-lg border px-3 py-2 text-left text-xs shadow-sm transition ${baseTone} ${selectionRing}`}
-                    onClick={() => setSelectedDate(day.date)}
-                    aria-pressed={isSelected}
-                  >
-                    <div className="font-semibold text-sm">{day.label}</div>
-                    <div className="mt-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {day.times.join(", ")}
-                    </div>
-                  </button>
-                );
-              })
+          <div className="p-3">
+            {calendarCells.length ? (
+              <div className="overflow-x-auto">
+                <div className="min-w-[640px] space-y-2">
+                  <div className="grid grid-cols-7 gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    {WEEKDAY_LABELS.map(label => (
+                      <div key={label} className="text-center">
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {calendarCells.map(cell => {
+                      if (!cell.date) {
+                        return <div key={cell.key} className="h-full min-h-[88px] rounded-lg border border-transparent" aria-hidden="true" />;
+                      }
+
+                      const cellDate = cell.date;
+                      const isSelected = cellDate === selectedDate;
+                      const hasLessons = cell.times.length > 0;
+                      const selectionRing = isSelected ? "ring-2 ring-sky-400 dark:ring-sky-300" : "";
+                      const todayTone = cell.isToday && hasLessons
+                        ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-500 dark:bg-sky-900/40 dark:text-sky-200"
+                        : "";
+                      const inactiveTone = !hasLessons
+                        ? "border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-500"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:bg-sky-50 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100 dark:hover:border-sky-500 dark:hover:bg-sky-900/50";
+
+                      return (
+                        <button
+                          key={cell.key}
+                          type="button"
+                          className={`flex min-h-[88px] flex-col justify-between rounded-lg border p-3 text-left text-xs shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-default disabled:opacity-100 dark:focus-visible:ring-sky-300 ${inactiveTone} ${todayTone} ${selectionRing}`}
+                          onClick={() => {
+                            if (hasLessons && cellDate) {
+                              setSelectedDate(cellDate);
+                            }
+                          }}
+                          aria-pressed={isSelected}
+                          aria-disabled={!hasLessons}
+                          disabled={!hasLessons}
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-base font-semibold leading-none text-slate-700 dark:text-slate-100">
+                              {cell.day}
+                            </span>
+                            <span className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                              {cell.day === 1 ? cell.monthLabel : ""}
+                            </span>
+                          </div>
+                          <div className="mt-3 space-y-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                            {hasLessons ? (
+                              cell.times.map(time => <div key={time}>{time}</div>)
+                            ) : (
+                              <div className="text-slate-400 dark:text-slate-500">Нет занятий</div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             ) : (
-              <div className="text-xs text-slate-500">В выбранном месяце нет тренировок для этой группы.</div>
+              <div className="text-xs text-slate-500">Выберите месяц, чтобы посмотреть расписание.</div>
+            )}
+            {scheduleDays.length === 0 && (
+              <div className="mt-3 text-xs text-slate-500">В выбранном месяце нет тренировок для этой группы.</div>
             )}
           </div>
         </div>
