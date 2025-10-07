@@ -47,12 +47,104 @@ export const LOCAL_ONLY_MESSAGE =
 
 const DEFAULT_AREAS: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
 
+const DEFAULT_GROUP_LIMIT = 20;
+
+const GROUP_NAME_RULES: { pattern: RegExp; replacement: string }[] = [
+  { pattern: /^4\s*[-–]\s*6(\s*лет)?$/i, replacement: "4–6 лет" },
+  { pattern: /^6\s*[-–]\s*9(\s*лет)?$/i, replacement: "7–10 лет" },
+  { pattern: /^7\s*[-–]\s*10(\s*лет)?$/i, replacement: "7–10 лет" },
+  { pattern: /^9\s*[-–]\s*14(\s*лет)?$/i, replacement: "11 лет и старше" },
+  { pattern: /^7\s*[-–]\s*14(\s*лет)?$/i, replacement: "11 лет и старше" },
+  { pattern: /^11(\s*лет)?(\s*и\s*старше|\+)?$/i, replacement: "11 лет и старше" },
+];
+
+function normalizeGroupName(value: string | undefined | null): string | undefined | null {
+  if (!value) return value;
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  for (const { pattern, replacement } of GROUP_NAME_RULES) {
+    if (pattern.test(trimmed)) {
+      return replacement;
+    }
+  }
+  return trimmed;
+}
+
+function normalizeGroupList(values: readonly string[] | undefined | null): string[] {
+  if (!values) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const normalized = normalizeGroupName(value);
+    if (!normalized) continue;
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+  return result;
+}
+
+function normalizeLimits(
+  limits: Settings["limits"],
+  areas: readonly Area[],
+  groups: readonly string[],
+): Settings["limits"] {
+  const entries = new Map<string, number>();
+  for (const [rawKey, value] of Object.entries(limits)) {
+    const [area, rawGroup = ""] = rawKey.split("|");
+    if (!area) continue;
+    const normalizedGroup = normalizeGroupName(rawGroup);
+    if (!normalizedGroup) continue;
+    entries.set(`${area}|${normalizedGroup}`, value);
+  }
+
+  for (const area of areas) {
+    for (const group of groups) {
+      const key = `${area}|${group}`;
+      if (!entries.has(key)) {
+        entries.set(key, DEFAULT_GROUP_LIMIT);
+      }
+    }
+  }
+
+  return Object.fromEntries(entries);
+}
+
+function shallowEqualArrays<T>(a: readonly T[], b: readonly T[]) {
+  if (a.length !== b.length) return false;
+  return a.every((item, index) => item === b[index]);
+}
+
+function shallowEqualLimits(a: Settings["limits"], b: Settings["limits"]) {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
 const DEFAULT_SETTINGS: Settings = {
   areas: DEFAULT_AREAS,
-  groups: ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"],
+  groups: [
+    "4–6 лет",
+    "7–10 лет",
+    "11 лет и старше",
+    "взрослые",
+    "индивидуальные",
+    "доп. группа",
+  ],
   limits: Object.fromEntries(
     DEFAULT_AREAS.flatMap(area =>
-      ["4–6", "6–9", "7–14", "9–14", "взрослые", "индивидуальные", "доп. группа"].map(group => [`${area}|${group}`, 20]),
+      [
+        "4–6 лет",
+        "7–10 лет",
+        "11 лет и старше",
+        "взрослые",
+        "индивидуальные",
+        "доп. группа",
+      ].map(group => [`${area}|${group}`, DEFAULT_GROUP_LIMIT]),
     ),
   ) as Settings["limits"],
   rentByAreaEUR: { Махмутлар: 300, Центр: 400, Джикджилли: 250 },
@@ -102,10 +194,21 @@ function normalizeSettings(value: unknown): Settings {
     areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
   ) as Settings["areas"];
 
+  const normalizedGroups = normalizeGroupList(
+    groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,
+  );
+
+  const sourceLimits =
+    raw.limits && typeof raw.limits === "object"
+      ? (raw.limits as Settings["limits"])
+      : DEFAULT_SETTINGS.limits;
+
+  const normalizedLimits = normalizeLimits(sourceLimits, normalizedAreas, normalizedGroups);
+
   return {
     areas: normalizedAreas,
-    groups: groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,
-    limits: raw.limits && typeof raw.limits === "object" ? (raw.limits as Settings["limits"]) : DEFAULT_SETTINGS.limits,
+    groups: normalizedGroups,
+    limits: normalizedLimits,
     rentByAreaEUR:
       raw.rentByAreaEUR && typeof raw.rentByAreaEUR === "object"
         ? (raw.rentByAreaEUR as Settings["rentByAreaEUR"])
@@ -134,7 +237,7 @@ function normalizeDB(value: unknown): DB | null {
       ? Math.floor(raw.revision)
       : 0;
 
-  return {
+  const normalized = normalizeGroupsInDB({
     revision,
     clients: ensureObjectArray<Client>(raw.clients),
     attendance: ensureObjectArray<AttendanceEntry>(raw.attendance),
@@ -148,7 +251,8 @@ function normalizeDB(value: unknown): DB | null {
     staff: ensureObjectArray<StaffMember>(raw.staff),
     settings: normalizeSettings(raw.settings),
     changelog: ensureObjectArray<{ id: string; who: string; what: string; when: string }>(raw.changelog),
-  } as DB;
+  } as DB);
+  return normalized;
 }
 
 function readLocalDB(): DB | null {
@@ -166,6 +270,89 @@ function readLocalDB(): DB | null {
     console.warn("Failed to read DB from localStorage", err);
   }
   return null;
+}
+
+function normalizeGroupsInDB(db: DB): DB {
+  const normalizeRequired = (value: string) => {
+    const normalized = normalizeGroupName(value);
+    return normalized ?? value;
+  };
+
+  const normalizeOptional = (value: string | undefined) => {
+    if (!value) return value;
+    const normalized = normalizeGroupName(value);
+    return normalized ?? value;
+  };
+
+  const clients = db.clients.map(client => {
+    const group = normalizeRequired(client.group);
+    return group === client.group ? client : { ...client, group };
+  });
+
+  const schedule = db.schedule.map(slot => {
+    const group = normalizeRequired(slot.group);
+    return group === slot.group ? slot : { ...slot, group };
+  });
+
+  const staff = db.staff.map(member => {
+    const normalizedGroups = normalizeGroupList(member.groups);
+    return shallowEqualArrays(normalizedGroups, member.groups)
+      ? member
+      : { ...member, groups: normalizedGroups };
+  });
+
+  const leads = db.leads.map(lead => {
+    const group = normalizeOptional(lead.group);
+    return group === lead.group ? lead : { ...lead, group };
+  });
+
+  const leadsArchive = db.leadsArchive.map(lead => {
+    const group = normalizeOptional(lead.group);
+    return group === lead.group ? lead : { ...lead, group };
+  });
+
+  const leadHistory = db.leadHistory.map(event => {
+    const group = normalizeOptional(event.group);
+    return group === event.group ? event : { ...event, group };
+  });
+
+  const tasks = db.tasks.map(task => {
+    const group = normalizeOptional(task.group);
+    return group === task.group ? task : { ...task, group };
+  });
+
+  const tasksArchive = db.tasksArchive.map(task => {
+    const group = normalizeOptional(task.group);
+    return group === task.group ? task : { ...task, group };
+  });
+
+  const normalizedSettingsGroups = normalizeGroupList(db.settings.groups);
+  const normalizedSettingsLimits = normalizeLimits(
+    db.settings.limits,
+    db.settings.areas,
+    normalizedSettingsGroups,
+  );
+
+  const settingsNeedsUpdate =
+    !shallowEqualArrays(normalizedSettingsGroups, db.settings.groups) ||
+    !shallowEqualLimits(normalizedSettingsLimits, db.settings.limits);
+
+  const settings = settingsNeedsUpdate
+    ? { ...db.settings, groups: normalizedSettingsGroups, limits: normalizedSettingsLimits }
+    : db.settings;
+
+  return {
+    ...db,
+    clients,
+    schedule,
+    staff,
+    leads,
+    leadsArchive,
+    leadHistory,
+    tasks,
+    tasksArchive,
+    settings,
+  };
 }
 
 function writeLocalDB(dbData: DB) {
