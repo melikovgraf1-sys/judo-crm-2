@@ -71,7 +71,7 @@ export function derivePaymentStatus(
   );
 
   if (!relatedTasks.length) {
-    return "ожидание";
+    return client.payStatus;
   }
 
   if (relatedTasks.some(task => task.status !== "done")) {
