@@ -8,7 +8,30 @@ import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
-import type { Area, Currency, DB, Group, TaskItem } from "../types";
+import type { Area, Client, Currency, DB, Group, TaskItem } from "../types";
+
+export function resolveClientsAfterTaskCompletion(
+  clients: Client[],
+  completed: TaskItem,
+): Partial<Record<string, Partial<Client>>> {
+  if (completed.topic !== "оплата" || completed.assigneeType !== "client" || !completed.assigneeId) {
+    return {};
+  }
+
+  const client = clients.find(c => c.id === completed.assigneeId);
+  if (!client) {
+    return {};
+  }
+
+  const payActual = client.payAmount ?? client.payActual;
+
+  return {
+    [client.id]: {
+      payStatus: "действует",
+      payActual: payActual ?? undefined,
+    },
+  };
+}
 
 export default function TasksTab({
   db,
@@ -69,8 +92,11 @@ export default function TasksTab({
     [filteredArchive],
   );
   const archiveCount = sortedArchive.length;
-  const recalcClients = (tasks: TaskItem[], archive: TaskItem[]) =>
-    applyPaymentStatusRules(db.clients, tasks, archive);
+  const recalcClients = (
+    tasks: TaskItem[],
+    archive: TaskItem[],
+    updates: Partial<Record<string, Partial<Client>>> = {},
+  ) => applyPaymentStatusRules(db.clients, tasks, archive, updates);
 
   const complete = async (id: string) => {
     const task = db.tasks.find(t => t.id === id);
@@ -79,12 +105,12 @@ export default function TasksTab({
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== id);
     const nextArchive = [completed, ...db.tasksArchive];
-    const clientsBeforeRecalc = resolveClientsAfterTaskCompletion(db.clients, completed);
+    const clientUpdates = resolveClientsAfterTaskCompletion(db.clients, completed);
     const next: DB = {
       ...db,
       tasks: nextTasks,
       tasksArchive: nextArchive,
-      clients: recalcClients(nextTasks, nextArchive, clientsBeforeRecalc),
+      clients: recalcClients(nextTasks, nextArchive, clientUpdates),
     };
     const result = await commitDBUpdate(next, setDB);
     if (!result.ok) {
