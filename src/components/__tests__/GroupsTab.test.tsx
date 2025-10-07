@@ -370,6 +370,49 @@ test('creates payment task with client info', async () => {
   expect(getDB().clients[0].payStatus).toBe('задолженность');
 });
 
+test('completes payment task and updates client payment data', async () => {
+  const db = makeDB();
+  db.clients = [
+    makeClient({
+      id: 'c1',
+      firstName: 'Должник',
+      payStatus: 'задолженность',
+      payAmount: 55,
+      payActual: undefined,
+    }),
+  ];
+  db.tasks = [
+    {
+      id: 'task-1',
+      title: 'Оплата клиента — Должник',
+      due: '2024-02-01T00:00:00.000Z',
+      status: 'open',
+      topic: 'оплата',
+      assigneeType: 'client',
+      assigneeId: 'c1',
+    },
+  ];
+
+  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  const row = await screen.findByText('Должник');
+  const tableRow = row.closest('tr');
+  expect(tableRow).not.toBeNull();
+  const payButton = await within(tableRow!).findByRole('button', { name: 'Оплатил' });
+
+  await userEvent.click(payButton);
+
+  await waitFor(() => {
+    expect(getDB().tasks).toHaveLength(0);
+    expect(getDB().tasksArchive).toHaveLength(1);
+    expect(getDB().clients[0].payStatus).toBe('действует');
+    expect(getDB().clients[0].payActual).toBe(55);
+  });
+
+  await waitFor(() => expect(within(tableRow!).queryByRole('button', { name: 'Оплатил' })).not.toBeInTheDocument());
+  expect(within(tableRow!).getByText('действует')).toBeInTheDocument();
+});
+
 test('individual group allows custom payment amount', async () => {
   const db = makeDB();
   db.settings.groups = ['Group1', 'индивидуальные'];
