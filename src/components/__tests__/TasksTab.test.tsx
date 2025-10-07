@@ -21,7 +21,7 @@ jest.mock('../../state/reserve', () => ({
   ensureReserveAreaIncluded: (areas: string[]) => areas,
   RESERVE_AREA_NAME: 'резерв',
 }));
-import TasksTab from '../TasksTab';
+import TasksTab, { resolveClientsAfterTaskCompletion } from '../TasksTab';
 import { commitDBUpdate } from '../../state/appState';
 
 function setup(initialTasks, overrides = {}) {
@@ -143,5 +143,33 @@ describe('TasksTab CRUD operations', () => {
     setup(clientTask, { clients: [client] });
     await userEvent.click(screen.getByText('Оплата'));
     expect(screen.getByText('Открыть карточку клиента')).toBeInTheDocument();
+  });
+});
+
+describe('resolveClientsAfterTaskCompletion', () => {
+  test('adds 14 days to payDate for half-month subscription when payment task is completed', () => {
+    const clients = [
+      {
+        id: 'client-1',
+        firstName: 'Иван',
+        subscriptionPlan: 'half-month',
+        payDate: '2024-01-01T00:00:00.000Z',
+        payStatus: 'ожидание',
+      },
+    ];
+    const task = {
+      id: 'task-1',
+      title: 'Оплата клиента',
+      due: '2024-01-05T00:00:00.000Z',
+      status: 'done',
+      topic: 'оплата',
+      assigneeType: 'client',
+      assigneeId: 'client-1',
+    };
+
+    const result = resolveClientsAfterTaskCompletion(clients, task);
+
+    expect(result).not.toBe(clients);
+    expect(result[0].payDate).toBe('2024-01-15T00:00:00.000Z');
   });
 });
