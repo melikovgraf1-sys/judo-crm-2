@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
-import { fmtDate, fmtMoney } from "../../state/utils";
+import * as utils from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
 import type { ScheduleSlot as ScheduleSlotType } from "../../types";
+
+const { calcAgeYears, calcExperience, fmtDate, fmtMoney } = utils;
 
 interface Props {
   client: Client;
