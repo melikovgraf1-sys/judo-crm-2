@@ -663,7 +663,6 @@ export default function TasksTab({
           client={clientToView}
           currency={currency}
           currencyRates={db.settings.currencyRates}
-          schedule={schedule}
           attendance={attendance}
           performance={performance}
           onClose={() => setViewClientId(null)}
