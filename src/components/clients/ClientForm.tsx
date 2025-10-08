@@ -88,10 +88,22 @@ const placementSchema: yup.ObjectSchema<ClientPlacementFormValues> = yup.object(
   id: yup.string().required(),
   area: yup.string().required("Укажите район"),
   group: yup.string().required("Укажите группу"),
-  payStatus: yup.string().required("Укажите статус оплаты"),
-  status: yup.string().required("Укажите статус"),
-  subscriptionPlan: yup.string().required("Выберите форму абонемента"),
-  payDate: yup.string().nullable().default(""),
+  payStatus: yup
+    .mixed<ClientPlacementFormValues["payStatus"]>()
+    .oneOf(["ожидание", "действует", "задолженность"], "Укажите статус оплаты")
+    .required("Укажите статус оплаты"),
+  status: yup
+    .mixed<ClientPlacementFormValues["status"]>()
+    .oneOf(["действующий", "отмена", "новый", "вернувшийся", "продлившийся"], "Укажите статус")
+    .required("Укажите статус"),
+  subscriptionPlan: yup
+    .mixed<ClientPlacementFormValues["subscriptionPlan"]>()
+    .oneOf(
+      SUBSCRIPTION_PLANS.map(option => option.value as SubscriptionPlan),
+      "Выберите форму абонемента",
+    )
+    .required("Выберите форму абонемента"),
+  payDate: yup.string().default(""),
   payAmount: yup.string().default(""),
   payActual: yup.string().default(""),
   remainingLessons: yup.string().default(""),
@@ -157,7 +169,6 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     handleSubmit,
     reset,
     formState: { errors, isValid },
-    watch,
     setValue,
   } = useForm<ClientFormValues>({
     resolver,
@@ -223,7 +234,6 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     "px-3 py-2 rounded-md border border-slate-300 bg-white placeholder:text-slate-400 " +
     "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
   const selectClass = `${fieldClass} appearance-none`;
-  const subtleTextClass = "text-xs text-slate-500 dark:text-slate-400";
 
   const onSubmit = handleSubmit(onSave);
 
@@ -552,7 +562,7 @@ function PlacementFields({
         <div className="flex flex-col gap-1">
           <label className={labelClass}>Группа</label>
           <select className={selectClass} {...register(`placements.${index}.group` as const)}>
-            {groupList?.map(option => (
+            {groupList?.map((option: Group) => (
               <option key={option} value={option}>
                 {option}
               </option>
