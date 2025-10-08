@@ -31,6 +31,8 @@ import type { TaskItem } from '../../types';
 import { RESERVE_AREA_NAME } from '../reserve';
 import * as seedModule from '../seed';
 
+const { makeSeedDB } = seedModule;
+
 describe('useAppState with local persistence', () => {
   beforeEach(() => {
     mockPush.mockClear();
@@ -285,6 +287,7 @@ describe('useAppState with local persistence', () => {
       { ...shared, id: 'client-a', firstName: 'Анна', parentName: 'Мария', payDate: FIXED_TODAY, payAmount: 100 },
       { ...shared, id: 'client-b', firstName: 'Борис', payDate: FIXED_TODAY, payAmount: 120 },
       { ...shared, id: 'client-with-task', firstName: 'Виктор', payDate: FIXED_TODAY, payAmount: 55 },
+      { ...shared, id: 'client-active', firstName: 'Дмитрий', payDate: FIXED_TODAY, payAmount: 80, payStatus: 'действует' },
       { ...shared, id: 'client-other', firstName: 'Глеб', payDate: '2024-05-09T00:00:00.000Z' },
     ];
 
@@ -308,6 +311,7 @@ describe('useAppState with local persistence', () => {
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-a')).toHaveLength(1);
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-b')).toHaveLength(1);
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-with-task')).toHaveLength(1);
+        expect(openPaymentTasks.filter(task => task.assigneeId === 'client-active')).toHaveLength(0);
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-other')).toHaveLength(0);
       });
 
@@ -321,6 +325,7 @@ describe('useAppState with local persistence', () => {
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-a')).toHaveLength(1);
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-b')).toHaveLength(1);
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-with-task')).toHaveLength(1);
+      expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-active')).toHaveLength(0);
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-other')).toHaveLength(0);
     } finally {
       seedSpy.mockRestore();
