@@ -11,6 +11,7 @@ import { readDailySelection, writeDailySelection, clearDailySelection } from "..
 import type { Area, Client, Currency, DB, Group, TaskItem } from "../types";
 
 type TaskSection = { key: string; label: string | null; tasks: TaskItem[] };
+type AreaGroupEntry = { label: Area; groups: Map<string, Group> };
 const UNGROUPED_KEY = "__ungrouped__";
 
 const canonicalize = (value?: string | null) => (value ?? "").trim();
@@ -114,28 +115,74 @@ export default function TasksTab({
 
   const schedule = useMemo(() => db.schedule ?? [], [db.schedule]);
   const groupsByArea = useMemo(() => buildGroupsByArea(schedule), [schedule]);
-  const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
-  const availableGroups = useMemo(() => {
-    if (!area) return [];
-    return groupsByArea.get(area) ?? [];
-  }, [area, groupsByArea]);
 
-  const normalizedGroupAreas = useMemo(() => {
-    const map = new Map<string, string>();
-    groupsByArea.forEach((groups, areaName) => {
-      const normalizedAreaName = normalizeKey(areaName);
-      if (!normalizedAreaName) return;
+  const { areaOptions, areaEntries, groupAreaMap } = useMemo(() => {
+    const entries = new Map<string, AreaGroupEntry>();
+    const groupArea = new Map<string, { areaKey: string; areaLabel: Area }[]>();
+    const order: string[] = [];
 
-      groups.forEach(groupName => {
-        const normalizedGroupName = normalizeKey(groupName);
-        if (!normalizedGroupName) return;
-        if (!map.has(normalizedGroupName)) {
-          map.set(normalizedGroupName, normalizedAreaName);
+    const ensureAreaEntry = (value?: string | null) => {
+      const canonicalArea = canonicalize(value);
+      if (!canonicalArea) return null;
+      const areaKey = normalizeKey(value);
+      let entry = entries.get(areaKey);
+      if (!entry) {
+        entry = { label: canonicalArea as Area, groups: new Map<string, Group>() };
+        entries.set(areaKey, entry);
+        order.push(areaKey);
+      }
+      return { key: areaKey, entry };
+    };
+
+    const recordGroup = (areaKey: string, areaLabel: Area, groupValue?: string | null) => {
+      const canonicalGroup = canonicalize(groupValue);
+      if (!canonicalGroup) return;
+      const groupKey = normalizeKey(groupValue);
+      const areaEntry = entries.get(areaKey);
+      if (!areaEntry) return;
+      if (!areaEntry.groups.has(groupKey)) {
+        areaEntry.groups.set(groupKey, canonicalGroup as Group);
+      }
+      const bucket = groupArea.get(groupKey);
+      if (bucket) {
+        if (!bucket.some(item => item.areaKey === areaKey)) {
+          bucket.push({ areaKey, areaLabel });
         }
+      } else {
+        groupArea.set(groupKey, [{ areaKey, areaLabel }]);
+      }
+    };
+
+    groupsByArea.forEach((groups, areaName) => {
+      const areaData = ensureAreaEntry(areaName);
+      if (!areaData) return;
+      const { key: areaKey, entry } = areaData;
+      groups.forEach(groupValue => {
+        recordGroup(areaKey, entry.label, groupValue);
       });
     });
-    return map;
-  }, [groupsByArea]);
+
+    const recordTask = (task: TaskItem) => {
+      const areaData = ensureAreaEntry(task.area);
+      if (!areaData) return;
+      const { key: areaKey, entry } = areaData;
+      recordGroup(areaKey, entry.label, task.group);
+    };
+
+    db.tasks.forEach(recordTask);
+    db.tasksArchive.forEach(recordTask);
+
+    const options = order.map(areaKey => entries.get(areaKey)!.label);
+
+    return { areaOptions: options, areaEntries: entries, groupAreaMap: groupArea };
+  }, [groupsByArea, db.tasks, db.tasksArchive]);
+
+  const availableGroups = useMemo(() => {
+    if (!area) return [];
+    const areaEntry = areaEntries.get(normalizeKey(area));
+    if (!areaEntry) return [];
+    return Array.from(areaEntry.groups.values());
+  }, [area, areaEntries]);
 
   const normalizedAvailableGroups = useMemo(
     () => new Set(availableGroups.map(normalizeKey)),
@@ -165,19 +212,25 @@ export default function TasksTab({
 
   const matchesFilter = useCallback(
     (task: TaskItem) => {
+      const taskAreaKey = normalizeKey(task.area);
+      const taskGroupKey = normalizeKey(task.group);
+
       if (normalizedArea) {
-        const taskArea = normalizeKey(task.area);
-        if (taskArea !== normalizedArea) {
-          const inferredArea = normalizedGroupAreas.get(normalizeKey(task.group));
-          if (inferredArea !== normalizedArea) {
+        if (taskAreaKey !== normalizedArea) {
+          const areaGroups = areaEntries.get(normalizedArea)?.groups ?? null;
+          if (!areaGroups || !taskGroupKey || !areaGroups.has(taskGroupKey)) {
             return false;
           }
         }
       }
-      if (normalizedGroup && normalizeKey(task.group) !== normalizedGroup) return false;
+
+      if (normalizedGroup && taskGroupKey !== normalizedGroup) {
+        return false;
+      }
+
       return true;
     },
-    [normalizedArea, normalizedGroup, normalizedGroupAreas],
+    [normalizedArea, normalizedGroup, areaEntries],
   );
 
   const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
@@ -254,7 +307,14 @@ export default function TasksTab({
     setEdit(null);
   };
   const add = async () => {
-    const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
+    const t: TaskItem = {
+      id: uid(),
+      title: "Новая задача",
+      due: todayISO(),
+      status: "open",
+      area: area ?? undefined,
+      group: group ?? undefined,
+    };
     const nextTasks = [t, ...db.tasks];
     const next: DB = {
       ...db,
@@ -303,8 +363,45 @@ export default function TasksTab({
   };
 
   const openTask = (task: TaskItem) => {
-    setEdit({ ...task });
+    const normalizedGroupKey = normalizeKey(task.group);
+    const possibleAreas = normalizedGroupKey ? groupAreaMap.get(normalizedGroupKey) ?? [] : [];
+    const inferredArea =
+      task.area ?? (possibleAreas.length === 1 ? possibleAreas[0].areaLabel : undefined);
+    setEdit({ ...task, area: inferredArea ?? task.area });
   };
+
+  const groupOptionsForEdit = useMemo(() => {
+    if (!edit) return [] as Group[];
+    const areaKey = edit.area ? normalizeKey(edit.area) : "";
+    if (areaKey) {
+      const options = Array.from(areaEntries.get(areaKey)?.groups.values() ?? []);
+      if (
+        edit.group &&
+        !options.some(option => normalizeKey(option) === normalizeKey(edit.group))
+      ) {
+        options.push(canonicalize(edit.group) as Group);
+      }
+      return options;
+    }
+
+    const unique = new Map<string, Group>();
+    areaEntries.forEach(entry => {
+      entry.groups.forEach((label, key) => {
+        if (!unique.has(key)) {
+          unique.set(key, label);
+        }
+      });
+    });
+
+    if (edit.group) {
+      const key = normalizeKey(edit.group);
+      if (!unique.has(key)) {
+        unique.set(key, canonicalize(edit.group) as Group);
+      }
+    }
+
+    return Array.from(unique.values());
+  }, [edit, areaEntries]);
 
   const clientToView = viewClientId ? db.clients.find(client => client.id === viewClientId) ?? null : null;
   const attendance = db.attendance ?? [];
@@ -471,6 +568,65 @@ export default function TasksTab({
               value={edit.due.slice(0, 10)}
               onChange={e => setEdit({ ...edit, due: e.target.value })}
             />
+            <select
+              className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={edit.area ?? ""}
+              onChange={event => {
+                const nextArea = event.target.value ? (event.target.value as Area) : undefined;
+                const areaKey = nextArea ? normalizeKey(nextArea) : "";
+                const areaEntry = areaKey ? areaEntries.get(areaKey) ?? null : null;
+                const hasGroup =
+                  edit.group && areaEntry
+                    ? areaEntry.groups.has(normalizeKey(edit.group))
+                    : false;
+                setEdit({
+                  ...edit,
+                  area: nextArea,
+                  group: hasGroup ? edit.group : undefined,
+                });
+              }}
+            >
+              <option value="">Без района</option>
+              {areaOptions.map(option => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <select
+              className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={edit.group ?? ""}
+              onChange={event => {
+                const nextGroup = event.target.value ? (event.target.value as Group) : undefined;
+                if (!nextGroup) {
+                  setEdit({ ...edit, group: undefined });
+                  return;
+                }
+                const owningAreas = groupAreaMap.get(normalizeKey(nextGroup)) ?? [];
+                const currentAreaKey = edit.area ? normalizeKey(edit.area) : "";
+                let nextAreaValue = edit.area;
+                if (owningAreas.length === 1) {
+                  nextAreaValue = owningAreas[0].areaLabel;
+                } else if (
+                  currentAreaKey &&
+                  !owningAreas.some(candidate => candidate.areaKey === currentAreaKey)
+                ) {
+                  nextAreaValue = undefined;
+                }
+                setEdit({
+                  ...edit,
+                  group: nextGroup,
+                  area: nextAreaValue,
+                });
+              }}
+            >
+              <option value="">Без группы</option>
+              {groupOptionsForEdit.map(option => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
             {edit.assigneeType === "client" ? (
               (() => {
                 const client = db.clients.find(c => c.id === edit.assigneeId);
@@ -507,7 +663,6 @@ export default function TasksTab({
           client={clientToView}
           currency={currency}
           currencyRates={db.settings.currencyRates}
-          schedule={schedule}
           attendance={attendance}
           performance={performance}
           onClose={() => setViewClientId(null)}
