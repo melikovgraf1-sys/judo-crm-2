@@ -584,7 +584,7 @@ function PlacementFields({
           )}
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Статус абонемента</label>
+          <label className={labelClass}>Статус клиента</label>
           <select className={selectClass} {...register(`placements.${index}.status` as const)}>
             <option value="действующий">действующий</option>
             <option value="отмена">отмена</option>

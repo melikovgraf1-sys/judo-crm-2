@@ -8,7 +8,8 @@ import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
-import type { Area, Client, Currency, DB, Group, TaskItem } from "../types";
+import type { Area, Client, Currency, DB, Group, ScheduleSlot, TaskItem } from "../types";
+import { resolvePaymentCompletion } from "../state/paymentCompletion";
 
 type TaskSection = { key: string; label: string | null; tasks: TaskItem[] };
 type AreaGroupEntry = { label: Area; groups: Map<string, Group> };
@@ -77,6 +78,11 @@ function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSec
 export function resolveClientsAfterTaskCompletion(
   clients: Client[],
   completed: TaskItem,
+  options: {
+    schedule?: ScheduleSlot[];
+    completedAt?: string;
+    manualLessonsIncrement?: number;
+  } = {},
 ): Partial<Record<string, Partial<Client>>> {
   if (completed.topic !== "оплата" || completed.assigneeType !== "client" || !completed.assigneeId) {
     return {};
@@ -87,13 +93,18 @@ export function resolveClientsAfterTaskCompletion(
     return {};
   }
 
-  const payActual = client.payAmount ?? client.payActual;
+  const { schedule = [], completedAt = todayISO(), manualLessonsIncrement = 8 } = options;
+
+  const updates = resolvePaymentCompletion({
+    client,
+    task: completed,
+    schedule,
+    completedAt,
+    manualLessonsIncrement,
+  });
 
   return {
-    [client.id]: {
-      payStatus: "действует",
-      payActual: payActual ?? undefined,
-    },
+    [client.id]: updates,
   };
 }
 
@@ -270,10 +281,14 @@ export default function TasksTab({
     const task = db.tasks.find(t => t.id === id);
     if (!task) return;
 
+    const completedAt = todayISO();
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== id);
     const nextArchive = [completed, ...db.tasksArchive];
-    const clientUpdates = resolveClientsAfterTaskCompletion(db.clients, completed);
+    const clientUpdates = resolveClientsAfterTaskCompletion(db.clients, completed, {
+      schedule,
+      completedAt,
+    });
     const next: DB = {
       ...db,
       tasks: nextTasks,

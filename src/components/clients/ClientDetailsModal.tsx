@@ -82,6 +82,13 @@ export default function ClientDetailsModal({
             <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {placementsSummary}
             </div>
+            {client.status && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+                  {client.status}
+                </span>
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -126,7 +133,6 @@ export default function ClientDetailsModal({
               <ClientInfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
               <ClientInfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
               <ClientInfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
-              <ClientInfoRow label="Статус абонемента" value={client.status ?? "—"} />
               <ClientInfoRow label="Статус оплаты" value={client.payStatus} />
               <ClientInfoRow
                 label="Форма абонемента"
@@ -164,7 +170,6 @@ export default function ClientDetailsModal({
                         {place.area} · {place.group}
                       </div>
                       <dl className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
-                        <ClientPlacementInfoCell label="Статус абонемента" value={place.status ?? "—"} />
                         <ClientPlacementInfoCell label="Статус оплаты" value={place.payStatus ?? "—"} />
                         <ClientPlacementInfoCell label="Форма абонемента" value={planLabel} />
                         <ClientPlacementInfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
