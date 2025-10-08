@@ -51,7 +51,7 @@ describe("SettingsTab", () => {
     if (originalFetch) {
       globalWithFetch.fetch = originalFetch;
     } else {
-      delete globalWithFetch.fetch;
+      delete (globalWithFetch as { fetch?: typeof fetch }).fetch;
     }
   });
 

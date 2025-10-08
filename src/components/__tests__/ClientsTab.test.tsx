@@ -83,6 +83,7 @@ const makeDB = () => ({
     coachSalaryByAreaEUR: {},
     currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
     coachPayFormula: '',
+    analyticsFavorites: [],
   },
   changelog: [],
 });
@@ -120,6 +121,19 @@ const makeClient = (overrides = {}) => ({
   payDate: '2024-01-10T00:00:00.000Z',
   payAmount: 55,
   remainingLessons: 5,
+  placements: [
+    {
+      id: 'pl-client-1',
+      area: 'Area1',
+      group: 'Group1',
+      payStatus: 'ожидание',
+      status: 'действующий',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-01-10T00:00:00.000Z',
+      payAmount: 55,
+      remainingLessons: 5,
+    },
+  ],
   ...overrides,
 });
 

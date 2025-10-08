@@ -17,18 +17,19 @@ describe("todayISO", () => {
 
   it("returns ISO string matching the local day even near midnight", () => {
     const fixed = new RealDate("2024-03-01T00:05:00");
-    const MockDate = class extends RealDate {
+    class MockDate extends RealDate {
       constructor(value?: number | string | Date) {
         if (value === undefined) {
-          return new RealDate(fixed.getTime()) as unknown as Date;
+          super(fixed.getTime());
+        } else {
+          super(value as string | number | Date);
         }
-        return super(value as string | number | Date);
       }
 
       static now() {
         return fixed.getTime();
       }
-    };
+    }
 
     global.Date = MockDate as unknown as DateConstructor;
 
