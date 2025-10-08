@@ -23,10 +23,12 @@ type Props = {
   currency: Currency;
   currencyRates: Settings["currencyRates"];
   onEdit: (c: Client) => void;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   onCreateTask: (client: Client) => void;
   openPaymentTasks?: Record<string, TaskItem | undefined>;
   onCompletePaymentTask?: (client: Client, task: TaskItem) => void;
+  onRemovePaymentTask?: (client: Client, task: TaskItem) => void;
+  onReserve?: (client: Client) => void;
   schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
@@ -73,6 +75,8 @@ export default function ClientTable({
   onCreateTask,
   openPaymentTasks,
   onCompletePaymentTask,
+  onRemovePaymentTask,
+  onReserve,
   schedule,
   attendance,
   performance,
@@ -284,49 +288,80 @@ export default function ClientTable({
       headerClassName: "text-right",
       headerAlign: "right",
       cellClassName: "flex justify-end gap-1",
-      renderCell: client => (
-        <>
-          {client.payStatus === "задолженность" &&
-            openPaymentTasks?.[client.id] &&
-            onCompletePaymentTask && (
+      renderCell: client => {
+        const paymentTask = openPaymentTasks?.[client.id];
+        const canCompletePaymentTask =
+          client.payStatus === "задолженность" && paymentTask && onCompletePaymentTask;
+        const canRemovePaymentTask = paymentTask && onRemovePaymentTask;
+
+        return (
+          <>
+            {canCompletePaymentTask && (
               <button
                 onClick={event => {
                   event.stopPropagation();
-                  onCompletePaymentTask(client, openPaymentTasks[client.id]!);
+                  onCompletePaymentTask!(client, paymentTask);
                 }}
                 className="px-2 py-1 text-xs rounded-md border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30"
               >
                 Оплатил
               </button>
             )}
-          <button
-            onClick={event => {
-              event.stopPropagation();
-              onCreateTask(client);
-            }}
-            className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
-          >
-            Создать задачу
-          </button>
-          <button
-            onClick={event => {
-              event.stopPropagation();
-              onRemove(client.id);
-            }}
-            className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
-          >
-            Удалить
-          </button>
-        </>
-      ),
+            <button
+              onClick={event => {
+                event.stopPropagation();
+                onCreateTask(client);
+              }}
+              className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+            >
+              Создать задачу
+            </button>
+            {canRemovePaymentTask && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onRemovePaymentTask(client, paymentTask);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
+              >
+                Удалить задачу
+              </button>
+            )}
+            {onReserve && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onReserve(client);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 dark:hover:bg-amber-900/30"
+              >
+                Резерв
+              </button>
+            )}
+            {onRemove && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onRemove(client.id);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
+              >
+                Удалить
+              </button>
+            )}
+          </>
+        );
+      },
     },
   ], [
     billingPeriod,
     currency,
     currencyRates,
     onCompletePaymentTask,
+    onRemovePaymentTask,
     onCreateTask,
     onRemove,
+    onReserve,
     openPaymentTasks,
     remainingMap,
   ]);
