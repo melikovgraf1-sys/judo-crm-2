@@ -24,6 +24,11 @@ jest.mock('../../state/reserve', () => ({
 import TasksTab, { resolveClientsAfterTaskCompletion } from '../TasksTab';
 import { commitDBUpdate } from '../../state/appState';
 
+const manualSchedule = [
+  { id: 's1', area: 'A', group: 'Индивидуальные', coachId: 'coach', weekday: 1, time: '10:00', location: 'зал' },
+  { id: 's2', area: 'A', group: 'Индивидуальные', coachId: 'coach', weekday: 3, time: '10:00', location: 'зал' },
+];
+
 function setup(initialTasks, overrides = {}) {
   const Wrapper = () => {
     const [db, setDB] = React.useState({
@@ -54,6 +59,58 @@ function setup(initialTasks, overrides = {}) {
   };
   return render(<Wrapper />);
 }
+
+test('resolveClientsAfterTaskCompletion updates manual group with extra lessons and payDate', () => {
+  const client = {
+    id: 'c-manual',
+    firstName: 'Инд',
+    lastName: 'Видуал',
+    channel: 'Telegram',
+    birthDate: '2015-01-01',
+    gender: 'м',
+    area: 'A',
+    group: 'Индивидуальные',
+    startDate: '2024-01-01',
+    payMethod: 'наличные',
+    payStatus: 'ожидание',
+    status: 'новый',
+    remainingLessons: 2,
+    placements: [
+      {
+        id: 'placement-1',
+        area: 'A',
+        group: 'Индивидуальные',
+        payStatus: 'ожидание',
+        status: 'новый',
+        subscriptionPlan: 'monthly',
+        remainingLessons: 2,
+      },
+    ],
+  };
+
+  const task = {
+    id: 'task-1',
+    title: 'Оплата',
+    due: '2024-10-08T00:00:00.000Z',
+    status: 'open',
+    topic: 'оплата',
+    assigneeType: 'client',
+    assigneeId: 'c-manual',
+    area: 'A',
+    group: 'Индивидуальные',
+  };
+
+  const completed = { ...task, status: 'done' };
+  const result = resolveClientsAfterTaskCompletion([client], completed, {
+    schedule: manualSchedule,
+    completedAt: '2024-10-08T00:00:00.000Z',
+  });
+
+  const update = result['c-manual'];
+  expect(update).toBeDefined();
+  expect(update?.remainingLessons).toBe(10);
+  expect(update?.payDate?.slice(0, 10)).toBe('2024-11-13');
+});
 
 describe('TasksTab CRUD operations', () => {
   const tasks = [

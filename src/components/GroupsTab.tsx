@@ -6,15 +6,13 @@ import ClientTable from "./clients/ClientTable";
 import ClientForm from "./clients/ClientForm";
 import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import {
-  DEFAULT_SUBSCRIPTION_PLAN,
-  applyPaymentStatusRules,
-} from "../state/payments";
+import { applyPaymentStatusRules } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailyPeriod, readDailySelection, writeDailyPeriod, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
 import { getClientPlacements } from "../state/clients";
+import { resolvePaymentCompletion } from "../state/paymentCompletion";
 import {
   collectAvailableYears,
   formatMonthInput,
@@ -305,111 +303,13 @@ export default function GroupsTab({
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== task.id);
     const nextArchive = [completed, ...db.tasksArchive];
-    const placements = getClientPlacements(client);
-    const placementFromTask = task.placementId
-      ? placements.find(place => place.id === task.placementId)
-      : placements.find(place => place.area === task.area && place.group === task.group);
-    const targetPlacement = placementFromTask ?? placements[0];
-    const payAmount = targetPlacement?.payAmount ?? client.payAmount;
-    const resolvedPayActual = payAmount ?? targetPlacement?.payActual ?? client.payActual;
-
-    const updates: Partial<Client> = {
-      payStatus: "действует",
-      ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
-    };
-
-    const toUTCDate = (value?: string | null): Date | null => {
-      if (!value) {
-        return null;
-      }
-      const parsed = new Date(value);
-      if (Number.isNaN(parsed.getTime())) {
-        return null;
-      }
-      return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
-    };
-
-    const addMonths = (date: Date, count: number) => {
-      const year = date.getUTCFullYear();
-      const month = date.getUTCMonth();
-      const day = date.getUTCDate();
-      const targetMonthIndex = month + count;
-      const targetYear = year + Math.floor(targetMonthIndex / 12);
-      const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
-      const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-      const clampedDay = Math.min(day, maxDay);
-      return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
-    };
-
-    const completionDate = toUTCDate(completedAt);
-    const currentPayDate = toUTCDate(targetPlacement?.payDate ?? client.payDate ?? null);
-    const startDate = toUTCDate(client.startDate ?? null);
-    const plan = targetPlacement?.subscriptionPlan ?? client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
-
-    let historyAnchor: Date | null = null;
-    let nextPayDate: Date | null = null;
-
-    if (plan === "half-month") {
-      const base = completionDate ?? currentPayDate ?? startDate;
-      if (base) {
-        const candidate = new Date(base.getTime());
-        candidate.setUTCDate(candidate.getUTCDate() + 14);
-        nextPayDate = candidate;
-      }
-    } else if (plan === "monthly" || plan === "discount") {
-      const base = currentPayDate ?? startDate ?? completionDate;
-      if (base) {
-        historyAnchor = base;
-        nextPayDate = addMonths(base, 1);
-      }
-    } else {
-      const base = completionDate ?? currentPayDate ?? startDate;
-      if (base) {
-        historyAnchor = base;
-        nextPayDate = base;
-      }
-    }
-
-    if (nextPayDate) {
-      updates.payDate = nextPayDate.toISOString();
-    }
-
-    if (historyAnchor) {
-      const historyValue = historyAnchor.toISOString();
-      const existingHistory = Array.isArray(client.payHistory) ? client.payHistory : [];
-      if (!existingHistory.includes(historyValue)) {
-        updates.payHistory = [...existingHistory, historyValue];
-      }
-    }
-
-    if (targetPlacement) {
-      const nextPlacement = {
-        ...targetPlacement,
-        payStatus: "действует" as const,
-        ...(updates.payActual != null ? { payActual: updates.payActual } : {}),
-        ...(updates.payDate ? { payDate: updates.payDate } : {}),
-      };
-
-      updates.placements = placements.map(placement =>
-        placement.id === nextPlacement.id ? nextPlacement : placement,
-      );
-
-      const primaryPlacementId = placements[0]?.id;
-      if (primaryPlacementId === nextPlacement.id) {
-        updates.area = nextPlacement.area;
-        updates.group = nextPlacement.group;
-        updates.subscriptionPlan = nextPlacement.subscriptionPlan;
-        if (nextPlacement.payAmount != null) {
-          updates.payAmount = nextPlacement.payAmount;
-        }
-        if (nextPlacement.payActual != null) {
-          updates.payActual = nextPlacement.payActual;
-        }
-        if (nextPlacement.remainingLessons != null) {
-          updates.remainingLessons = nextPlacement.remainingLessons;
-        }
-      }
-    }
+    const updates = resolvePaymentCompletion({
+      client,
+      task,
+      schedule: db.schedule,
+      completedAt,
+      manualLessonsIncrement: 8,
+    });
 
     const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
       [client.id]: updates,

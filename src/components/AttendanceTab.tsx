@@ -8,7 +8,7 @@ import ColumnSettings from "./ColumnSettings";
 import { compareValues, toggleSort } from "./tableUtils";
 import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import { buildGroupsByArea, clientRequiresManualRemainingLessons } from "../state/lessons";
+import { buildGroupsByArea, calculateManualPayDate, clientRequiresManualRemainingLessons } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
 import { isReserveArea } from "../state/areas";
 import type {
@@ -319,6 +319,34 @@ export default function AttendanceTab({
     if (!client) return;
     const manual = clientRequiresManualRemainingLessons(client);
 
+    const applyManualUpdate = (target: Client, nextRemaining: number): Client => {
+      const current = target.remainingLessons ?? 0;
+      if (nextRemaining === current) {
+        return target;
+      }
+      const referenceISO = selectedDateISO ?? todayISO();
+      const referenceDate = new Date(referenceISO);
+      const due = calculateManualPayDate(target.area, target.group, nextRemaining, db.schedule, referenceDate);
+      const dueISO = due?.toISOString();
+      const updated: Client = { ...target, remainingLessons: nextRemaining };
+      if (dueISO) {
+        updated.payDate = dueISO;
+      }
+      if (Array.isArray(target.placements) && target.placements.length) {
+        updated.placements = target.placements.map(place => {
+          if (place.area === target.area && place.group === target.group) {
+            const nextPlace = { ...place, remainingLessons: nextRemaining };
+            if (dueISO) {
+              nextPlace.payDate = dueISO;
+            }
+            return nextPlace;
+          }
+          return place;
+        });
+      }
+      return updated;
+    };
+
     if (mark && mark.came === false) {
       const next = {
         ...db,
@@ -342,10 +370,7 @@ export default function AttendanceTab({
             if (c.id !== clientId) return c;
             const current = c.remainingLessons ?? 0;
             const nextRemaining = Math.max(0, current + 1);
-            if (nextRemaining === current) {
-              return c;
-            }
-            return { ...c, remainingLessons: nextRemaining };
+            return applyManualUpdate(c, nextRemaining);
           });
       const next = {
         ...db,
@@ -370,10 +395,7 @@ export default function AttendanceTab({
             if (c.id !== clientId) return c;
             const current = c.remainingLessons ?? 0;
             const nextRemaining = Math.max(0, current - 1);
-            if (nextRemaining === current) {
-              return c;
-            }
-            return { ...c, remainingLessons: nextRemaining };
+            return applyManualUpdate(c, nextRemaining);
           });
       const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
       const result = await commitDBUpdate(next, setDB);
@@ -385,7 +407,7 @@ export default function AttendanceTab({
         }
       }
     }
-  }, [db, marksForSelectedDate, selectedDate, setDB]);
+  }, [db, marksForSelectedDate, selectedDate, selectedDateISO, setDB]);
 
   const columns: ColumnConfig[] = useMemo(() => {
     return [
@@ -397,6 +419,13 @@ export default function AttendanceTab({
           <span className="font-medium text-slate-800 dark:text-slate-100">{client.firstName} {client.lastName}</span>
         ),
         sortValue: (client: Client) => `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase(),
+      },
+      {
+        id: "parent",
+        label: "Родитель",
+        width: "minmax(200px, max-content)",
+        renderCell: (client: Client) => client.parentName ?? "—",
+        sortValue: (client: Client) => (client.parentName ?? "").toLowerCase(),
       },
       {
         id: "area",

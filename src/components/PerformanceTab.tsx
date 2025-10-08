@@ -196,6 +196,13 @@ export default function PerformanceTab({
         sortValue: (client: Client) => `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase(),
       },
       {
+        id: "parent",
+        label: "Родитель",
+        width: "minmax(200px, max-content)",
+        renderCell: (client: Client) => client.parentName ?? "—",
+        sortValue: (client: Client) => (client.parentName ?? "").toLowerCase(),
+      },
+      {
         id: "area",
         label: "Район",
         width: "minmax(140px, max-content)",

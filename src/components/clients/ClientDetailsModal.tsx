@@ -2,7 +2,10 @@ import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import * as utils from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
-import { getEffectiveRemainingLessons } from "../../state/lessons";
+import {
+  estimateGroupRemainingLessonsByParams,
+  getEffectiveRemainingLessons,
+} from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
 import type { ScheduleSlot as ScheduleSlotType } from "../../types";
 
@@ -32,7 +35,90 @@ export default function ClientDetailsModal({
   onRemove,
 }: Props) {
   const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
+  const placements = client.placements?.length
+    ? client.placements
+    : [
+        {
+          id: client.id,
+          area: client.area,
+          group: client.group,
+          payStatus: client.payStatus,
+          status: client.status,
+          subscriptionPlan: client.subscriptionPlan,
+          payDate: client.payDate,
+          payAmount: client.payAmount,
+          payActual: client.payActual,
+          remainingLessons: client.remainingLessons,
+        },
+      ];
+
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
+
+  const deriveRemainingLessons = (
+    value: number | string | undefined | null,
+  ): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value < 0 ? 0 : value;
+    }
+
+    if (typeof value === "string") {
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isNaN(parsed)) {
+        return parsed < 0 ? 0 : parsed;
+      }
+    }
+
+    return null;
+  };
+
+  const derivedRemainingLessons = (() => {
+    const direct = deriveRemainingLessons(client.remainingLessons ?? null);
+    if (direct != null) {
+      return direct;
+    }
+
+    if (typeof totalRemainingLessons === "number") {
+      return totalRemainingLessons;
+    }
+
+    for (const place of placements) {
+      const candidate = deriveRemainingLessons(place.remainingLessons ?? null);
+      if (candidate != null) {
+        return candidate;
+      }
+    }
+
+    return null;
+  })();
+
+  const placementsWithRemaining = placements.map(place => {
+    const manual = deriveRemainingLessons(place.remainingLessons ?? null);
+    if (manual != null) {
+      return { ...place, effectiveRemainingLessons: manual };
+    }
+
+    const estimated = estimateGroupRemainingLessonsByParams(
+      place.area,
+      place.group,
+      place.payDate,
+      normalizedSchedule,
+    );
+
+    if (estimated != null) {
+      return { ...place, effectiveRemainingLessons: estimated };
+    }
+
+    if (typeof totalRemainingLessons === "number") {
+      return { ...place, effectiveRemainingLessons: totalRemainingLessons };
+    }
+
+    if (derivedRemainingLessons != null) {
+      return { ...place, effectiveRemainingLessons: derivedRemainingLessons };
+    }
+
+    return { ...place, effectiveRemainingLessons: null };
+  });
+
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
   const attendanceEntries = useMemo(() => {
@@ -51,23 +137,6 @@ export default function ClientDetailsModal({
 
   const attendedCount = attendanceEntries.filter(entry => entry.came).length;
   const successfulCount = performanceEntries.filter(entry => entry.successful).length;
-
-  const placements = client.placements?.length
-    ? client.placements
-    : [
-        {
-          id: client.id,
-          area: client.area,
-          group: client.group,
-          payStatus: client.payStatus,
-          status: client.status,
-          subscriptionPlan: client.subscriptionPlan,
-          payDate: client.payDate,
-          payAmount: client.payAmount,
-          payActual: client.payActual,
-          remainingLessons: client.remainingLessons,
-        },
-      ];
 
   const placementsSummary = placements.map(place => `${place.area} · ${place.group}`).join(", ");
 
@@ -114,44 +183,28 @@ export default function ClientDetailsModal({
         </div>
 
         {section === "info" && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="grid gap-2 text-sm sm:grid-cols-2">
               <ClientInfoRow label="Телефон" value={client.phone || "—"} />
               <ClientInfoRow label="WhatsApp" value={client.whatsApp || "—"} />
               <ClientInfoRow label="Telegram" value={client.telegram || "—"} />
               <ClientInfoRow label="Instagram" value={client.instagram || "—"} />
-              <ClientInfoRow label="Канал" value={client.channel} />
+              <ClientInfoRow label="Канал" value={client.channel || "—"} />
+              <ClientInfoRow label="Способ оплаты" value={client.payMethod || "—"} />
+              <ClientInfoRow label="Статус клиента" value={client.status || "—"} />
               <ClientInfoRow label="Родитель" value={client.parentName || "—"} />
               <ClientInfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />
               <ClientInfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
               <ClientInfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
               <ClientInfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
-              <ClientInfoRow label="Статус абонемента" value={client.status ?? "—"} />
-              <ClientInfoRow label="Статус оплаты" value={client.payStatus} />
-              <ClientInfoRow
-                label="Форма абонемента"
-                value={client.subscriptionPlan ? getSubscriptionPlanMeta(client.subscriptionPlan)?.label ?? "—" : "—"}
-              />
-              <ClientInfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
-              <ClientInfoRow
-                label="Сумма оплаты"
-                value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
-              />
-              <ClientInfoRow
-                label="Факт оплаты"
-                value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
-              />
-              <ClientInfoRow
-                label="Остаток занятий"
-                value={totalRemainingLessons != null ? String(totalRemainingLessons) : "—"}
-              />
             </div>
+
             <div className="space-y-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Тренировочные места
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {placements.map(place => {
+                {placementsWithRemaining.map(place => {
                   const planLabel = place.subscriptionPlan
                     ? getSubscriptionPlanMeta(place.subscriptionPlan)?.label ?? "—"
                     : "—";
@@ -163,8 +216,7 @@ export default function ClientDetailsModal({
                       <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
                         {place.area} · {place.group}
                       </div>
-                      <dl className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
-                        <ClientPlacementInfoCell label="Статус абонемента" value={place.status ?? "—"} />
+                      <dl className="mt-3 grid gap-1 text-slate-600 dark:text-slate-300">
                         <ClientPlacementInfoCell label="Статус оплаты" value={place.payStatus ?? "—"} />
                         <ClientPlacementInfoCell label="Форма абонемента" value={planLabel} />
                         <ClientPlacementInfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
@@ -187,7 +239,9 @@ export default function ClientDetailsModal({
                         <ClientPlacementInfoCell
                           label="Остаток занятий"
                           value={
-                            place.remainingLessons != null ? String(place.remainingLessons) : "—"
+                            place.effectiveRemainingLessons != null
+                              ? String(place.effectiveRemainingLessons)
+                              : "—"
                           }
                         />
                       </dl>
@@ -196,6 +250,7 @@ export default function ClientDetailsModal({
                 })}
               </div>
             </div>
+
             {client.comment ? (
               <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
