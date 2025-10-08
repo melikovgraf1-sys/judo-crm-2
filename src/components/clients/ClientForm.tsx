@@ -326,6 +326,19 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               <option>наличные</option>
             </select>
           </div>
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Статус клиента</label>
+            <select className={selectClass} {...register("placements.0.status" as const)}>
+              <option value="действующий">действующий</option>
+              <option value="отмена">отмена</option>
+              <option value="новый">новый</option>
+              <option value="вернувшийся">вернувшийся</option>
+              <option value="продлившийся">продлившийся</option>
+            </select>
+            {errors.placements?.[0]?.status && (
+              <span className="text-xs text-rose-600">{errors.placements?.[0]?.status?.message}</span>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -583,19 +596,21 @@ function PlacementFields({
             <span className="text-xs text-rose-600">{placementErrors.payStatus.message}</span>
           )}
         </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Статус клиента</label>
-          <select className={selectClass} {...register(`placements.${index}.status` as const)}>
-            <option value="действующий">действующий</option>
-            <option value="отмена">отмена</option>
-            <option value="новый">новый</option>
-            <option value="вернувшийся">вернувшийся</option>
-            <option value="продлившийся">продлившийся</option>
-          </select>
-          {placementErrors?.status && (
-            <span className="text-xs text-rose-600">{placementErrors.status.message}</span>
-          )}
-        </div>
+        {!isPrimary && (
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Статус клиента</label>
+            <select className={selectClass} {...register(`placements.${index}.status` as const)}>
+              <option value="действующий">действующий</option>
+              <option value="отмена">отмена</option>
+              <option value="новый">новый</option>
+              <option value="вернувшийся">вернувшийся</option>
+              <option value="продлившийся">продлившийся</option>
+            </select>
+            {placementErrors?.status && (
+              <span className="text-xs text-rose-600">{placementErrors.status.message}</span>
+            )}
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <label className={labelClass}>Форма абонемента</label>
           <select className={selectClass} {...register(`placements.${index}.subscriptionPlan` as const)}>
