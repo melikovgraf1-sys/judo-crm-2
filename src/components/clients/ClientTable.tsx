@@ -27,6 +27,8 @@ type Props = {
   onCreateTask: (client: Client) => void;
   openPaymentTasks?: Record<string, TaskItem | undefined>;
   onCompletePaymentTask?: (client: Client, task: TaskItem) => void;
+  onRemovePaymentTask?: (client: Client, task: TaskItem) => void;
+  onReserve?: (client: Client) => void;
   schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
@@ -73,6 +75,8 @@ export default function ClientTable({
   onCreateTask,
   openPaymentTasks,
   onCompletePaymentTask,
+  onRemovePaymentTask,
+  onReserve,
   schedule,
   attendance,
   performance,
@@ -294,9 +298,9 @@ export default function ClientTable({
                   event.stopPropagation();
                   onCompletePaymentTask(client, openTask);
                 }}
-                className="px-2 py-1 text-xs rounded-md border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30"
+                className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
               >
-                Оплатил
+                Создать задачу
               </button>
             )}
           <button
@@ -328,8 +332,10 @@ export default function ClientTable({
     currency,
     currencyRates,
     onCompletePaymentTask,
+    onRemovePaymentTask,
     onCreateTask,
     onRemove,
+    onReserve,
     openPaymentTasks,
     remainingMap,
   ]);
@@ -456,7 +462,6 @@ export default function ClientTable({
           client={selected}
           currency={currency}
           currencyRates={currencyRates}
-          schedule={schedule}
           attendance={attendance}
           performance={performance}
           onEdit={onEdit}

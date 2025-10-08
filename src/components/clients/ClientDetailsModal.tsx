@@ -282,9 +282,9 @@ export default function ClientDetailsModal({
 
 function ClientInfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="text-slate-700 dark:text-slate-100">{value}</span>
+    <div className="flex justify-between gap-3">
+      <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right text-slate-700 dark:text-slate-200">{value}</span>
     </div>
   );
 }

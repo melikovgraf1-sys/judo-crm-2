@@ -345,16 +345,47 @@ test('update: moving client between groups clears manual-only fields', async () 
   expect(updated?.payAmount).toBe(55);
 });
 
-test('delete: removes client after confirmation', async () => {
+test('delete: removes payment task after confirmation', async () => {
+  const task = {
+    id: 'task-1',
+    title: 'Оплата',
+    due: '2024-02-01T00:00:00.000Z',
+    status: 'open',
+    assigneeType: 'client',
+    assigneeId: 'c1',
+    topic: 'оплата',
+  };
+
   const db = makeDB();
-  db.clients = [makeClient({ id: 'c1', firstName: 'Del' })];
+  db.tasks = [task];
+  db.clients = [makeClient({ id: 'c1', firstName: 'Del', payStatus: 'задолженность' })];
+
   const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
-  await waitFor(() => expect(screen.getByText('Del')).toBeInTheDocument());
-  await userEvent.click(screen.getByText('Удалить'));
+  const row = await screen.findByText('Del');
+  const deleteBtn = within(row.closest('tr')).getByRole('button', { name: 'Удалить задачу' });
+
+  await userEvent.click(deleteBtn);
 
   expect(global.confirm).toHaveBeenCalled();
-  await waitFor(() => expect(screen.queryByText('Del')).not.toBeInTheDocument());
-  expect(getDB().clients.find(c => c.id === 'c1')).toBeUndefined();
+  await waitFor(() => expect(getDB().tasks).toHaveLength(0));
+  expect(getDB().tasksArchive[0]).toMatchObject({ id: 'task-1' });
+  await waitFor(() => expect(within(row.closest('tr')).queryByRole('button', { name: 'Удалить задачу' })).not.toBeInTheDocument());
+});
+
+test('reserve: moves client to reserve area', async () => {
+  const db = makeDB();
+  db.clients = [makeClient({ id: 'c1', firstName: 'Reserve' })];
+
+  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+  const row = await screen.findByText('Reserve');
+  const reserveBtn = within(row.closest('tr')).getByRole('button', { name: 'Резерв' });
+
+  await userEvent.click(reserveBtn);
+
+  expect(global.confirm).toHaveBeenCalled();
+  await waitFor(() => expect(screen.queryByText('Reserve')).not.toBeInTheDocument());
+  const updated = getDB().clients.find(c => c.id === 'c1');
+  expect(updated?.area).toBe('резерв');
 });
 
 test('creates payment task with client info', async () => {
