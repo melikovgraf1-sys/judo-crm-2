@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
 import Modal from "./Modal";
@@ -9,6 +9,70 @@ import { applyPaymentStatusRules } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import type { Area, Client, Currency, DB, Group, TaskItem } from "../types";
+
+type TaskSection = { key: string; label: string | null; tasks: TaskItem[] };
+type AreaGroupEntry = { label: Area; groups: Map<string, Group> };
+const UNGROUPED_KEY = "__ungrouped__";
+
+const canonicalize = (value?: string | null) => (value ?? "").trim();
+const normalizeKey = (value?: string | null) => {
+  const canonical = canonicalize(value);
+  return canonical ? canonical.toLocaleLowerCase() : "";
+};
+
+function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSection[] {
+  const buckets = new Map<string, TaskItem[]>();
+  const labels = new Map<string, string>();
+  const order: string[] = [];
+
+  const normalizedAvailableLabels = new Map<string, string>();
+  availableGroups.forEach(groupName => {
+    const key = normalizeKey(groupName) || UNGROUPED_KEY;
+    const label = canonicalize(groupName) || "Без группы";
+    normalizedAvailableLabels.set(key, label);
+  });
+
+  tasks.forEach(task => {
+    const normalizedGroup = normalizeKey(task.group);
+    const key = normalizedGroup || UNGROUPED_KEY;
+    const canonicalGroup = canonicalize(task.group);
+    if (!buckets.has(key)) {
+      buckets.set(key, []);
+      const label =
+        normalizedAvailableLabels.get(key) ?? (canonicalGroup ? canonicalGroup : "Без группы");
+      labels.set(key, label);
+      order.push(key);
+    }
+    buckets.get(key)!.push(task);
+  });
+
+  const sections: TaskSection[] = [];
+
+  availableGroups.forEach(groupName => {
+    const canonicalGroup = canonicalize(groupName);
+    const key = normalizeKey(groupName) || UNGROUPED_KEY;
+    const tasksInBucket = buckets.get(key);
+    if (!tasksInBucket) return;
+
+    sections.push({ key, label: canonicalGroup || "Без группы", tasks: tasksInBucket });
+    buckets.delete(key);
+    labels.delete(key);
+
+    const idx = order.indexOf(key);
+    if (idx !== -1) {
+      order.splice(idx, 1);
+    }
+  });
+
+  order.forEach(key => {
+    const tasksInBucket = buckets.get(key);
+    if (!tasksInBucket) return;
+    const label = labels.get(key) ?? (key === UNGROUPED_KEY ? "Без группы" : key);
+    sections.push({ key, label, tasks: tasksInBucket });
+  });
+
+  return sections;
+}
 
 export function resolveClientsAfterTaskCompletion(
   clients: Client[],
@@ -49,23 +113,94 @@ export default function TasksTab({
   const [showArchive, setShowArchive] = useState(false);
   const [viewClientId, setViewClientId] = useState<string | null>(null);
 
-  const schedule = db.schedule ?? [];
+  const schedule = useMemo(() => db.schedule ?? [], [db.schedule]);
   const groupsByArea = useMemo(() => buildGroupsByArea(schedule), [schedule]);
-  const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
+
+  const { areaOptions, areaEntries, groupAreaMap } = useMemo(() => {
+    const entries = new Map<string, AreaGroupEntry>();
+    const groupArea = new Map<string, { areaKey: string; areaLabel: Area }>();
+    const order: string[] = [];
+
+    const ensureAreaEntry = (value?: string | null) => {
+      const canonicalArea = canonicalize(value);
+      if (!canonicalArea) return null;
+      const areaKey = normalizeKey(value);
+      let entry = entries.get(areaKey);
+      if (!entry) {
+        entry = { label: canonicalArea as Area, groups: new Map<string, Group>() };
+        entries.set(areaKey, entry);
+        order.push(areaKey);
+      }
+      return { key: areaKey, entry };
+    };
+
+    const recordGroup = (areaKey: string, areaLabel: Area, groupValue?: string | null) => {
+      const canonicalGroup = canonicalize(groupValue);
+      if (!canonicalGroup) return;
+      const groupKey = normalizeKey(groupValue);
+      const areaEntry = entries.get(areaKey);
+      if (!areaEntry) return;
+      if (!areaEntry.groups.has(groupKey)) {
+        areaEntry.groups.set(groupKey, canonicalGroup as Group);
+      }
+      if (!groupArea.has(groupKey)) {
+        groupArea.set(groupKey, { areaKey, areaLabel });
+      }
+    };
+
+    groupsByArea.forEach((groups, areaName) => {
+      const areaData = ensureAreaEntry(areaName);
+      if (!areaData) return;
+      const { key: areaKey, entry } = areaData;
+      groups.forEach(groupValue => {
+        const canonicalGroup = canonicalize(groupValue);
+        if (!canonicalGroup) return;
+        const groupKey = normalizeKey(groupValue);
+        if (!entry.groups.has(groupKey)) {
+          entry.groups.set(groupKey, canonicalGroup as Group);
+        }
+        if (!groupArea.has(groupKey)) {
+          groupArea.set(groupKey, { areaKey, areaLabel: entry.label });
+        }
+      });
+    });
+
+    const recordTask = (task: TaskItem) => {
+      const areaData = ensureAreaEntry(task.area);
+      if (!areaData) return;
+      const { key: areaKey, entry } = areaData;
+      recordGroup(areaKey, entry.label, task.group);
+    };
+
+    db.tasks.forEach(recordTask);
+    db.tasksArchive.forEach(recordTask);
+
+    const options = order.map(areaKey => entries.get(areaKey)!.label);
+
+    return { areaOptions: options, areaEntries: entries, groupAreaMap: groupArea };
+  }, [groupsByArea, db.tasks, db.tasksArchive]);
+
   const availableGroups = useMemo(() => {
     if (!area) return [];
-    return groupsByArea.get(area) ?? [];
-  }, [area, groupsByArea]);
+    const areaEntry = areaEntries.get(normalizeKey(area));
+    if (!areaEntry) return [];
+    return Array.from(areaEntry.groups.values());
+  }, [area, areaEntries]);
+
+  const normalizedAvailableGroups = useMemo(
+    () => new Set(availableGroups.map(normalizeKey)),
+    [availableGroups],
+  );
 
   useEffect(() => {
     if (!area && group !== null) {
       setGroup(null);
       return;
     }
-    if (area && group && !availableGroups.includes(group)) {
+    if (area && group && !normalizedAvailableGroups.has(normalizeKey(group))) {
       setGroup(null);
     }
-  }, [area, availableGroups, group]);
+  }, [area, group, normalizedAvailableGroups]);
 
   useEffect(() => {
     if (area || group) {
@@ -75,15 +210,29 @@ export default function TasksTab({
     }
   }, [area, group]);
 
-  const matchesFilter = (task: TaskItem) => {
-    if (area && task.area !== area) return false;
-    if (group && task.group !== group) return false;
-    return true;
-  };
+  const normalizedArea = useMemo(() => normalizeKey(area), [area]);
+  const normalizedGroup = useMemo(() => normalizeKey(group), [group]);
+
+  const matchesFilter = useCallback(
+    (task: TaskItem) => {
+      if (normalizedArea) {
+        const taskArea = normalizeKey(task.area);
+        if (taskArea !== normalizedArea) {
+          const inferredArea = groupAreaMap.get(normalizeKey(task.group))?.areaKey ?? "";
+          if (inferredArea !== normalizedArea) {
+            return false;
+          }
+        }
+      }
+      if (normalizedGroup && normalizeKey(task.group) !== normalizedGroup) return false;
+      return true;
+    },
+    [normalizedArea, normalizedGroup, groupAreaMap],
+  );
 
   const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
-  const visibleActiveTasks = useMemo(() => activeTasks.filter(matchesFilter), [activeTasks, area, group]);
-  const filteredArchive = useMemo(() => db.tasksArchive.filter(matchesFilter), [db.tasksArchive, area, group]);
+  const visibleActiveTasks = useMemo(() => activeTasks.filter(matchesFilter), [activeTasks, matchesFilter]);
+  const filteredArchive = useMemo(() => db.tasksArchive.filter(matchesFilter), [db.tasksArchive, matchesFilter]);
   const sortedArchive = useMemo(
     () =>
       filteredArchive
@@ -92,6 +241,22 @@ export default function TasksTab({
     [filteredArchive],
   );
   const archiveCount = sortedArchive.length;
+
+  const groupedActiveTasks = useMemo(() => {
+    if (area && !group) {
+      return buildTaskSections(visibleActiveTasks, availableGroups);
+    }
+
+    return [{ key: "all", label: null, tasks: visibleActiveTasks }];
+  }, [visibleActiveTasks, area, group, availableGroups]);
+
+  const groupedArchiveTasks = useMemo(() => {
+    if (area && !group) {
+      return buildTaskSections(sortedArchive, availableGroups);
+    }
+
+    return [{ key: "all", label: null, tasks: sortedArchive }];
+  }, [sortedArchive, area, group, availableGroups]);
   const recalcClients = (
     tasks: TaskItem[],
     archive: TaskItem[],
@@ -139,7 +304,14 @@ export default function TasksTab({
     setEdit(null);
   };
   const add = async () => {
-    const t: TaskItem = { id: uid(), title: "Новая задача", due: todayISO(), status: "open" };
+    const t: TaskItem = {
+      id: uid(),
+      title: "Новая задача",
+      due: todayISO(),
+      status: "open",
+      area: area ?? undefined,
+      group: group ?? undefined,
+    };
     const nextTasks = [t, ...db.tasks];
     const next: DB = {
       ...db,
@@ -188,8 +360,44 @@ export default function TasksTab({
   };
 
   const openTask = (task: TaskItem) => {
-    setEdit({ ...task });
+    const normalizedGroupKey = normalizeKey(task.group);
+    const inferredArea =
+      task.area ?? (normalizedGroupKey ? groupAreaMap.get(normalizedGroupKey)?.areaLabel : undefined);
+    setEdit({ ...task, area: inferredArea ?? task.area });
   };
+
+  const groupOptionsForEdit = useMemo(() => {
+    if (!edit) return [] as Group[];
+    const areaKey = edit.area ? normalizeKey(edit.area) : "";
+    if (areaKey) {
+      const options = Array.from(areaEntries.get(areaKey)?.groups.values() ?? []);
+      if (
+        edit.group &&
+        !options.some(option => normalizeKey(option) === normalizeKey(edit.group))
+      ) {
+        options.push(canonicalize(edit.group) as Group);
+      }
+      return options;
+    }
+
+    const unique = new Map<string, Group>();
+    areaEntries.forEach(entry => {
+      entry.groups.forEach((label, key) => {
+        if (!unique.has(key)) {
+          unique.set(key, label);
+        }
+      });
+    });
+
+    if (edit.group) {
+      const key = normalizeKey(edit.group);
+      if (!unique.has(key)) {
+        unique.set(key, canonicalize(edit.group) as Group);
+      }
+    }
+
+    return Array.from(unique.values());
+  }, [edit, areaEntries]);
 
   const clientToView = viewClientId ? db.clients.find(client => client.id === viewClientId) ?? null : null;
   const attendance = db.attendance ?? [];
@@ -227,60 +435,71 @@ export default function TasksTab({
           </select>
         </div>
         <button onClick={add} className="px-3 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700">+ Задача</button>
-        <ul className="space-y-2">
-          {visibleActiveTasks.map(t => (
-            <li
-              key={t.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => openTask(t)}
-              onKeyDown={event => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  openTask(t);
-                }
-              }}
-              className="p-3 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 flex items-center justify-between gap-2 cursor-pointer transition hover:border-sky-200 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:border-sky-400/60 dark:hover:bg-slate-800/60"
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={t.status === "done"}
-                  onClick={event => event.stopPropagation()}
-                  onChange={() => complete(t.id)}
-                />
-                <span
-                  className={`text-sm ${
-                    t.status === "done" ? "line-through text-slate-500" : "text-slate-800 dark:text-slate-100"
-                  }`}
-                >
-                  {t.title}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-500">{fmtDate(t.due)}</span>
-                <button
-                  onClick={event => {
-                    event.stopPropagation();
-                    openTask(t);
-                  }}
-                  className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
-                >
-                  ✎
-                </button>
-                <button
-                  onClick={event => {
-                    event.stopPropagation();
-                    remove(t.id);
-                  }}
-                  className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
-                >
-                  ✕
-                </button>
-              </div>
-            </li>
+        <div className="space-y-4">
+          {groupedActiveTasks.map(section => (
+            <div key={section.key} className="space-y-2">
+              {section.label ? (
+                <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 border border-slate-200 rounded-md bg-slate-50 dark:text-slate-300 dark:border-slate-700 dark:bg-slate-800/60">
+                  {section.label}
+                </div>
+              ) : null}
+              <ul className="space-y-2">
+                {section.tasks.map(t => (
+                  <li
+                    key={t.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openTask(t)}
+                    onKeyDown={event => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openTask(t);
+                      }
+                    }}
+                    className="p-3 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 flex items-center justify-between gap-2 cursor-pointer transition hover:border-sky-200 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:border-sky-400/60 dark:hover:bg-slate-800/60"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={t.status === "done"}
+                        onClick={event => event.stopPropagation()}
+                        onChange={() => complete(t.id)}
+                      />
+                      <span
+                        className={`text-sm ${
+                          t.status === "done" ? "line-through text-slate-500" : "text-slate-800 dark:text-slate-100"
+                        }`}
+                      >
+                        {t.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-500">{fmtDate(t.due)}</span>
+                      <button
+                        onClick={event => {
+                          event.stopPropagation();
+                          openTask(t);
+                        }}
+                        className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={event => {
+                          event.stopPropagation();
+                          remove(t.id);
+                        }}
+                        className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 dark:bg-slate-800"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
         <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
           <button
             type="button"
@@ -291,33 +510,44 @@ export default function TasksTab({
             <span className="text-xs text-slate-500">{archiveCount}</span>
           </button>
           {showArchive && (
-            <ul className="space-y-2">
+            <div className="space-y-4">
               {sortedArchive.length ? (
-                sortedArchive.map(task => (
-                  <li
-                    key={task.id}
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 text-sm flex flex-col gap-1"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{task.title}</span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{fmtDate(task.due)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                      <span>{task.topic ?? ""}</span>
-                      <button
-                        type="button"
-                        onClick={() => restore(task.id)}
-                        className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
-                      >
-                        Вернуть
-                      </button>
-                    </div>
-                  </li>
+                groupedArchiveTasks.map(section => (
+                  <div key={`archive-${section.key}`} className="space-y-2">
+                    {section.label ? (
+                      <div className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 border border-slate-200 rounded-md bg-slate-100 dark:text-slate-300 dark:border-slate-700 dark:bg-slate-900/60">
+                        {section.label}
+                      </div>
+                    ) : null}
+                    <ul className="space-y-2">
+                      {section.tasks.map(task => (
+                        <li
+                          key={task.id}
+                          className="p-3 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 text-sm flex flex-col gap-1"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-medium text-slate-700 dark:text-slate-200">{task.title}</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{fmtDate(task.due)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                            <span>{task.topic ?? ""}</span>
+                            <button
+                              type="button"
+                              onClick={() => restore(task.id)}
+                              className="px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                            >
+                              Вернуть
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))
               ) : (
-                <li className="text-sm text-slate-500 dark:text-slate-400 px-3">Архив пуст</li>
+                <div className="text-sm text-slate-500 dark:text-slate-400 px-3">Архив пуст</div>
               )}
-            </ul>
+            </div>
           )}
         </div>
         {edit && (
@@ -334,6 +564,55 @@ export default function TasksTab({
               value={edit.due.slice(0, 10)}
               onChange={e => setEdit({ ...edit, due: e.target.value })}
             />
+            <select
+              className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={edit.area ?? ""}
+              onChange={event => {
+                const nextArea = event.target.value ? (event.target.value as Area) : undefined;
+                const areaKey = nextArea ? normalizeKey(nextArea) : "";
+                const areaEntry = areaKey ? areaEntries.get(areaKey) ?? null : null;
+                const hasGroup =
+                  edit.group && areaEntry
+                    ? areaEntry.groups.has(normalizeKey(edit.group))
+                    : false;
+                setEdit({
+                  ...edit,
+                  area: nextArea,
+                  group: hasGroup ? edit.group : undefined,
+                });
+              }}
+            >
+              <option value="">Без района</option>
+              {areaOptions.map(option => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <select
+              className="w-full px-3 py-2 rounded-md border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={edit.group ?? ""}
+              onChange={event => {
+                const nextGroup = event.target.value ? (event.target.value as Group) : undefined;
+                if (!nextGroup) {
+                  setEdit({ ...edit, group: undefined });
+                  return;
+                }
+                const owningArea = groupAreaMap.get(normalizeKey(nextGroup));
+                setEdit({
+                  ...edit,
+                  group: nextGroup,
+                  area: owningArea?.areaLabel ?? edit.area,
+                });
+              }}
+            >
+              <option value="">Без группы</option>
+              {groupOptionsForEdit.map(option => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
             {edit.assigneeType === "client" ? (
               (() => {
                 const client = db.clients.find(c => c.id === edit.assigneeId);
