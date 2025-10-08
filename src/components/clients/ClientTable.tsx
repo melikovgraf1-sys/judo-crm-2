@@ -6,6 +6,7 @@ import { compareValues, toggleSort } from "../tableUtils";
 import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
 import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
+import { isReserveArea } from "../../state/areas";
 import type {
   AttendanceEntry,
   Client,
@@ -290,6 +291,7 @@ export default function ClientTable({
       cellClassName: "flex justify-end gap-1",
       renderCell: client => {
         const openTask = openPaymentTasks?.[client.id];
+        const showReserveButton = Boolean(onReserve && !isReserveArea(client.area));
         return (
           <>
             {openTask && onCompletePaymentTask && (
@@ -298,31 +300,55 @@ export default function ClientTable({
                   event.stopPropagation();
                   onCompletePaymentTask(client, openTask);
                 }}
+                className="px-2 py-1 text-xs rounded-md border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                Оплатил
+              </button>
+            )}
+            {openTask && onRemovePaymentTask && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onRemovePaymentTask(client, openTask);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                Удалить задачу
+              </button>
+            )}
+            {!openTask && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onCreateTask(client);
+                }}
                 className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
               >
                 Создать задачу
               </button>
             )}
-          <button
-            onClick={event => {
-              event.stopPropagation();
-              onCreateTask(client);
-            }}
-            className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
-          >
-            Создать задачу
-          </button>
-          {onRemove && (
-            <button
-              onClick={event => {
-                event.stopPropagation();
-                onRemove(client.id);
-              }}
-              className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
-            >
-              Удалить
-            </button>
-          )}
+            {showReserveButton && onReserve && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onReserve(client);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Резерв
+              </button>
+            )}
+            {onRemove && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onRemove(client.id);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
+              >
+                Удалить
+              </button>
+            )}
           </>
         );
       },
