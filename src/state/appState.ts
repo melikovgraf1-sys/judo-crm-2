@@ -602,6 +602,10 @@ export function useAppState(): AppState {
         return;
       }
 
+      if (client.payStatus !== "ожидание") {
+        return;
+      }
+
       if (openPaymentAssignments.has(client.id)) {
         return;
       }
