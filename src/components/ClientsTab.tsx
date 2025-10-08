@@ -8,6 +8,7 @@ import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyClientStatusAutoTransition } from "../state/clientLifecycle";
 import { applyPaymentStatusRules } from "../state/payments";
+import { getClientPlacements } from "../state/clients";
 import { transformClientFormValues } from "./clients/clientMutations";
 import {
   appendImportedClients,
@@ -259,34 +260,65 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
   };
 
   const createPaymentTask = async (client: Client) => {
-    const areaValueRaw = client.area?.trim() ?? "";
-    const groupValueRaw = client.group?.trim() ?? "";
-    const areaValue = (areaValueRaw ? areaValueRaw : undefined) as Area | undefined;
-    const groupValue = (groupValueRaw ? groupValueRaw : undefined) as Group | undefined;
+    const placements = getClientPlacements(client);
+    const targetPlacement = placements[0];
+    const payAmount = targetPlacement?.payAmount ?? client.payAmount;
+    const payDate = targetPlacement?.payDate ?? client.payDate;
 
     const titleParts = [
       `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
       client.parentName ? `родитель: ${client.parentName}` : null,
-      client.payAmount != null
-        ? `сумма: ${fmtMoney(client.payAmount, ui.currency, db.settings.currencyRates)}`
-        : null,
-      client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
+      payAmount != null ? `сумма: ${fmtMoney(payAmount, ui.currency, db.settings.currencyRates)}` : null,
+      payDate ? `дата: ${payDate.slice(0, 10)}` : null,
     ].filter(Boolean);
 
     const task: TaskItem = {
       id: uid(),
       title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
-      due: client.payDate || todayISO(),
+      due: payDate || todayISO(),
       status: "open",
       topic: "оплата",
       assigneeType: "client",
       assigneeId: client.id,
-      area: areaValue,
-      group: groupValue,
+      area: targetPlacement?.area ?? client.area,
+      group: targetPlacement?.group ?? client.group,
+      placementId: targetPlacement?.id,
     };
 
+    let updates: Partial<Client> | undefined;
+
+    if (targetPlacement) {
+      const nextPlacement = { ...targetPlacement, payStatus: "задолженность" as const };
+      const nextPlacements = placements.map(placement =>
+        placement.id === nextPlacement.id ? nextPlacement : placement,
+      );
+
+      updates = { placements: nextPlacements };
+
+      if (placements[0]?.id === nextPlacement.id) {
+        updates = {
+          ...updates,
+          payStatus: "задолженность",
+          area: nextPlacement.area,
+          group: nextPlacement.group,
+          subscriptionPlan: nextPlacement.subscriptionPlan,
+          ...(nextPlacement.payAmount != null ? { payAmount: nextPlacement.payAmount } : {}),
+          ...(nextPlacement.payDate ? { payDate: nextPlacement.payDate } : {}),
+          ...(nextPlacement.payActual != null ? { payActual: nextPlacement.payActual } : {}),
+          ...(nextPlacement.remainingLessons != null
+            ? { remainingLessons: nextPlacement.remainingLessons }
+            : {}),
+        };
+      }
+    }
+
     const nextTasks = [task, ...db.tasks];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, db.tasksArchive);
+    const nextClients = applyPaymentStatusRules(
+      db.clients,
+      nextTasks,
+      db.tasksArchive,
+      updates ? { [client.id]: updates } : {},
+    );
     const next = {
       ...db,
       tasks: nextTasks,

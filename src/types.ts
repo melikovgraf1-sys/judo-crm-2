@@ -199,6 +199,7 @@ export interface TaskItem {
   topic?: "оплата" | "аренда" | "день рождения" | "другое";
   area?: Area;
   group?: Group;
+  placementId?: string;
 }
 
 export interface StaffMember {

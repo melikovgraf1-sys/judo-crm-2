@@ -8,6 +8,7 @@ import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { fmtMoney, todayISO, uid } from "./utils";
 import { applyPaymentStatusRules, DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
+import { getClientPlacements } from "./clients";
 import { ensureReserveAreaIncluded } from "./areas";
 import type {
   AttendanceEntry,
@@ -15,6 +16,7 @@ import type {
   AuthState,
   AuthUser,
   Client,
+  ClientPlacement,
   DB,
   Lead,
   LeadLifecycleEvent,
@@ -649,55 +651,108 @@ export function useAppState(): AppState {
     const timestamp = todayISO();
     const today = typeof timestamp === "string" ? timestamp.slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-    const openPaymentAssignments = new Set(
-      currentDB.tasks
-        .filter(
-          task =>
-            task.status === "open" && task.topic === "оплата" && task.assigneeType === "client" && task.assigneeId,
-        )
-        .map(task => task.assigneeId as string),
-    );
+    const openPaymentAssignments = new Set<string>();
+    currentDB.tasks
+      .filter(
+        task => task.status === "open" && task.topic === "оплата" && task.assigneeType === "client" && task.assigneeId,
+      )
+      .forEach(task => {
+        const assigneeId = task.assigneeId as string;
+        if (!assigneeId) {
+          return;
+        }
+        if (task.placementId) {
+          openPaymentAssignments.add(`${assigneeId}:${task.placementId}`);
+        } else {
+          openPaymentAssignments.add(`${assigneeId}:*`);
+        }
+      });
 
     const newTasks: TaskItem[] = [];
     const changelogEntries: DB["changelog"] = [];
+    const updates: Partial<Record<string, Partial<Client>>> = {};
 
     currentDB.clients.forEach(client => {
-      if (!client.payDate || client.payDate.slice(0, 10) !== today) {
-        return;
-      }
+      const placements = getClientPlacements(client);
+      const primaryPlacementId = placements[0]?.id;
 
-      if (client.payStatus !== "ожидание") {
-        return;
-      }
+      placements.forEach(placement => {
+        const payDate = placement.payDate ?? client.payDate;
+        if (!payDate || payDate.slice(0, 10) !== today) {
+          return;
+        }
 
-      if (openPaymentAssignments.has(client.id)) {
-        return;
-      }
+        if (placement.payStatus !== "ожидание") {
+          return;
+        }
 
-      const titleParts = [
-        `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
-        client.parentName ? `родитель: ${client.parentName}` : null,
-        client.payAmount != null
-          ? `сумма: ${fmtMoney(client.payAmount, currentUI?.currency ?? "EUR", currentDB.settings.currencyRates)}`
-          : null,
-        client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
-      ].filter(Boolean);
+        if (openPaymentAssignments.has(`${client.id}:*`)) {
+          return;
+        }
 
-      newTasks.push({
-        id: uid(),
-        title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
-        due: client.payDate || timestamp,
-        status: "open",
-        topic: "оплата",
-        assigneeType: "client",
-        assigneeId: client.id,
-      });
+        const key = `${client.id}:${placement.id ?? "primary"}`;
+        if (openPaymentAssignments.has(key)) {
+          return;
+        }
 
-      changelogEntries.push({
-        id: uid(),
-        who: "Система",
-        what: `Создана задача по оплате ${client.firstName}`,
-        when: timestamp,
+        const payAmount = placement.payAmount ?? client.payAmount;
+
+        const titleParts = [
+          `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
+          client.parentName ? `родитель: ${client.parentName}` : null,
+          payAmount != null
+            ? `сумма: ${fmtMoney(payAmount, currentUI?.currency ?? "EUR", currentDB.settings.currencyRates)}`
+            : null,
+          payDate ? `дата: ${payDate.slice(0, 10)}` : null,
+        ].filter(Boolean);
+
+        newTasks.push({
+          id: uid(),
+          title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
+          due: payDate || timestamp,
+          status: "open",
+          topic: "оплата",
+          assigneeType: "client",
+          assigneeId: client.id,
+          area: placement.area ?? client.area,
+          group: placement.group ?? client.group,
+          placementId: placement.id,
+        });
+
+        changelogEntries.push({
+          id: uid(),
+          who: "Система",
+          what: `Создана задача по оплате ${client.firstName}`,
+          when: timestamp,
+        });
+
+        const baseUpdate = updates[client.id] ?? {};
+        const sourcePlacements = (baseUpdate.placements as ClientPlacement[] | undefined) ?? placements;
+        const updatedPlacement = { ...placement, payStatus: "задолженность" as const };
+        const nextPlacements = sourcePlacements.map(item =>
+          item.id === updatedPlacement.id ? updatedPlacement : item,
+        );
+
+        updates[client.id] = {
+          ...baseUpdate,
+          placements: nextPlacements,
+        };
+
+        if (primaryPlacementId === updatedPlacement.id) {
+          updates[client.id] = {
+            ...updates[client.id],
+            payStatus: "задолженность",
+            area: updatedPlacement.area,
+            group: updatedPlacement.group,
+            subscriptionPlan: updatedPlacement.subscriptionPlan,
+            ...(updatedPlacement.payAmount != null ? { payAmount: updatedPlacement.payAmount } : {}),
+            ...(updatedPlacement.payDate ? { payDate: updatedPlacement.payDate } : {}),
+            ...(updatedPlacement.payActual != null ? { payActual: updatedPlacement.payActual } : {}),
+            ...(updatedPlacement.remainingLessons != null
+              ? { remainingLessons: updatedPlacement.remainingLessons }
+              : {}),
+          };
+        }
       });
     });
 
@@ -706,7 +761,7 @@ export function useAppState(): AppState {
     }
 
     const nextTasks = [...newTasks, ...currentDB.tasks];
-    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive);
+    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive, updates);
     const next: DB = {
       ...currentDB,
       tasks: nextTasks,
