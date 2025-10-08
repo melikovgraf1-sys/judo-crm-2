@@ -236,6 +236,11 @@ export default function GroupsTab({
   };
 
   const createPaymentTask = async (client: Client) => {
+    const areaValueRaw = client.area?.trim() ?? "";
+    const groupValueRaw = client.group?.trim() ?? "";
+    const areaValue = (areaValueRaw ? areaValueRaw : undefined) as Area | undefined;
+    const groupValue = (groupValueRaw ? groupValueRaw : undefined) as Group | undefined;
+
     const titleParts = [
       `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
       client.parentName ? `родитель: ${client.parentName}` : null,
@@ -253,6 +258,8 @@ export default function GroupsTab({
       topic: "оплата",
       assigneeType: "client",
       assigneeId: client.id,
+      area: areaValue,
+      group: groupValue,
     };
 
     const nextTasks = [task, ...db.tasks];
