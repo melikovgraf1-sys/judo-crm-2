@@ -25,6 +25,7 @@ export default function ClientDetailsModal({
   onEdit,
   onRemove,
 }: Props) {
+  const totalRemainingLessons = getEffectiveRemainingLessons(client, schedule);
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
   const attendanceEntries = useMemo(() => {
@@ -107,6 +108,87 @@ export default function ClientDetailsModal({
 
         {section === "info" && (
           <div className="space-y-2">
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <ClientInfoRow label="Телефон" value={client.phone || "—"} />
+              <ClientInfoRow label="WhatsApp" value={client.whatsApp || "—"} />
+              <ClientInfoRow label="Telegram" value={client.telegram || "—"} />
+              <ClientInfoRow label="Instagram" value={client.instagram || "—"} />
+              <ClientInfoRow label="Канал" value={client.channel} />
+              <ClientInfoRow label="Родитель" value={client.parentName || "—"} />
+              <ClientInfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />
+              <ClientInfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
+              <ClientInfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
+              <ClientInfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
+              <ClientInfoRow label="Статус абонемента" value={client.status ?? "—"} />
+              <ClientInfoRow label="Статус оплаты" value={client.payStatus} />
+              <ClientInfoRow
+                label="Форма абонемента"
+                value={client.subscriptionPlan ? getSubscriptionPlanMeta(client.subscriptionPlan)?.label ?? "—" : "—"}
+              />
+              <ClientInfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
+              <ClientInfoRow
+                label="Сумма оплаты"
+                value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
+              />
+              <ClientInfoRow
+                label="Факт оплаты"
+                value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
+              />
+              <ClientInfoRow
+                label="Остаток занятий"
+                value={totalRemainingLessons != null ? String(totalRemainingLessons) : "—"}
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Тренировочные места
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {placements.map(place => {
+                  const planLabel = place.subscriptionPlan
+                    ? getSubscriptionPlanMeta(place.subscriptionPlan)?.label ?? "—"
+                    : "—";
+                  return (
+                    <div
+                      key={`${place.id}-${place.area}-${place.group}`}
+                      className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
+                        {place.area} · {place.group}
+                      </div>
+                      <dl className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
+                        <ClientPlacementInfoCell label="Статус абонемента" value={place.status ?? "—"} />
+                        <ClientPlacementInfoCell label="Статус оплаты" value={place.payStatus ?? "—"} />
+                        <ClientPlacementInfoCell label="Форма абонемента" value={planLabel} />
+                        <ClientPlacementInfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
+                        <ClientPlacementInfoCell
+                          label="Сумма оплаты"
+                          value={
+                            place.payAmount != null
+                              ? fmtMoney(place.payAmount, currency, currencyRates)
+                              : "—"
+                          }
+                        />
+                        <ClientPlacementInfoCell
+                          label="Факт оплаты"
+                          value={
+                            place.payActual != null
+                              ? fmtMoney(place.payActual, currency, currencyRates)
+                              : "—"
+                          }
+                        />
+                        <ClientPlacementInfoCell
+                          label="Остаток занятий"
+                          value={
+                            place.remainingLessons != null ? String(place.remainingLessons) : "—"
+                          }
+                        />
+                      </dl>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <div className="space-y-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Тренировочные места
@@ -170,13 +252,13 @@ export default function ClientDetailsModal({
 
         {section === "attendance" && (
           <div className="space-y-2">
-            <SummaryPill label="Отметок" value={attendanceEntries.length} />
-            <SummaryPill label="Посетил" value={attendedCount} />
-            <SummaryPill
+            <ClientSummaryPill label="Отметок" value={attendanceEntries.length} />
+            <ClientSummaryPill label="Посетил" value={attendedCount} />
+            <ClientSummaryPill
               label="Последнее занятие"
               value={attendanceEntries[0] ? fmtDate(attendanceEntries[0].date) : "—"}
             />
-            <HistoryList
+            <ClientHistoryList
               emptyText="Пока нет отметок посещаемости"
               entries={attendanceEntries.map(entry => ({
                 id: entry.id,
@@ -190,13 +272,13 @@ export default function ClientDetailsModal({
 
         {section === "performance" && (
           <div className="space-y-2">
-            <SummaryPill label="Оценок" value={performanceEntries.length} />
-            <SummaryPill label="Успешных" value={successfulCount} />
-            <SummaryPill
+            <ClientSummaryPill label="Оценок" value={performanceEntries.length} />
+            <ClientSummaryPill label="Успешных" value={successfulCount} />
+            <ClientSummaryPill
               label="Последняя оценка"
               value={performanceEntries[0] ? fmtDate(performanceEntries[0].date) : "—"}
             />
-            <HistoryList
+            <ClientHistoryList
               emptyText="Пока нет отметок успеваемости"
               entries={performanceEntries.map(entry => ({
                 id: entry.id,
@@ -241,7 +323,7 @@ export default function ClientDetailsModal({
   );
 }
 
-function InfoCell({ label, value }: { label: string; value: React.ReactNode }) {
+function ClientInfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-3">
       <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
@@ -250,7 +332,16 @@ function InfoCell({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function SummaryPill({ label, value }: { label: string; value: React.ReactNode }) {
+function ClientPlacementInfoCell({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right text-slate-700 dark:text-slate-200">{value}</span>
+    </div>
+  );
+}
+
+function ClientSummaryPill({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
       <span className="uppercase tracking-wide">{label}</span>
@@ -259,7 +350,7 @@ function SummaryPill({ label, value }: { label: string; value: React.ReactNode }
   );
 }
 
-function HistoryList({
+function ClientHistoryList({
   entries,
   emptyText,
 }: {
