@@ -1,15 +1,13 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
-import { calcAgeYears, calcExperience, fmtDate, fmtMoney } from "../../state/utils";
+import { fmtDate, fmtMoney } from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
-import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot, Settings } from "../../types";
+import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
 
 interface Props {
   client: Client;
   currency: Currency;
   currencyRates: Settings["currencyRates"];
-  schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
   onClose: () => void;
@@ -21,14 +19,12 @@ export default function ClientDetailsModal({
   client,
   currency,
   currencyRates,
-  schedule,
   attendance,
   performance,
   onClose,
   onEdit,
   onRemove,
 }: Props) {
-  const remaining = getEffectiveRemainingLessons(client, schedule);
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
   const attendanceEntries = useMemo(() => {
@@ -111,34 +107,6 @@ export default function ClientDetailsModal({
 
         {section === "info" && (
           <div className="space-y-2">
-            <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <InfoRow label="Телефон" value={client.phone || "—"} />
-              <InfoRow label="WhatsApp" value={client.whatsApp || "—"} />
-              <InfoRow label="Telegram" value={client.telegram || "—"} />
-              <InfoRow label="Instagram" value={client.instagram || "—"} />
-              <InfoRow label="Канал" value={client.channel} />
-              <InfoRow label="Родитель" value={client.parentName || "—"} />
-              <InfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />
-              <InfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
-              <InfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
-              <InfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
-              <InfoRow label="Статус абонемента" value={client.status ?? "—"} />
-              <InfoRow label="Статус оплаты" value={client.payStatus} />
-              <InfoRow
-                label="Форма абонемента"
-                value={client.subscriptionPlan ? getSubscriptionPlanMeta(client.subscriptionPlan)?.label ?? "—" : "—"}
-              />
-              <InfoRow label="Дата оплаты" value={client.payDate?.slice(0, 10) || "—"} />
-              <InfoRow
-                label="Сумма оплаты"
-                value={client.payAmount != null ? fmtMoney(client.payAmount, currency, currencyRates) : "—"}
-              />
-              <InfoRow
-                label="Факт оплаты"
-                value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
-              />
-              <InfoRow label="Остаток занятий" value={remaining != null ? String(remaining) : "—"} />
-            </div>
             <div className="space-y-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Тренировочные места
@@ -270,15 +238,6 @@ export default function ClientDetailsModal({
         )}
       </div>
     </Modal>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="text-slate-700 dark:text-slate-100">{value}</span>
-    </div>
   );
 }
 

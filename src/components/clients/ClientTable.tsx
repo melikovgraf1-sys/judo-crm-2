@@ -488,7 +488,6 @@ export default function ClientTable({
           client={selected}
           currency={currency}
           currencyRates={currencyRates}
-          schedule={schedule}
           attendance={attendance}
           performance={performance}
           onEdit={onEdit}
