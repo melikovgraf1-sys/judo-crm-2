@@ -2,13 +2,15 @@ import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import { fmtDate, fmtMoney } from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
+import { getEffectiveRemainingLessons } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
+import type { ScheduleSlot as ScheduleSlotType } from "../../types";
 
 interface Props {
   client: Client;
   currency: Currency;
   currencyRates: Settings["currencyRates"];
-  schedule?: ScheduleSlot[];
+  schedule?: ScheduleSlotType[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
   onClose: () => void;
@@ -27,8 +29,8 @@ export default function ClientDetailsModal({
   onEdit,
   onRemove,
 }: Props) {
-  const schedule = scheduleProp ?? [];
-  const totalRemainingLessons = getEffectiveRemainingLessons(client, schedule);
+  const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
+  const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
   const attendanceEntries = useMemo(() => {
