@@ -118,7 +118,7 @@ export default function TasksTab({
 
   const { areaOptions, areaEntries, groupAreaMap } = useMemo(() => {
     const entries = new Map<string, AreaGroupEntry>();
-    const groupArea = new Map<string, { areaKey: string; areaLabel: Area }>();
+    const groupArea = new Map<string, { areaKey: string; areaLabel: Area }[]>();
     const order: string[] = [];
 
     const ensureAreaEntry = (value?: string | null) => {
@@ -143,8 +143,13 @@ export default function TasksTab({
       if (!areaEntry.groups.has(groupKey)) {
         areaEntry.groups.set(groupKey, canonicalGroup as Group);
       }
-      if (!groupArea.has(groupKey)) {
-        groupArea.set(groupKey, { areaKey, areaLabel });
+      const bucket = groupArea.get(groupKey);
+      if (bucket) {
+        if (!bucket.some(item => item.areaKey === areaKey)) {
+          bucket.push({ areaKey, areaLabel });
+        }
+      } else {
+        groupArea.set(groupKey, [{ areaKey, areaLabel }]);
       }
     };
 
@@ -153,15 +158,7 @@ export default function TasksTab({
       if (!areaData) return;
       const { key: areaKey, entry } = areaData;
       groups.forEach(groupValue => {
-        const canonicalGroup = canonicalize(groupValue);
-        if (!canonicalGroup) return;
-        const groupKey = normalizeKey(groupValue);
-        if (!entry.groups.has(groupKey)) {
-          entry.groups.set(groupKey, canonicalGroup as Group);
-        }
-        if (!groupArea.has(groupKey)) {
-          groupArea.set(groupKey, { areaKey, areaLabel: entry.label });
-        }
+        recordGroup(areaKey, entry.label, groupValue);
       });
     });
 
@@ -192,28 +189,6 @@ export default function TasksTab({
     [availableGroups],
   );
 
-  const normalizedGroupAreas = useMemo(() => {
-    const map = new Map<string, string>();
-    groupsByArea.forEach((groups, areaName) => {
-      const normalizedAreaName = normalizeKey(areaName);
-      if (!normalizedAreaName) return;
-
-      groups.forEach(groupName => {
-        const normalizedGroupName = normalizeKey(groupName);
-        if (!normalizedGroupName) return;
-        if (!map.has(normalizedGroupName)) {
-          map.set(normalizedGroupName, normalizedAreaName);
-        }
-      });
-    });
-    return map;
-  }, [groupsByArea]);
-
-  const normalizedAvailableGroups = useMemo(
-    () => new Set(availableGroups.map(normalizeKey)),
-    [availableGroups],
-  );
-
   useEffect(() => {
     if (!area && group !== null) {
       setGroup(null);
@@ -237,19 +212,25 @@ export default function TasksTab({
 
   const matchesFilter = useCallback(
     (task: TaskItem) => {
+      const taskAreaKey = normalizeKey(task.area);
+      const taskGroupKey = normalizeKey(task.group);
+
       if (normalizedArea) {
-        const taskArea = normalizeKey(task.area);
-        if (taskArea !== normalizedArea) {
-          const inferredArea = groupAreaMap.get(normalizeKey(task.group))?.areaKey ?? "";
-          if (inferredArea !== normalizedArea) {
+        if (taskAreaKey !== normalizedArea) {
+          const areaGroups = areaEntries.get(normalizedArea)?.groups ?? null;
+          if (!areaGroups || !taskGroupKey || !areaGroups.has(taskGroupKey)) {
             return false;
           }
         }
       }
-      if (normalizedGroup && normalizeKey(task.group) !== normalizedGroup) return false;
+
+      if (normalizedGroup && taskGroupKey !== normalizedGroup) {
+        return false;
+      }
+
       return true;
     },
-    [normalizedArea, normalizedGroup, groupAreaMap],
+    [normalizedArea, normalizedGroup, areaEntries],
   );
 
   const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
@@ -383,8 +364,9 @@ export default function TasksTab({
 
   const openTask = (task: TaskItem) => {
     const normalizedGroupKey = normalizeKey(task.group);
+    const possibleAreas = normalizedGroupKey ? groupAreaMap.get(normalizedGroupKey) ?? [] : [];
     const inferredArea =
-      task.area ?? (normalizedGroupKey ? groupAreaMap.get(normalizedGroupKey)?.areaLabel : undefined);
+      task.area ?? (possibleAreas.length === 1 ? possibleAreas[0].areaLabel : undefined);
     setEdit({ ...task, area: inferredArea ?? task.area });
   };
 
@@ -620,11 +602,21 @@ export default function TasksTab({
                   setEdit({ ...edit, group: undefined });
                   return;
                 }
-                const owningArea = groupAreaMap.get(normalizeKey(nextGroup));
+                const owningAreas = groupAreaMap.get(normalizeKey(nextGroup)) ?? [];
+                const currentAreaKey = edit.area ? normalizeKey(edit.area) : "";
+                let nextAreaValue = edit.area;
+                if (owningAreas.length === 1) {
+                  nextAreaValue = owningAreas[0].areaLabel;
+                } else if (
+                  currentAreaKey &&
+                  !owningAreas.some(candidate => candidate.areaKey === currentAreaKey)
+                ) {
+                  nextAreaValue = undefined;
+                }
                 setEdit({
                   ...edit,
                   group: nextGroup,
-                  area: owningArea?.areaLabel ?? edit.area,
+                  area: nextAreaValue,
                 });
               }}
             >
