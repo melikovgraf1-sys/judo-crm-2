@@ -93,17 +93,10 @@ type EarliestSlot = { time: string; weekday: number };
 export function buildGroupsByArea(schedule: ScheduleSlot[]): Map<Area, Group[]> {
   const map = new Map<Area, Group[]>();
   const earliestByArea = new Map<Area, EarliestSlot>();
+  const earliestByAreaGroup = new Map<Area, Map<Group, EarliestSlot>>();
 
   for (const slot of schedule) {
     const groups = map.get(slot.area);
-    if (groups) {
-      if (!groups.includes(slot.group)) {
-        groups.push(slot.group);
-      }
-    } else {
-      map.set(slot.area, [slot.group]);
-    }
-
     const candidate: EarliestSlot = { time: slot.time, weekday: slot.weekday };
     const current = earliestByArea.get(slot.area);
     if (!current) {
@@ -114,10 +107,58 @@ export function buildGroupsByArea(schedule: ScheduleSlot[]): Map<Area, Group[]> 
         earliestByArea.set(slot.area, candidate);
       }
     }
+
+    const areaGroups = map.get(slot.area);
+    if (areaGroups) {
+      if (!areaGroups.includes(slot.group)) {
+        areaGroups.push(slot.group);
+      }
+    } else {
+      map.set(slot.area, [slot.group]);
+    }
+
+    const groupMap = earliestByAreaGroup.get(slot.area);
+    if (!groupMap) {
+      earliestByAreaGroup.set(slot.area, new Map([[slot.group, candidate]]));
+    } else {
+      const currentGroupEarliest = groupMap.get(slot.group);
+      if (!currentGroupEarliest) {
+        groupMap.set(slot.group, candidate);
+      } else {
+        const timeCompare = candidate.time.localeCompare(currentGroupEarliest.time);
+        if (
+          timeCompare < 0 ||
+          (timeCompare === 0 && candidate.weekday < currentGroupEarliest.weekday)
+        ) {
+          groupMap.set(slot.group, candidate);
+        }
+      }
+    }
   }
 
-  for (const [, groups] of map) {
-    groups.sort();
+  for (const [area, groups] of map) {
+    groups.sort((groupA, groupB) => {
+      const groupMap = earliestByAreaGroup.get(area);
+      const earliestA = groupMap?.get(groupA);
+      const earliestB = groupMap?.get(groupB);
+
+      if (earliestA && earliestB) {
+        const timeCompare = earliestA.time.localeCompare(earliestB.time);
+        if (timeCompare !== 0) {
+          return timeCompare;
+        }
+        const weekdayCompare = earliestA.weekday - earliestB.weekday;
+        if (weekdayCompare !== 0) {
+          return weekdayCompare;
+        }
+      } else if (earliestA) {
+        return -1;
+      } else if (earliestB) {
+        return 1;
+      }
+
+      return groupA.localeCompare(groupB);
+    });
   }
 
   const sortedEntries = Array.from(map.entries()).sort((a, b) => {
