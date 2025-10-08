@@ -9,8 +9,6 @@ import { commitDBUpdate } from "../state/appState";
 import {
   DEFAULT_SUBSCRIPTION_PLAN,
   applyPaymentStatusRules,
-  getDefaultPayAmount,
-  shouldAllowCustomPayAmount,
 } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailyPeriod, readDailySelection, writeDailyPeriod, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
@@ -170,24 +168,6 @@ export default function GroupsTab({
   const startEdit = (c: Client) => {
     setEditing(c);
     setModalOpen(true);
-  };
-
-  const resolvePayAmount = (rawValue: string, group: Group, previous?: number): number | undefined => {
-    const defaultAmount = getDefaultPayAmount(group);
-    if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
-      return defaultAmount;
-    }
-
-    const parsed = Number.parseFloat(rawValue);
-    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
-      return parsed;
-    }
-
-    if (defaultAmount != null) {
-      return defaultAmount;
-    }
-
-    return previous;
   };
 
   const saveClient = async (data: ClientFormValues) => {

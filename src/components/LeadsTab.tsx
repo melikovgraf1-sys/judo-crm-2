@@ -21,6 +21,7 @@ import type {
   LeadStage,
   LeadFormValues,
   Client,
+  ClientPlacement,
   LeadLifecycleEvent,
   LeadLifecycleOutcome,
   SubscriptionPlan,
@@ -278,9 +279,21 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
   const nameParts = rawName.split(/\s+/).filter(Boolean);
   const firstName = lead.firstName ?? nameParts[0] ?? "Новый";
   const lastName = lead.lastName ?? (nameParts.length > 1 ? nameParts.slice(1).join(" ") : undefined);
+  const clientId = uid();
+
+  const primaryPlacement: ClientPlacement = {
+    id: `placement-${clientId}`,
+    area,
+    group,
+    payStatus: "ожидание",
+    status: "новый",
+    subscriptionPlan,
+    payDate: fallbackDate,
+    ...(subscriptionPlanMeta?.amount != null ? { payAmount: subscriptionPlanMeta.amount } : {}),
+  };
 
   const client: Client = {
-    id: uid(),
+    id: clientId,
     firstName,
     lastName,
     parentName: lead.parentName,
@@ -301,6 +314,7 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     subscriptionPlan,
     payDate: fallbackDate,
     ...(subscriptionPlanMeta?.amount != null ? { payAmount: subscriptionPlanMeta.amount } : {}),
+    placements: [primaryPlacement],
   };
 
   return client;
