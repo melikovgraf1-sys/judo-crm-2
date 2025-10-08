@@ -112,13 +112,30 @@ export default function TasksTab({
   const [showArchive, setShowArchive] = useState(false);
   const [viewClientId, setViewClientId] = useState<string | null>(null);
 
-  const schedule = db.schedule ?? [];
+  const schedule = useMemo(() => db.schedule ?? [], [db.schedule]);
   const groupsByArea = useMemo(() => buildGroupsByArea(schedule), [schedule]);
   const areaOptions = useMemo(() => Array.from(groupsByArea.keys()), [groupsByArea]);
   const availableGroups = useMemo(() => {
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
+
+  const normalizedGroupAreas = useMemo(() => {
+    const map = new Map<string, string>();
+    groupsByArea.forEach((groups, areaName) => {
+      const normalizedAreaName = normalizeKey(areaName);
+      if (!normalizedAreaName) return;
+
+      groups.forEach(groupName => {
+        const normalizedGroupName = normalizeKey(groupName);
+        if (!normalizedGroupName) return;
+        if (!map.has(normalizedGroupName)) {
+          map.set(normalizedGroupName, normalizedAreaName);
+        }
+      });
+    });
+    return map;
+  }, [groupsByArea]);
 
   const normalizedAvailableGroups = useMemo(
     () => new Set(availableGroups.map(normalizeKey)),
@@ -148,11 +165,19 @@ export default function TasksTab({
 
   const matchesFilter = useCallback(
     (task: TaskItem) => {
-      if (normalizedArea && normalizeKey(task.area) !== normalizedArea) return false;
+      if (normalizedArea) {
+        const taskArea = normalizeKey(task.area);
+        if (taskArea !== normalizedArea) {
+          const inferredArea = normalizedGroupAreas.get(normalizeKey(task.group));
+          if (inferredArea !== normalizedArea) {
+            return false;
+          }
+        }
+      }
       if (normalizedGroup && normalizeKey(task.group) !== normalizedGroup) return false;
       return true;
     },
-    [normalizedArea, normalizedGroup],
+    [normalizedArea, normalizedGroup, normalizedGroupAreas],
   );
 
   const activeTasks = useMemo(() => db.tasks.filter(task => task.status !== "done"), [db.tasks]);
