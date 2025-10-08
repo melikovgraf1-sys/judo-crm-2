@@ -23,10 +23,12 @@ type Props = {
   currency: Currency;
   currencyRates: Settings["currencyRates"];
   onEdit: (c: Client) => void;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   onCreateTask: (client: Client) => void;
   openPaymentTasks?: Record<string, TaskItem | undefined>;
   onCompletePaymentTask?: (client: Client, task: TaskItem) => void;
+  onRemovePaymentTask?: (client: Client, task: TaskItem) => void;
+  onReserve?: (client: Client) => void;
   schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
@@ -73,6 +75,8 @@ export default function ClientTable({
   onCreateTask,
   openPaymentTasks,
   onCompletePaymentTask,
+  onRemovePaymentTask,
+  onReserve,
   schedule,
   attendance,
   performance,
@@ -326,8 +330,10 @@ export default function ClientTable({
     currency,
     currencyRates,
     onCompletePaymentTask,
+    onRemovePaymentTask,
     onCreateTask,
     onRemove,
+    onReserve,
     openPaymentTasks,
     remainingMap,
   ]);
