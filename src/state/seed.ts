@@ -21,7 +21,7 @@ export function makeSeedDB(): DB {
   const activeAreas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
   const areas: Area[] = [...activeAreas, RESERVE_AREA_NAME];
   const groups: Group[] = [
-    "4–6",
+    "4–6 лет",
     "7–10 лет",
     "11 лет и старше",
     "взрослые",
@@ -37,14 +37,14 @@ export function makeSeedDB(): DB {
       role: "Тренер",
       name: "Алексей",
       areas: ["Центр", "Джикджилли"],
-      groups: ["4–6", "7–10 лет", "11 лет и старше", "взрослые"],
+      groups: ["4–6 лет", "7–10 лет", "11 лет и старше", "взрослые"],
     },
     {
       id: uid(),
       role: "Тренер",
       name: "Сергей",
       areas: ["Махмутлар"],
-      groups: ["4–6", "7–10 лет", "11 лет и старше"],
+      groups: ["4–6 лет", "7–10 лет", "11 лет и старше"],
     },
   ];
 
@@ -133,7 +133,7 @@ export function makeSeedDB(): DB {
   const coachAlexey = staff.find(s => s.name === "Алексей")?.id || "";
   schedule.push(
     { id: uid(), area: "Центр", group: "7–10 лет", coachId: coachAlexey, weekday: 2, time: "17:30", location: "" },
-    { id: uid(), area: "Центр", group: "4–6", coachId: coachAlexey, weekday: 2, time: "18:30", location: "" },
+    { id: uid(), area: "Центр", group: "4–6 лет", coachId: coachAlexey, weekday: 2, time: "18:30", location: "" },
     { id: uid(), area: "Центр", group: "11 лет и старше", coachId: coachAlexey, weekday: 2, time: "19:30", location: "" },
   );
 

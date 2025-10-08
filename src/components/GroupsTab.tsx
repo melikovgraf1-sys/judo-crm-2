@@ -7,6 +7,7 @@ import ClientForm from "./clients/ClientForm";
 import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import {
+  DEFAULT_SUBSCRIPTION_PLAN,
   applyPaymentStatusRules,
   getDefaultPayAmount,
   shouldAllowCustomPayAmount,
@@ -100,12 +101,19 @@ export default function GroupsTab({
     if (!area || !group) {
       return [];
     }
+    const matchesPeriod = (client: Client) => {
+      if (period.month == null) {
+        return isClientInPeriod(client, period) || isClientActiveInPeriod(client, period);
+      }
+      return isClientInPeriod(client, period);
+    };
+
     return db.clients.filter(c =>
       c.area === area &&
       c.group === group &&
       !isReserveArea(c.area) &&
       (pay === "all" || c.payStatus === pay) &&
-      (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
+      matchesPeriod(c) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search, search, period]);
@@ -274,15 +282,57 @@ export default function GroupsTab({
   };
 
   const completePaymentTask = async (client: Client, task: TaskItem) => {
+    const completedAt = todayISO();
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== task.id);
     const nextArchive = [completed, ...db.tasksArchive];
     const payActual = client.payAmount ?? client.payActual;
+
+    const updates: Partial<Client> = {
+      payStatus: "действует",
+      payActual: payActual ?? undefined,
+    };
+
+    const resolveNextPayDate = () => {
+      const parsed = new Date(completedAt);
+      if (Number.isNaN(parsed.getTime())) {
+        return null;
+      }
+
+      const base = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+      const plan = client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+
+      if (plan === "half-month") {
+        base.setUTCDate(base.getUTCDate() + 14);
+        return base;
+      }
+
+      const addMonths = (date: Date, count: number) => {
+        const year = date.getUTCFullYear();
+        const month = date.getUTCMonth();
+        const day = date.getUTCDate();
+        const targetMonthIndex = month + count;
+        const targetYear = year + Math.floor(targetMonthIndex / 12);
+        const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+        const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+        const clampedDay = Math.min(day, maxDay);
+        return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
+      };
+
+      if (plan === "monthly" || plan === "discount") {
+        return addMonths(base, 1);
+      }
+
+      return base;
+    };
+
+    const nextPayDate = resolveNextPayDate();
+    if (nextPayDate) {
+      updates.payDate = nextPayDate.toISOString();
+    }
+
     const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
-      [client.id]: {
-        payStatus: "действует",
-        payActual: payActual ?? undefined,
-      },
+      [client.id]: updates,
     });
     const next = {
       ...db,
@@ -291,7 +341,7 @@ export default function GroupsTab({
       clients: nextClients,
       changelog: [
         ...db.changelog,
-        { id: uid(), who: "UI", what: `Задача по оплате ${client.firstName} выполнена`, when: todayISO() },
+        { id: uid(), who: "UI", what: `Задача по оплате ${client.firstName} выполнена`, when: completedAt },
       ],
     };
     const result = await commitDBUpdate(next, setDB);
