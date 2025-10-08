@@ -560,6 +560,19 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       continue;
     }
 
+    const placement = {
+      id: `placement-${uid()}`,
+      area,
+      group,
+      payStatus: payStatus!,
+      status: status!,
+      subscriptionPlan,
+      payDate: payDate ?? "",
+      payAmount: payAmountRaw,
+      payActual: payActualRaw,
+      remainingLessons: remainingRaw,
+    };
+
     const formValues: ClientFormValues = {
       firstName,
       lastName: record.lastName,
@@ -572,17 +585,9 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       channel: channel!,
       birthDate: birthDate!,
       gender: gender!,
-      area,
-      group,
       startDate: startDate!,
       payMethod: payMethod!,
-      payStatus: payStatus!,
-      status: status!,
-      subscriptionPlan,
-      payDate: payDate ?? "",
-      payAmount: payAmountRaw,
-      payActual: payActualRaw,
-      remainingLessons: remainingRaw,
+      placements: [placement],
     };
 
     const prepared = transformClientFormValues(formValues, null);
@@ -624,6 +629,38 @@ function mergeClientData(target: Client, source: Omit<Client, "id">) {
     const incoming = source[field];
     if ((current == null || current === "") && incoming) {
       target[field] = incoming as Client[MergeableField];
+    }
+  }
+
+  if (Array.isArray(source.placements) && source.placements.length) {
+    const existing = Array.isArray(target.placements) ? [...target.placements] : [];
+    const existingKeys = new Set(existing.map(placement => `${placement.area}|${placement.group}`));
+    const additional = source.placements.filter(placement => {
+      const key = `${placement.area}|${placement.group}`;
+      if (existingKeys.has(key)) {
+        return false;
+      }
+      existingKeys.add(key);
+      return true;
+    });
+
+    if (additional.length) {
+      target.placements = [...existing, ...additional];
+    } else if (!target.placements) {
+      target.placements = existing;
+    }
+
+    const primary = target.placements?.[0];
+    if (primary) {
+      target.area = primary.area;
+      target.group = primary.group;
+      target.payStatus = primary.payStatus;
+      target.status = primary.status;
+      target.subscriptionPlan = primary.subscriptionPlan;
+      if (primary.payDate) target.payDate = primary.payDate;
+      if (primary.payAmount != null) target.payAmount = primary.payAmount;
+      if (primary.payActual != null) target.payActual = primary.payActual;
+      if (primary.remainingLessons != null) target.remainingLessons = primary.remainingLessons;
     }
   }
 }

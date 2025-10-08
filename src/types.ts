@@ -16,6 +16,19 @@ export type SubscriptionPlan = "monthly" | "half-month" | "discount" | "single";
 
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
 
+export interface ClientPlacement {
+  id: string;
+  area: Area;
+  group: Group;
+  payStatus: PaymentStatus;
+  status: ClientStatus;
+  subscriptionPlan?: SubscriptionPlan;
+  payDate?: string; // ISO
+  payAmount?: number;
+  payActual?: number;
+  remainingLessons?: number;
+}
+
 export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты";
 
 export type Currency = "EUR" | "TRY" | "RUB";
@@ -59,6 +72,7 @@ export interface Client {
   payAmount?: number;
   payActual?: number;
   remainingLessons?: number;
+  placements: ClientPlacement[];
   payHistory?: string[];
   // Автополя (рассчитываются на лету)
 }
@@ -75,10 +89,15 @@ export interface ClientFormValues {
   birthDate: string;
   parentName: string;
   gender: Gender;
-  area: Area;
-  group: Group;
   startDate: string;
   payMethod: PaymentMethod;
+  placements: ClientPlacementFormValues[];
+}
+
+export interface ClientPlacementFormValues {
+  id: string;
+  area: Area;
+  group: Group;
   payStatus: PaymentStatus;
   status: ClientStatus;
   subscriptionPlan: SubscriptionPlan;
