@@ -192,6 +192,28 @@ export default function TasksTab({
     [availableGroups],
   );
 
+  const normalizedGroupAreas = useMemo(() => {
+    const map = new Map<string, string>();
+    groupsByArea.forEach((groups, areaName) => {
+      const normalizedAreaName = normalizeKey(areaName);
+      if (!normalizedAreaName) return;
+
+      groups.forEach(groupName => {
+        const normalizedGroupName = normalizeKey(groupName);
+        if (!normalizedGroupName) return;
+        if (!map.has(normalizedGroupName)) {
+          map.set(normalizedGroupName, normalizedAreaName);
+        }
+      });
+    });
+    return map;
+  }, [groupsByArea]);
+
+  const normalizedAvailableGroups = useMemo(
+    () => new Set(availableGroups.map(normalizeKey)),
+    [availableGroups],
+  );
+
   useEffect(() => {
     if (!area && group !== null) {
       setGroup(null);
