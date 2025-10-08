@@ -58,6 +58,20 @@ const baseCandidate = (): Omit<Client, 'id'> => ({
   payAmount: 100,
   payActual: 100,
   remainingLessons: 5,
+  placements: [
+    {
+      id: 'pl-base',
+      area: 'Area1',
+      group: 'Group1',
+      payStatus: 'ожидание',
+      status: 'новый',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-01-10T00:00:00.000Z',
+      payAmount: 100,
+      payActual: 100,
+      remainingLessons: 5,
+    },
+  ],
 });
 
 beforeEach(() => {
@@ -93,6 +107,20 @@ describe('appendImportedClients', () => {
       payAmount: 120,
       payActual: 120,
       remainingLessons: 8,
+      placements: [
+        {
+          id: 'pl-existing',
+          area: 'Area1',
+          group: 'Group1',
+          payStatus: 'ожидание',
+          status: 'новый',
+          subscriptionPlan: 'monthly',
+          payDate: '2024-01-10T00:00:00.000Z',
+          payAmount: 120,
+          payActual: 120,
+          remainingLessons: 8,
+        },
+      ],
     };
 
     const db = makeDB({ clients: [existing] });

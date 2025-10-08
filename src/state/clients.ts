@@ -1,4 +1,25 @@
-import type { Client, DB } from "../types";
+import type { Client, ClientPlacement, DB } from "../types";
+
+export function getClientPlacements(client: Client): ClientPlacement[] {
+  if (Array.isArray(client.placements) && client.placements.length) {
+    return client.placements;
+  }
+
+  return [
+    {
+      id: client.id,
+      area: client.area,
+      group: client.group,
+      payStatus: client.payStatus,
+      status: client.status,
+      subscriptionPlan: client.subscriptionPlan,
+      payDate: client.payDate,
+      payAmount: client.payAmount,
+      payActual: client.payActual,
+      remainingLessons: client.remainingLessons,
+    },
+  ];
+}
 
 export type DuplicateField =
   | "fullName"

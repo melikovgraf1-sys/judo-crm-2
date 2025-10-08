@@ -23,7 +23,7 @@ type Props = {
   currency: Currency;
   currencyRates: Settings["currencyRates"];
   onEdit: (c: Client) => void;
-  onRemove: (id: string) => void;
+  onRemove?: (id: string) => void;
   onCreateTask: (client: Client) => void;
   openPaymentTasks?: Record<string, TaskItem | undefined>;
   onCompletePaymentTask?: (client: Client, task: TaskItem) => void;
@@ -131,15 +131,50 @@ export default function ClientTable({
       id: "area",
       label: "Район",
       width: "minmax(120px, max-content)",
-      renderCell: client => client.area,
-      sortValue: client => client.area,
+      renderCell: client => {
+        const placements = client.placements?.length
+          ? client.placements
+          : [
+              {
+                id: client.id,
+                area: client.area,
+                group: client.group,
+                payStatus: client.payStatus,
+                status: client.status,
+                subscriptionPlan: client.subscriptionPlan,
+                payDate: client.payDate,
+                payAmount: client.payAmount,
+                payActual: client.payActual,
+                remainingLessons: client.remainingLessons,
+              },
+            ];
+        const uniqueAreas = Array.from(new Set(placements.map(item => item.area)));
+        return uniqueAreas.join(", ");
+      },
+      sortValue: client => (client.placements?.[0]?.area ?? client.area ?? "").toString(),
     },
     {
       id: "group",
       label: "Группа",
       width: "minmax(120px, max-content)",
-      renderCell: client => client.group,
-      sortValue: client => client.group,
+      renderCell: client => {
+        const placements = client.placements?.length
+          ? client.placements
+          : [{
+              id: client.id,
+              area: client.area,
+              group: client.group,
+              payStatus: client.payStatus,
+              status: client.status,
+              subscriptionPlan: client.subscriptionPlan,
+              payDate: client.payDate,
+              payAmount: client.payAmount,
+              payActual: client.payActual,
+              remainingLessons: client.remainingLessons,
+            }];
+        return placements.map(item => item.group).join(", ");
+      },
+      sortValue: client => (client.placements?.[0]?.group ?? client.group ?? "").toString(),
     },
     {
       id: "age",
@@ -165,7 +200,7 @@ export default function ClientTable({
     },
     {
       id: "status",
-      label: "Статус",
+      label: "Статус абонемента",
       width: "minmax(140px, max-content)",
       renderCell: client => {
         if (!client.status) {
@@ -249,15 +284,15 @@ export default function ClientTable({
       headerClassName: "text-right",
       headerAlign: "right",
       cellClassName: "flex justify-end gap-1",
-      renderCell: client => (
-        <>
-          {client.payStatus === "задолженность" &&
-            openPaymentTasks?.[client.id] &&
-            onCompletePaymentTask && (
+      renderCell: client => {
+        const openTask = openPaymentTasks?.[client.id];
+        return (
+          <>
+            {openTask && onCompletePaymentTask && (
               <button
                 onClick={event => {
                   event.stopPropagation();
-                  onCompletePaymentTask(client, openPaymentTasks[client.id]!);
+                  onCompletePaymentTask(client, openTask);
                 }}
                 className="px-2 py-1 text-xs rounded-md border border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30"
               >
@@ -273,17 +308,20 @@ export default function ClientTable({
           >
             Создать задачу
           </button>
-          <button
-            onClick={event => {
-              event.stopPropagation();
-              onRemove(client.id);
-            }}
-            className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
-          >
-            Удалить
-          </button>
-        </>
-      ),
+          {onRemove && (
+            <button
+              onClick={event => {
+                event.stopPropagation();
+                onRemove(client.id);
+              }}
+              className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
+            >
+              Удалить
+            </button>
+          )}
+          </>
+        );
+      },
     },
   ], [
     billingPeriod,
