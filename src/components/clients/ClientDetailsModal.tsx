@@ -151,6 +151,16 @@ export default function ClientDetailsModal({
             <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {placementsSummary}
             </div>
+            {(client.payMethod || client.status) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {client.payMethod ? (
+                  <ClientBadge label="Способ оплаты" value={client.payMethod} />
+                ) : null}
+                {client.status ? (
+                  <ClientBadge label="Статус клиента" value={client.status} />
+                ) : null}
+              </div>
+            )}
           </div>
           <button
             type="button"
@@ -341,6 +351,15 @@ function ClientInfoRow({ label, value }: { label: string; value: React.ReactNode
       <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
       <span className="text-right text-slate-700 dark:text-slate-200">{value}</span>
     </div>
+  );
+}
+
+function ClientBadge({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+      <span>{label}</span>
+      <span className="text-sm normal-case">{value}</span>
+    </span>
   );
 }
 
