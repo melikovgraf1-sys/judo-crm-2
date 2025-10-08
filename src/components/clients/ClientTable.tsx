@@ -4,7 +4,7 @@ import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
 import { compareValues, toggleSort } from "../tableUtils";
 import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
-import { getClientRecurringPayDate, type PeriodFilter } from "../../state/period";
+import { getClientRecurringPayDate, matchesPeriod, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import { isReserveArea } from "../../state/areas";
 import type {
@@ -53,6 +53,7 @@ const DEFAULT_VISIBLE_COLUMNS = [
   "whatsApp",
   "telegram",
   "instagram",
+  "parent",
   "area",
   "group",
   "age",
@@ -92,6 +93,47 @@ export default function ClientTable({
     return map;
   }, [list, schedule]);
 
+  const paidInPeriodMap = useMemo(() => {
+    if (!billingPeriod || billingPeriod.month == null) {
+      return null;
+    }
+    const map = new Map<string, boolean>();
+    list.forEach(client => {
+      const history = Array.isArray(client.payHistory) ? client.payHistory : [];
+      const paid = history.some(entry => matchesPeriod(entry, billingPeriod));
+      map.set(client.id, paid);
+    });
+    return map;
+  }, [billingPeriod, list]);
+
+  const isPaidInSelectedPeriod = (client: Client): boolean => {
+    if (!billingPeriod || billingPeriod.month == null) {
+      return client.payStatus === "действует";
+    }
+    return paidInPeriodMap?.get(client.id) ?? false;
+  };
+
+  const getDisplayPayStatus = (client: Client): string => {
+    if (!billingPeriod || billingPeriod.month == null) {
+      return client.payStatus;
+    }
+    if (client.payStatus === "задолженность") {
+      return "задолженность";
+    }
+    return isPaidInSelectedPeriod(client) ? "действует" : "ожидание";
+  };
+
+  const getPayStatusTone = (client: Client): string => {
+    const status = getDisplayPayStatus(client);
+    if (status === "действует") {
+      return "rounded-full bg-emerald-100 text-emerald-700";
+    }
+    if (status === "задолженность") {
+      return "rounded-full bg-rose-100 text-rose-700";
+    }
+    return "rounded-full bg-amber-100 text-amber-700";
+  };
+
   const columns: ColumnConfig[] = useMemo(() => [
     {
       id: "name",
@@ -103,6 +145,13 @@ export default function ClientTable({
         </span>
       ),
       sortValue: client => `${client.firstName} ${client.lastName ?? ""}`.trim().toLowerCase(),
+    },
+    {
+      id: "parent",
+      label: "Родитель",
+      width: "minmax(200px, max-content)",
+      renderCell: client => client.parentName ?? "—",
+      sortValue: client => (client.parentName ?? "").toLowerCase(),
     },
     {
       id: "phone",
@@ -205,7 +254,7 @@ export default function ClientTable({
     },
     {
       id: "status",
-      label: "Статус абонемента",
+      label: "Статус клиента",
       width: "minmax(140px, max-content)",
       renderCell: client => {
         if (!client.status) {
@@ -227,17 +276,13 @@ export default function ClientTable({
       renderCell: client => (
         <span
           className={`px-2 py-1 text-xs ${
-            client.payStatus === "действует"
-              ? "rounded-full bg-emerald-100 text-emerald-700"
-              : client.payStatus === "задолженность"
-              ? "rounded-full bg-rose-100 text-rose-700"
-              : "rounded-full bg-amber-100 text-amber-700"
+            getPayStatusTone(client)
           }`}
         >
-          {client.payStatus}
+          {getDisplayPayStatus(client)}
         </span>
       ),
-      sortValue: client => client.payStatus,
+      sortValue: client => getDisplayPayStatus(client),
     },
     {
       id: "remainingLessons",
@@ -262,8 +307,20 @@ export default function ClientTable({
       id: "payActual",
       label: "Факт оплаты",
       width: "minmax(130px, max-content)",
-      renderCell: client => (client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"),
-      sortValue: client => client.payActual ?? 0,
+      renderCell: client => {
+        const paid = isPaidInSelectedPeriod(client);
+        if (billingPeriod?.month != null && !paid) {
+          return "—";
+        }
+        return client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—";
+      },
+      sortValue: client => {
+        const paid = isPaidInSelectedPeriod(client);
+        if (billingPeriod?.month != null && !paid) {
+          return 0;
+        }
+        return client.payActual ?? 0;
+      },
     },
     {
       id: "payDate",
