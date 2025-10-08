@@ -21,7 +21,7 @@ import {
   type DuplicateField,
   type DuplicateMatchDetail,
 } from "../state/clients";
-import type { Client, ClientFormValues, DB, TaskItem, UIState } from "../types";
+import type { Area, Client, ClientFormValues, DB, Group, TaskItem, UIState } from "../types";
 
 type ClientsTabProps = {
   db: DB;
@@ -259,6 +259,11 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
   };
 
   const createPaymentTask = async (client: Client) => {
+    const areaValueRaw = client.area?.trim() ?? "";
+    const groupValueRaw = client.group?.trim() ?? "";
+    const areaValue = (areaValueRaw ? areaValueRaw : undefined) as Area | undefined;
+    const groupValue = (groupValueRaw ? groupValueRaw : undefined) as Group | undefined;
+
     const titleParts = [
       `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
       client.parentName ? `родитель: ${client.parentName}` : null,
@@ -276,6 +281,8 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
       topic: "оплата",
       assigneeType: "client",
       assigneeId: client.id,
+      area: areaValue,
+      group: groupValue,
     };
 
     const nextTasks = [task, ...db.tasks];

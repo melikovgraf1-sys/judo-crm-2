@@ -366,6 +366,8 @@ test('creates payment task with client info', async () => {
     topic: 'оплата',
     assigneeType: 'client',
     assigneeId: 'c1',
+    area: 'Area1',
+    group: 'Group1',
   });
   expect(getDB().clients[0].payStatus).toBe('задолженность');
 });
