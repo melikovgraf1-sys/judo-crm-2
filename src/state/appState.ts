@@ -285,8 +285,72 @@ function normalizeGroupsInDB(db: DB): DB {
   };
 
   const clients = db.clients.map(client => {
-    const group = normalizeRequired(client.group);
-    return group === client.group ? client : { ...client, group };
+    const basePlacements = Array.isArray(client.placements) ? client.placements : [];
+    const sourcePlacements = basePlacements.length
+      ? [
+          {
+            ...basePlacements[0],
+            id: basePlacements[0].id || `placement-${client.id}`,
+            area: client.area,
+            group: client.group,
+            payStatus: basePlacements[0].payStatus ?? client.payStatus,
+            status: basePlacements[0].status ?? client.status,
+            subscriptionPlan: basePlacements[0].subscriptionPlan ?? client.subscriptionPlan,
+            payDate: basePlacements[0].payDate ?? client.payDate,
+            payAmount: basePlacements[0].payAmount ?? client.payAmount,
+            payActual: basePlacements[0].payActual ?? client.payActual,
+            remainingLessons: basePlacements[0].remainingLessons ?? client.remainingLessons,
+          },
+          ...basePlacements.slice(1),
+        ]
+      : [
+          {
+            id: `placement-${client.id}`,
+            area: client.area,
+            group: client.group,
+            payStatus: client.payStatus,
+            status: client.status,
+            subscriptionPlan: client.subscriptionPlan,
+            payDate: client.payDate,
+            payAmount: client.payAmount,
+            payActual: client.payActual,
+            remainingLessons: client.remainingLessons,
+          },
+        ];
+
+    const normalizedPlacements = sourcePlacements.map((placement, index) => {
+      const normalizedGroup = normalizeRequired(placement.group);
+      const normalizedArea = placement.area?.trim?.() ? placement.area : client.area;
+      const id = placement.id || `placement-${client.id}-${index}`;
+      return {
+        id,
+        area: normalizedArea,
+        group: normalizedGroup,
+        payStatus: placement.payStatus ?? client.payStatus,
+        status: placement.status ?? client.status,
+        subscriptionPlan: placement.subscriptionPlan ?? client.subscriptionPlan,
+        ...(placement.payDate ? { payDate: placement.payDate } : {}),
+        ...(placement.payAmount != null ? { payAmount: placement.payAmount } : {}),
+        ...(placement.payActual != null ? { payActual: placement.payActual } : {}),
+        ...(placement.remainingLessons != null ? { remainingLessons: placement.remainingLessons } : {}),
+      };
+    });
+
+    const primary = normalizedPlacements[0];
+
+    return {
+      ...client,
+      area: primary.area,
+      group: primary.group,
+      payStatus: primary.payStatus,
+      status: primary.status,
+      subscriptionPlan: primary.subscriptionPlan,
+      ...(primary.payDate ? { payDate: primary.payDate } : {}),
+      ...(primary.payAmount != null ? { payAmount: primary.payAmount } : {}),
+      ...(primary.payActual != null ? { payActual: primary.payActual } : {}),
+      ...(primary.remainingLessons != null ? { remainingLessons: primary.remainingLessons } : {}),
+      placements: normalizedPlacements,
+    };
   });
 
   const schedule = db.schedule.map(slot => {
@@ -969,6 +1033,16 @@ export function useAppState(): AppState {
   const onQuickAdd = () => setQuickOpen(true);
   const addQuickClient = async () => {
     const defaultPlanMeta = getSubscriptionPlanMeta(DEFAULT_SUBSCRIPTION_PLAN);
+    const primaryPlacement = {
+      id: `placement-${uid()}`,
+      area: db.settings.areas[0],
+      group: db.settings.groups[0],
+      payStatus: "ожидание" as const,
+      status: "новый" as const,
+      subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
+      payDate: todayISO(),
+      ...(defaultPlanMeta?.amount != null ? { payAmount: defaultPlanMeta.amount } : {}),
+    };
     const c: Client = {
       id: uid(),
       firstName: "Новый",
@@ -981,15 +1055,16 @@ export function useAppState(): AppState {
       channel: "Telegram",
       birthDate: new Date("2017-01-01").toISOString(),
       gender: "м",
-      area: db.settings.areas[0],
-      group: db.settings.groups[0],
+      area: primaryPlacement.area,
+      group: primaryPlacement.group,
       startDate: todayISO(),
       payMethod: "перевод",
-      payStatus: "ожидание",
-      status: "новый",
-      subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
-      ...(defaultPlanMeta?.amount != null ? { payAmount: defaultPlanMeta.amount } : {}),
-      payDate: todayISO(),
+      payStatus: primaryPlacement.payStatus,
+      status: primaryPlacement.status,
+      subscriptionPlan: primaryPlacement.subscriptionPlan,
+      ...(primaryPlacement.payAmount != null ? { payAmount: primaryPlacement.payAmount } : {}),
+      payDate: primaryPlacement.payDate,
+      placements: [primaryPlacement],
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
     if (await commitDBUpdate(next, setDB)) {

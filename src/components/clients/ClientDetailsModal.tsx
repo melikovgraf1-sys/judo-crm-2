@@ -48,6 +48,25 @@ export default function ClientDetailsModal({
   const attendedCount = attendanceEntries.filter(entry => entry.came).length;
   const successfulCount = performanceEntries.filter(entry => entry.successful).length;
 
+  const placements = client.placements?.length
+    ? client.placements
+    : [
+        {
+          id: client.id,
+          area: client.area,
+          group: client.group,
+          payStatus: client.payStatus,
+          status: client.status,
+          subscriptionPlan: client.subscriptionPlan,
+          payDate: client.payDate,
+          payAmount: client.payAmount,
+          payActual: client.payActual,
+          remainingLessons: client.remainingLessons,
+        },
+      ];
+
+  const placementsSummary = placements.map(place => `${place.area} · ${place.group}`).join(", ");
+
   return (
     <Modal size="lg" onClose={onClose}>
       <div className="flex flex-col gap-3">
@@ -57,7 +76,7 @@ export default function ClientDetailsModal({
               {client.firstName} {client.lastName}
             </div>
             <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {client.area} · {client.group}
+              {placementsSummary}
             </div>
           </div>
           <button
@@ -103,7 +122,7 @@ export default function ClientDetailsModal({
               <InfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
               <InfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
               <InfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
-              <InfoRow label="Статус" value={client.status ?? "—"} />
+              <InfoRow label="Статус абонемента" value={client.status ?? "—"} />
               <InfoRow label="Статус оплаты" value={client.payStatus} />
               <InfoRow
                 label="Форма абонемента"
@@ -119,6 +138,56 @@ export default function ClientDetailsModal({
                 value={client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—"}
               />
               <InfoRow label="Остаток занятий" value={remaining != null ? String(remaining) : "—"} />
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Тренировочные места
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {placements.map(place => {
+                  const planLabel = place.subscriptionPlan
+                    ? getSubscriptionPlanMeta(place.subscriptionPlan)?.label ?? "—"
+                    : "—";
+                  return (
+                    <div
+                      key={`${place.id}-${place.area}-${place.group}`}
+                      className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
+                        {place.area} · {place.group}
+                      </div>
+                      <dl className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
+                        <InfoCell label="Статус абонемента" value={place.status ?? "—"} />
+                        <InfoCell label="Статус оплаты" value={place.payStatus ?? "—"} />
+                        <InfoCell label="Форма абонемента" value={planLabel} />
+                        <InfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
+                        <InfoCell
+                          label="Сумма оплаты"
+                          value={
+                            place.payAmount != null
+                              ? fmtMoney(place.payAmount, currency, currencyRates)
+                              : "—"
+                          }
+                        />
+                        <InfoCell
+                          label="Факт оплаты"
+                          value={
+                            place.payActual != null
+                              ? fmtMoney(place.payActual, currency, currencyRates)
+                              : "—"
+                          }
+                        />
+                        <InfoCell
+                          label="Остаток занятий"
+                          value={
+                            place.remainingLessons != null ? String(place.remainingLessons) : "—"
+                          }
+                        />
+                      </dl>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             {client.comment ? (
               <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -209,6 +278,15 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
       <span className="text-slate-700 dark:text-slate-100">{value}</span>
+    </div>
+  );
+}
+
+function InfoCell({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right text-slate-700 dark:text-slate-200">{value}</span>
     </div>
   );
 }
