@@ -8,6 +8,7 @@ interface Props {
   client: Client;
   currency: Currency;
   currencyRates: Settings["currencyRates"];
+  schedule?: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
   onClose: () => void;
@@ -19,12 +20,14 @@ export default function ClientDetailsModal({
   client,
   currency,
   currencyRates,
+  schedule: scheduleProp = [],
   attendance,
   performance,
   onClose,
   onEdit,
   onRemove,
 }: Props) {
+  const schedule = scheduleProp ?? [];
   const totalRemainingLessons = getEffectiveRemainingLessons(client, schedule);
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
