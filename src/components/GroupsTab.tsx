@@ -24,7 +24,7 @@ import {
   type PeriodFilter,
 } from "../state/period";
 
-import { isReserveArea } from "../state/areas";
+import { RESERVE_AREA_NAME, isReserveArea } from "../state/areas";
 
 export default function GroupsTab({
   db,
@@ -432,16 +432,50 @@ export default function GroupsTab({
     }
   };
 
-  const removeClient = async (id: string) => {
-    if (!window.confirm("Удалить клиента?")) return;
+  const removePaymentTask = async (client: Client, task: TaskItem) => {
+    if (!window.confirm("Удалить задачу об оплате?")) return;
+
+    const nextTasks = db.tasks.filter(t => t.id !== task.id);
+    const nextArchive = [task, ...db.tasksArchive];
+    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive);
+
     const next = {
       ...db,
-      clients: db.clients.filter(c => c.id !== id),
-      changelog: [...db.changelog, { id: uid(), who: "UI", what: `Удалён клиент ${id}`, when: todayISO() }],
+      tasks: nextTasks,
+      tasksArchive: nextArchive,
+      clients: nextClients,
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Удалена задача по оплате ${client.firstName}`, when: todayISO() },
+      ],
     };
+
     const result = await commitDBUpdate(next, setDB);
     if (!result.ok && result.reason === "error") {
-      window.alert("Не удалось удалить клиента. Проверьте доступ к базе данных.");
+      window.alert("Не удалось удалить задачу. Проверьте доступ к базе данных.");
+    }
+  };
+
+  const reserveClient = async (client: Client) => {
+    if (!window.confirm("Переместить клиента в резерв?")) return;
+
+    const reserveGroup = db.settings.groups.includes(RESERVE_AREA_NAME) ? RESERVE_AREA_NAME : client.group;
+    const nextClients = db.clients.map(c =>
+      c.id === client.id ? { ...c, area: RESERVE_AREA_NAME, group: reserveGroup } : c,
+    );
+
+    const next = {
+      ...db,
+      clients: nextClients,
+      changelog: [
+        ...db.changelog,
+        { id: uid(), who: "UI", what: `Клиент ${client.firstName} перемещён в резерв`, when: todayISO() },
+      ],
+    };
+
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
+      window.alert("Не удалось переместить клиента в резерв. Проверьте доступ к базе данных.");
     }
   };
 
@@ -471,10 +505,11 @@ export default function GroupsTab({
           currency={ui.currency}
           currencyRates={db.settings.currencyRates}
           onEdit={startEdit}
-          onRemove={removeClient}
+          onRemovePaymentTask={removePaymentTask}
           onCreateTask={createPaymentTask}
           openPaymentTasks={openPaymentTasks}
           onCompletePaymentTask={completePaymentTask}
+          onReserve={reserveClient}
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}
