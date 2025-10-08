@@ -9,13 +9,12 @@ import { commitDBUpdate } from "../state/appState";
 import {
   DEFAULT_SUBSCRIPTION_PLAN,
   applyPaymentStatusRules,
-  getDefaultPayAmount,
-  shouldAllowCustomPayAmount,
 } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailyPeriod, readDailySelection, writeDailyPeriod, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
 import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
+import { getClientPlacements } from "../state/clients";
 import {
   collectAvailableYears,
   formatMonthInput,
@@ -172,24 +171,6 @@ export default function GroupsTab({
     setModalOpen(true);
   };
 
-  const resolvePayAmount = (rawValue: string, group: Group, previous?: number): number | undefined => {
-    const defaultAmount = getDefaultPayAmount(group);
-    if (!shouldAllowCustomPayAmount(group) && defaultAmount != null) {
-      return defaultAmount;
-    }
-
-    const parsed = Number.parseFloat(rawValue);
-    if (!Number.isNaN(parsed) && Number.isFinite(parsed)) {
-      return parsed;
-    }
-
-    if (defaultAmount != null) {
-      return defaultAmount;
-    }
-
-    return previous;
-  };
-
   const saveClient = async (data: ClientFormValues) => {
     const prepared = transformClientFormValues(data, editing);
     if (editing) {
@@ -244,27 +225,65 @@ export default function GroupsTab({
   };
 
   const createPaymentTask = async (client: Client) => {
+    const placements = getClientPlacements(client);
+    const targetPlacement = placements.find(place => place.area === area && place.group === group) ?? placements[0];
+    const payAmount = targetPlacement?.payAmount ?? client.payAmount;
+    const payDate = targetPlacement?.payDate ?? client.payDate;
+
     const titleParts = [
       `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
       client.parentName ? `родитель: ${client.parentName}` : null,
-      client.payAmount != null
-        ? `сумма: ${fmtMoney(client.payAmount, ui.currency, db.settings.currencyRates)}`
-        : null,
-      client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
+      payAmount != null ? `сумма: ${fmtMoney(payAmount, ui.currency, db.settings.currencyRates)}` : null,
+      payDate ? `дата: ${payDate.slice(0, 10)}` : null,
     ].filter(Boolean);
 
     const task: TaskItem = {
       id: uid(),
       title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
-      due: client.payDate || todayISO(),
+      due: payDate || todayISO(),
       status: "open",
       topic: "оплата",
       assigneeType: "client",
       assigneeId: client.id,
+      area: targetPlacement?.area ?? client.area,
+      group: targetPlacement?.group ?? client.group,
+      placementId: targetPlacement?.id,
     };
 
+    let updates: Partial<Client> | undefined;
+
+    if (targetPlacement) {
+      const nextPlacement = { ...targetPlacement, payStatus: "задолженность" as const };
+      const nextPlacements = placements.map(placement =>
+        placement.id === nextPlacement.id ? nextPlacement : placement,
+      );
+
+      updates = { placements: nextPlacements };
+
+      if (placements[0]?.id === nextPlacement.id) {
+        updates = {
+          ...updates,
+          payStatus: "задолженность",
+          area: nextPlacement.area,
+          group: nextPlacement.group,
+          subscriptionPlan: nextPlacement.subscriptionPlan,
+          ...(nextPlacement.payAmount != null ? { payAmount: nextPlacement.payAmount } : {}),
+          ...(nextPlacement.payDate ? { payDate: nextPlacement.payDate } : {}),
+          ...(nextPlacement.payActual != null ? { payActual: nextPlacement.payActual } : {}),
+          ...(nextPlacement.remainingLessons != null
+            ? { remainingLessons: nextPlacement.remainingLessons }
+            : {}),
+        };
+      }
+    }
+
     const nextTasks = [task, ...db.tasks];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, db.tasksArchive);
+    const nextClients = applyPaymentStatusRules(
+      db.clients,
+      nextTasks,
+      db.tasksArchive,
+      updates ? { [client.id]: updates } : {},
+    );
     const next = {
       ...db,
       tasks: nextTasks,
@@ -286,11 +305,17 @@ export default function GroupsTab({
     const completed: TaskItem = { ...task, status: "done" };
     const nextTasks = db.tasks.filter(t => t.id !== task.id);
     const nextArchive = [completed, ...db.tasksArchive];
-    const payActual = client.payAmount ?? client.payActual;
+    const placements = getClientPlacements(client);
+    const placementFromTask = task.placementId
+      ? placements.find(place => place.id === task.placementId)
+      : placements.find(place => place.area === task.area && place.group === task.group);
+    const targetPlacement = placementFromTask ?? placements[0];
+    const payAmount = targetPlacement?.payAmount ?? client.payAmount;
+    const resolvedPayActual = payAmount ?? targetPlacement?.payActual ?? client.payActual;
 
     const updates: Partial<Client> = {
       payStatus: "действует",
-      payActual: payActual ?? undefined,
+      ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
     };
 
     const toUTCDate = (value?: string | null): Date | null => {
@@ -317,9 +342,9 @@ export default function GroupsTab({
     };
 
     const completionDate = toUTCDate(completedAt);
-    const currentPayDate = toUTCDate(client.payDate ?? null);
+    const currentPayDate = toUTCDate(targetPlacement?.payDate ?? client.payDate ?? null);
     const startDate = toUTCDate(client.startDate ?? null);
-    const plan = client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+    const plan = targetPlacement?.subscriptionPlan ?? client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
 
     let historyAnchor: Date | null = null;
     let nextPayDate: Date | null = null;
@@ -354,6 +379,35 @@ export default function GroupsTab({
       const existingHistory = Array.isArray(client.payHistory) ? client.payHistory : [];
       if (!existingHistory.includes(historyValue)) {
         updates.payHistory = [...existingHistory, historyValue];
+      }
+    }
+
+    if (targetPlacement) {
+      const nextPlacement = {
+        ...targetPlacement,
+        payStatus: "действует" as const,
+        ...(updates.payActual != null ? { payActual: updates.payActual } : {}),
+        ...(updates.payDate ? { payDate: updates.payDate } : {}),
+      };
+
+      updates.placements = placements.map(placement =>
+        placement.id === nextPlacement.id ? nextPlacement : placement,
+      );
+
+      const primaryPlacementId = placements[0]?.id;
+      if (primaryPlacementId === nextPlacement.id) {
+        updates.area = nextPlacement.area;
+        updates.group = nextPlacement.group;
+        updates.subscriptionPlan = nextPlacement.subscriptionPlan;
+        if (nextPlacement.payAmount != null) {
+          updates.payAmount = nextPlacement.payAmount;
+        }
+        if (nextPlacement.payActual != null) {
+          updates.payActual = nextPlacement.payActual;
+        }
+        if (nextPlacement.remainingLessons != null) {
+          updates.remainingLessons = nextPlacement.remainingLessons;
+        }
       }
     }
 
