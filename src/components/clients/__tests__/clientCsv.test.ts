@@ -12,6 +12,7 @@ import { uid, todayISO } from '../../../state/utils';
 const asMock = <T extends (...args: any[]) => any>(fn: T) => fn as unknown as jest.MockedFunction<T>;
 
 const makeDB = (overrides: Partial<DB> = {}): DB => ({
+  revision: 0,
   clients: [],
   attendance: [],
   performance: [],
@@ -30,6 +31,7 @@ const makeDB = (overrides: Partial<DB> = {}): DB => ({
     coachSalaryByAreaEUR: {},
     currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
     coachPayFormula: '',
+    analyticsFavorites: [],
   },
   changelog: [],
   ...overrides,

@@ -4,6 +4,7 @@ import type { PeriodFilter } from "../period";
 
 describe("computeAnalyticsSnapshot with period", () => {
   const buildDB = (): DB => ({
+    revision: 0,
     clients: [
       {
         id: "c1",
@@ -23,6 +24,19 @@ describe("computeAnalyticsSnapshot with period", () => {
         payAmount: 60,
         payActual: 60,
         remainingLessons: 0,
+        placements: [
+          {
+            id: "pl-c1",
+            area: "Area1",
+            group: "Group1",
+            payStatus: "действует",
+            status: "действующий",
+            payDate: "2024-01-10T00:00:00.000Z",
+            payAmount: 60,
+            payActual: 60,
+            remainingLessons: 0,
+          },
+        ],
       },
       {
         id: "c2",
@@ -42,6 +56,19 @@ describe("computeAnalyticsSnapshot with period", () => {
         payAmount: 70,
         payActual: 70,
         remainingLessons: 0,
+        placements: [
+          {
+            id: "pl-c2",
+            area: "Area1",
+            group: "Group1",
+            payStatus: "действует",
+            status: "действующий",
+            payDate: "2023-12-05T00:00:00.000Z",
+            payAmount: 70,
+            payActual: 70,
+            remainingLessons: 0,
+          },
+        ],
       },
     ],
     attendance: [
@@ -104,6 +131,19 @@ describe("computeAnalyticsSnapshot with period", () => {
       payAmount: 80,
       payActual: 0,
       remainingLessons: 0,
+      placements: [
+        {
+          id: "pl-c3",
+          area: "Area1",
+          group: "Group1",
+          payStatus: "действует",
+          status: "новый",
+          payDate: "2024-03-05T00:00:00.000Z",
+          payAmount: 80,
+          payActual: 0,
+          remainingLessons: 0,
+        },
+      ],
     });
 
     const period: PeriodFilter = { year: 2024, month: 1 };

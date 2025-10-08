@@ -58,6 +58,7 @@ const createDB = (): DB => ({
     coachSalaryByAreaEUR: {},
     currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
     coachPayFormula: "",
+    analyticsFavorites: [],
   },
   changelog: [],
 });

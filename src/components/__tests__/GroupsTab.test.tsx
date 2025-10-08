@@ -101,6 +101,7 @@ const makeDB = () => ({
     coachSalaryByAreaEUR: {},
     currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
     coachPayFormula: '',
+    analyticsFavorites: [],
   },
   changelog: [],
 });
@@ -127,30 +128,55 @@ const renderGroups = (db = makeDB(), ui = makeUI(), initialFilters = {}) => {
   return { ...utils, getDB: () => current };
 };
 
-const makeClient = (overrides = {}) => ({
-  id: 'client-id',
-  firstName: 'Имя',
-  lastName: '',
-  phone: '',
-  whatsApp: '',
-  telegram: '',
-  instagram: '',
-  channel: 'Telegram',
-  birthDate: '2010-01-01T00:00:00.000Z',
-  parentName: '',
-  gender: 'м',
-  area: 'Area1',
-  group: 'Group1',
-  startDate: '2024-01-01T00:00:00.000Z',
-  payMethod: 'перевод',
-  payStatus: 'ожидание',
-  status: 'действующий',
-  subscriptionPlan: 'monthly',
-  payDate: '2024-01-10T00:00:00.000Z',
-  payAmount: 55,
-  remainingLessons: 5,
-  ...overrides,
-});
+const makeClient = (overrides = {}) => {
+  const base = {
+    id: 'client-id',
+    firstName: 'Имя',
+    lastName: '',
+    phone: '',
+    whatsApp: '',
+    telegram: '',
+    instagram: '',
+    channel: 'Telegram',
+    birthDate: '2010-01-01T00:00:00.000Z',
+    parentName: '',
+    gender: 'м',
+    area: 'Area1',
+    group: 'Group1',
+    startDate: '2024-01-01T00:00:00.000Z',
+    payMethod: 'перевод',
+    payStatus: 'ожидание',
+    status: 'действующий',
+    subscriptionPlan: 'monthly',
+    payDate: '2024-01-10T00:00:00.000Z',
+    payAmount: 55,
+    payActual: 55,
+    remainingLessons: 5,
+    ...overrides,
+  };
+
+  if (overrides.placements) {
+    return base;
+  }
+
+  return {
+    ...base,
+    placements: [
+      {
+        id: `pl-${base.id}`,
+        area: base.area,
+        group: base.group,
+        payStatus: base.payStatus,
+        status: base.status,
+        subscriptionPlan: base.subscriptionPlan,
+        payDate: base.payDate,
+        payAmount: base.payAmount,
+        payActual: base.payActual,
+        remainingLessons: base.remainingLessons,
+      },
+    ],
+  };
+};
 
 test('create: adds client through modal', async () => {
   const { getDB, unmount } = renderGroups();
@@ -399,7 +425,7 @@ test('creates payment task with client info', async () => {
     assigneeId: 'c1',
     area: 'Area1',
     group: 'Group1',
-    placementId: 'c1',
+    placementId: 'pl-c1',
   });
   expect(getDB().clients[0].payStatus).toBe('задолженность');
 });
@@ -549,8 +575,9 @@ test('half-month subscription advances payDate by 14 days on payment completion'
   await waitFor(() => {
     expect(getDB().tasks).toHaveLength(0);
     expect(getDB().tasksArchive).toHaveLength(1);
-    expect(getDB().clients[0].payStatus).toBe('действует');
-    expect(getDB().clients[0].payDate).toBe('2024-01-15T00:00:00.000Z');
+    const updated = getDB().clients[0];
+    expect(updated.payStatus).toBe('действует');
+    expect(updated.placements[0]?.payDate).toBe('2024-01-15T00:00:00.000Z');
   });
   await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());
 

@@ -14,6 +14,7 @@ describe("derivePaymentStatus", () => {
     payMethod: "наличные",
     payStatus: "ожидание",
     status: "новый",
+    placements: [],
   };
 
   const baseTask: TaskItem = {
