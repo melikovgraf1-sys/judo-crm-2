@@ -410,6 +410,7 @@ test('completes payment task and updates client payment data', async () => {
     expect(getDB().clients[0].payDate).toBe('2024-02-10T00:00:00.000Z');
     expect(getDB().clients[0].payHistory).toEqual(['2024-01-10T00:00:00.000Z']);
   });
+  await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());
 
   const januaryRow = await screen.findByText('Должник');
   const januaryTableRow = januaryRow.closest('tr');
