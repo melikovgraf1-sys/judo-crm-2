@@ -59,6 +59,7 @@ export interface Client {
   payAmount?: number;
   payActual?: number;
   remainingLessons?: number;
+  payHistory?: string[];
   // Автополя (рассчитываются на лету)
 }
 

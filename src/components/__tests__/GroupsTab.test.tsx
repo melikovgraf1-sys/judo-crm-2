@@ -228,8 +228,8 @@ test('filters clients by selected month', async () => {
   fireEvent.change(monthInput, { target: { value: '2' } });
 
   await waitFor(() => {
-    expect(screen.getByRole('row', { name: /Январь/ })).toBeInTheDocument();
     expect(screen.getByRole('row', { name: /Февраль/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Январь/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('row', { name: /Март/ })).not.toBeInTheDocument();
   });
 });
@@ -407,10 +407,126 @@ test('completes payment task and updates client payment data', async () => {
     expect(getDB().tasksArchive).toHaveLength(1);
     expect(getDB().clients[0].payStatus).toBe('действует');
     expect(getDB().clients[0].payActual).toBe(55);
+    expect(getDB().clients[0].payDate).toBe('2024-02-10T00:00:00.000Z');
+    expect(getDB().clients[0].payHistory).toEqual(['2024-01-10T00:00:00.000Z']);
+  });
+  await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());
+
+  const januaryRow = await screen.findByText('Должник');
+  const januaryTableRow = januaryRow.closest('tr');
+  expect(januaryTableRow).not.toBeNull();
+  await waitFor(() =>
+    expect(within(januaryTableRow!).queryByRole('button', { name: 'Оплатил' })).not.toBeInTheDocument(),
+  );
+
+  const monthInput = screen.getByLabelText('Фильтр по месяцу');
+  fireEvent.change(monthInput, { target: { value: '2' } });
+
+  await waitFor(() => expect(screen.getByText('Должник')).toBeInTheDocument());
+});
+
+test('monthly subscription completed late keeps previous month visible', async () => {
+  todayISO.mockReturnValue('2024-10-01T00:00:00.000Z');
+
+  const db = makeDB();
+  db.clients = [
+    makeClient({
+      id: 'late',
+      firstName: 'Поздний',
+      payStatus: 'задолженность',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-09-05T00:00:00.000Z',
+    }),
+  ];
+  db.tasks = [
+    {
+      id: 'task-late',
+      title: 'Оплата клиента — Поздний',
+      due: '2024-09-05T00:00:00.000Z',
+      status: 'open',
+      topic: 'оплата',
+      assigneeType: 'client',
+      assigneeId: 'late',
+    },
+  ];
+
+  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  const monthInput = screen.getByLabelText('Фильтр по месяцу');
+  fireEvent.change(monthInput, { target: { value: '9' } });
+
+  const row = await screen.findByText('Поздний');
+  const tableRow = row.closest('tr');
+  expect(tableRow).not.toBeNull();
+  const payButton = await within(tableRow!).findByRole('button', { name: 'Оплатил' });
+
+  await userEvent.click(payButton);
+
+  await waitFor(() => {
+    expect(getDB().clients[0].payDate).toBe('2024-10-05T00:00:00.000Z');
+    expect(getDB().clients[0].payHistory).toContain('2024-09-05T00:00:00.000Z');
   });
 
-  await waitFor(() => expect(within(tableRow!).queryByRole('button', { name: 'Оплатил' })).not.toBeInTheDocument());
-  expect(within(tableRow!).getByText('действует')).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByText('Поздний')).toBeInTheDocument());
+
+  fireEvent.change(monthInput, { target: { value: '10' } });
+  await waitFor(() => expect(screen.getByText('Поздний')).toBeInTheDocument());
+
+  fireEvent.change(monthInput, { target: { value: '9' } });
+  await waitFor(() => expect(screen.getByText('Поздний')).toBeInTheDocument());
+});
+
+test('half-month subscription advances payDate by 14 days on payment completion', async () => {
+  const db = makeDB();
+  db.clients = [
+    makeClient({
+      id: 'half',
+      firstName: 'Пол',
+      payStatus: 'задолженность',
+      subscriptionPlan: 'half-month',
+      payDate: '2024-02-01T00:00:00.000Z',
+      payAmount: 27.5,
+    }),
+  ];
+  db.tasks = [
+    {
+      id: 'task-half',
+      title: 'Оплата клиента — Пол',
+      due: '2024-02-01T00:00:00.000Z',
+      status: 'open',
+      topic: 'оплата',
+      assigneeType: 'client',
+      assigneeId: 'half',
+    },
+  ];
+
+  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  const monthInput = screen.getByLabelText('Фильтр по месяцу');
+  fireEvent.change(monthInput, { target: { value: '2' } });
+
+  const row = await screen.findByText('Пол');
+  const tableRow = row.closest('tr');
+  expect(tableRow).not.toBeNull();
+  const payButton = await within(tableRow!).findByRole('button', { name: 'Оплатил' });
+
+  await userEvent.click(payButton);
+
+  await waitFor(() => {
+    expect(getDB().tasks).toHaveLength(0);
+    expect(getDB().tasksArchive).toHaveLength(1);
+    expect(getDB().clients[0].payStatus).toBe('действует');
+    expect(getDB().clients[0].payDate).toBe('2024-01-15T00:00:00.000Z');
+  });
+  await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());
+
+  fireEvent.change(monthInput, { target: { value: '1' } });
+  const januaryRow = await screen.findByText('Пол');
+  const januaryTableRow = januaryRow.closest('tr');
+  expect(januaryTableRow).not.toBeNull();
+  await waitFor(() =>
+    expect(within(januaryTableRow!).queryByRole('button', { name: 'Оплатил' })).not.toBeInTheDocument(),
+  );
 });
 
 test('individual group allows custom payment amount', async () => {
