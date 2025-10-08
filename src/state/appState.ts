@@ -8,6 +8,7 @@ import { db as firestore, ensureSignedIn } from "../firebase";
 import { makeSeedDB } from "./seed";
 import { fmtMoney, todayISO, uid } from "./utils";
 import { applyPaymentStatusRules, DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
+import { getClientPlacements } from "./clients";
 import { ensureReserveAreaIncluded } from "./areas";
 import type {
   AttendanceEntry,
@@ -15,6 +16,7 @@ import type {
   AuthState,
   AuthUser,
   Client,
+  ClientPlacement,
   DB,
   Lead,
   LeadLifecycleEvent,
@@ -285,8 +287,72 @@ function normalizeGroupsInDB(db: DB): DB {
   };
 
   const clients = db.clients.map(client => {
-    const group = normalizeRequired(client.group);
-    return group === client.group ? client : { ...client, group };
+    const basePlacements = Array.isArray(client.placements) ? client.placements : [];
+    const sourcePlacements = basePlacements.length
+      ? [
+          {
+            ...basePlacements[0],
+            id: basePlacements[0].id || `placement-${client.id}`,
+            area: client.area,
+            group: client.group,
+            payStatus: basePlacements[0].payStatus ?? client.payStatus,
+            status: basePlacements[0].status ?? client.status,
+            subscriptionPlan: basePlacements[0].subscriptionPlan ?? client.subscriptionPlan,
+            payDate: basePlacements[0].payDate ?? client.payDate,
+            payAmount: basePlacements[0].payAmount ?? client.payAmount,
+            payActual: basePlacements[0].payActual ?? client.payActual,
+            remainingLessons: basePlacements[0].remainingLessons ?? client.remainingLessons,
+          },
+          ...basePlacements.slice(1),
+        ]
+      : [
+          {
+            id: `placement-${client.id}`,
+            area: client.area,
+            group: client.group,
+            payStatus: client.payStatus,
+            status: client.status,
+            subscriptionPlan: client.subscriptionPlan,
+            payDate: client.payDate,
+            payAmount: client.payAmount,
+            payActual: client.payActual,
+            remainingLessons: client.remainingLessons,
+          },
+        ];
+
+    const normalizedPlacements = sourcePlacements.map((placement, index) => {
+      const normalizedGroup = normalizeRequired(placement.group);
+      const normalizedArea = placement.area?.trim?.() ? placement.area : client.area;
+      const id = placement.id || `placement-${client.id}-${index}`;
+      return {
+        id,
+        area: normalizedArea,
+        group: normalizedGroup,
+        payStatus: placement.payStatus ?? client.payStatus,
+        status: placement.status ?? client.status,
+        subscriptionPlan: placement.subscriptionPlan ?? client.subscriptionPlan,
+        ...(placement.payDate ? { payDate: placement.payDate } : {}),
+        ...(placement.payAmount != null ? { payAmount: placement.payAmount } : {}),
+        ...(placement.payActual != null ? { payActual: placement.payActual } : {}),
+        ...(placement.remainingLessons != null ? { remainingLessons: placement.remainingLessons } : {}),
+      };
+    });
+
+    const primary = normalizedPlacements[0];
+
+    return {
+      ...client,
+      area: primary.area,
+      group: primary.group,
+      payStatus: primary.payStatus,
+      status: primary.status,
+      subscriptionPlan: primary.subscriptionPlan,
+      ...(primary.payDate ? { payDate: primary.payDate } : {}),
+      ...(primary.payAmount != null ? { payAmount: primary.payAmount } : {}),
+      ...(primary.payActual != null ? { payActual: primary.payActual } : {}),
+      ...(primary.remainingLessons != null ? { remainingLessons: primary.remainingLessons } : {}),
+      placements: normalizedPlacements,
+    };
   });
 
   const schedule = db.schedule.map(slot => {
@@ -585,55 +651,108 @@ export function useAppState(): AppState {
     const timestamp = todayISO();
     const today = typeof timestamp === "string" ? timestamp.slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-    const openPaymentAssignments = new Set(
-      currentDB.tasks
-        .filter(
-          task =>
-            task.status === "open" && task.topic === "оплата" && task.assigneeType === "client" && task.assigneeId,
-        )
-        .map(task => task.assigneeId as string),
-    );
+    const openPaymentAssignments = new Set<string>();
+    currentDB.tasks
+      .filter(
+        task => task.status === "open" && task.topic === "оплата" && task.assigneeType === "client" && task.assigneeId,
+      )
+      .forEach(task => {
+        const assigneeId = task.assigneeId as string;
+        if (!assigneeId) {
+          return;
+        }
+        if (task.placementId) {
+          openPaymentAssignments.add(`${assigneeId}:${task.placementId}`);
+        } else {
+          openPaymentAssignments.add(`${assigneeId}:*`);
+        }
+      });
 
     const newTasks: TaskItem[] = [];
     const changelogEntries: DB["changelog"] = [];
+    const updates: Partial<Record<string, Partial<Client>>> = {};
 
     currentDB.clients.forEach(client => {
-      if (!client.payDate || client.payDate.slice(0, 10) !== today) {
-        return;
-      }
+      const placements = getClientPlacements(client);
+      const primaryPlacementId = placements[0]?.id;
 
-      if (client.payStatus !== "ожидание") {
-        return;
-      }
+      placements.forEach(placement => {
+        const payDate = placement.payDate ?? client.payDate;
+        if (!payDate || payDate.slice(0, 10) !== today) {
+          return;
+        }
 
-      if (openPaymentAssignments.has(client.id)) {
-        return;
-      }
+        if (placement.payStatus !== "ожидание") {
+          return;
+        }
 
-      const titleParts = [
-        `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
-        client.parentName ? `родитель: ${client.parentName}` : null,
-        client.payAmount != null
-          ? `сумма: ${fmtMoney(client.payAmount, currentUI?.currency ?? "EUR", currentDB.settings.currencyRates)}`
-          : null,
-        client.payDate ? `дата: ${client.payDate.slice(0, 10)}` : null,
-      ].filter(Boolean);
+        if (openPaymentAssignments.has(`${client.id}:*`)) {
+          return;
+        }
 
-      newTasks.push({
-        id: uid(),
-        title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
-        due: client.payDate || timestamp,
-        status: "open",
-        topic: "оплата",
-        assigneeType: "client",
-        assigneeId: client.id,
-      });
+        const key = `${client.id}:${placement.id ?? "primary"}`;
+        if (openPaymentAssignments.has(key)) {
+          return;
+        }
 
-      changelogEntries.push({
-        id: uid(),
-        who: "Система",
-        what: `Создана задача по оплате ${client.firstName}`,
-        when: timestamp,
+        const payAmount = placement.payAmount ?? client.payAmount;
+
+        const titleParts = [
+          `${client.firstName}${client.lastName ? ` ${client.lastName}` : ""}`.trim(),
+          client.parentName ? `родитель: ${client.parentName}` : null,
+          payAmount != null
+            ? `сумма: ${fmtMoney(payAmount, currentUI?.currency ?? "EUR", currentDB.settings.currencyRates)}`
+            : null,
+          payDate ? `дата: ${payDate.slice(0, 10)}` : null,
+        ].filter(Boolean);
+
+        newTasks.push({
+          id: uid(),
+          title: `Оплата клиента — ${titleParts.join(" • ") || client.firstName}`,
+          due: payDate || timestamp,
+          status: "open",
+          topic: "оплата",
+          assigneeType: "client",
+          assigneeId: client.id,
+          area: placement.area ?? client.area,
+          group: placement.group ?? client.group,
+          placementId: placement.id,
+        });
+
+        changelogEntries.push({
+          id: uid(),
+          who: "Система",
+          what: `Создана задача по оплате ${client.firstName}`,
+          when: timestamp,
+        });
+
+        const baseUpdate = updates[client.id] ?? {};
+        const sourcePlacements = (baseUpdate.placements as ClientPlacement[] | undefined) ?? placements;
+        const updatedPlacement = { ...placement, payStatus: "задолженность" as const };
+        const nextPlacements = sourcePlacements.map(item =>
+          item.id === updatedPlacement.id ? updatedPlacement : item,
+        );
+
+        updates[client.id] = {
+          ...baseUpdate,
+          placements: nextPlacements,
+        };
+
+        if (primaryPlacementId === updatedPlacement.id) {
+          updates[client.id] = {
+            ...updates[client.id],
+            payStatus: "задолженность",
+            area: updatedPlacement.area,
+            group: updatedPlacement.group,
+            subscriptionPlan: updatedPlacement.subscriptionPlan,
+            ...(updatedPlacement.payAmount != null ? { payAmount: updatedPlacement.payAmount } : {}),
+            ...(updatedPlacement.payDate ? { payDate: updatedPlacement.payDate } : {}),
+            ...(updatedPlacement.payActual != null ? { payActual: updatedPlacement.payActual } : {}),
+            ...(updatedPlacement.remainingLessons != null
+              ? { remainingLessons: updatedPlacement.remainingLessons }
+              : {}),
+          };
+        }
       });
     });
 
@@ -642,7 +761,7 @@ export function useAppState(): AppState {
     }
 
     const nextTasks = [...newTasks, ...currentDB.tasks];
-    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive);
+    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive, updates);
     const next: DB = {
       ...currentDB,
       tasks: nextTasks,
@@ -969,6 +1088,16 @@ export function useAppState(): AppState {
   const onQuickAdd = () => setQuickOpen(true);
   const addQuickClient = async () => {
     const defaultPlanMeta = getSubscriptionPlanMeta(DEFAULT_SUBSCRIPTION_PLAN);
+    const primaryPlacement = {
+      id: `placement-${uid()}`,
+      area: db.settings.areas[0],
+      group: db.settings.groups[0],
+      payStatus: "ожидание" as const,
+      status: "новый" as const,
+      subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
+      payDate: todayISO(),
+      ...(defaultPlanMeta?.amount != null ? { payAmount: defaultPlanMeta.amount } : {}),
+    };
     const c: Client = {
       id: uid(),
       firstName: "Новый",
@@ -981,15 +1110,16 @@ export function useAppState(): AppState {
       channel: "Telegram",
       birthDate: new Date("2017-01-01").toISOString(),
       gender: "м",
-      area: db.settings.areas[0],
-      group: db.settings.groups[0],
+      area: primaryPlacement.area,
+      group: primaryPlacement.group,
       startDate: todayISO(),
       payMethod: "перевод",
-      payStatus: "ожидание",
-      status: "новый",
-      subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
-      ...(defaultPlanMeta?.amount != null ? { payAmount: defaultPlanMeta.amount } : {}),
-      payDate: todayISO(),
+      payStatus: primaryPlacement.payStatus,
+      status: primaryPlacement.status,
+      subscriptionPlan: primaryPlacement.subscriptionPlan,
+      ...(primaryPlacement.payAmount != null ? { payAmount: primaryPlacement.payAmount } : {}),
+      payDate: primaryPlacement.payDate,
+      placements: [primaryPlacement],
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
     if (await commitDBUpdate(next, setDB)) {
