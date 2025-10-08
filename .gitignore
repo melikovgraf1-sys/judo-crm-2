@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/src/dataconnect-generated/node_modules
 /.pnp
 .pnp.js
 
