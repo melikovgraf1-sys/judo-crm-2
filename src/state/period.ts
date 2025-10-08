@@ -103,7 +103,13 @@ export function matchesPeriod(value: string | null | undefined, period: PeriodFi
 }
 
 export function isClientInPeriod(client: Client, period: PeriodFilter): boolean {
-  return matchesPeriod(client.payDate ?? client.startDate, period);
+  const checkpoints: (string | null | undefined)[] = [
+    client.payDate,
+    ...(Array.isArray(client.payHistory) ? client.payHistory : []),
+    client.startDate,
+  ];
+
+  return checkpoints.some(value => matchesPeriod(value ?? null, period));
 }
 
 export function isClientActiveInPeriod(client: Client, period: PeriodFilter): boolean {

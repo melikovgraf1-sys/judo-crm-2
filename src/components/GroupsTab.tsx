@@ -293,42 +293,68 @@ export default function GroupsTab({
       payActual: payActual ?? undefined,
     };
 
-    const resolveNextPayDate = () => {
-      const parsed = new Date(completedAt);
+    const toUTCDate = (value?: string | null): Date | null => {
+      if (!value) {
+        return null;
+      }
+      const parsed = new Date(value);
       if (Number.isNaN(parsed.getTime())) {
         return null;
       }
-
-      const base = new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
-      const plan = client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
-
-      if (plan === "half-month") {
-        base.setUTCDate(base.getUTCDate() + 14);
-        return base;
-      }
-
-      const addMonths = (date: Date, count: number) => {
-        const year = date.getUTCFullYear();
-        const month = date.getUTCMonth();
-        const day = date.getUTCDate();
-        const targetMonthIndex = month + count;
-        const targetYear = year + Math.floor(targetMonthIndex / 12);
-        const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
-        const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-        const clampedDay = Math.min(day, maxDay);
-        return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
-      };
-
-      if (plan === "monthly" || plan === "discount") {
-        return addMonths(base, 1);
-      }
-
-      return base;
+      return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
     };
 
-    const nextPayDate = resolveNextPayDate();
+    const addMonths = (date: Date, count: number) => {
+      const year = date.getUTCFullYear();
+      const month = date.getUTCMonth();
+      const day = date.getUTCDate();
+      const targetMonthIndex = month + count;
+      const targetYear = year + Math.floor(targetMonthIndex / 12);
+      const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+      const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+      const clampedDay = Math.min(day, maxDay);
+      return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
+    };
+
+    const completionDate = toUTCDate(completedAt);
+    const currentPayDate = toUTCDate(client.payDate ?? null);
+    const startDate = toUTCDate(client.startDate ?? null);
+    const plan = client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+
+    let historyAnchor: Date | null = null;
+    let nextPayDate: Date | null = null;
+
+    if (plan === "half-month") {
+      const base = completionDate ?? currentPayDate ?? startDate;
+      if (base) {
+        const candidate = new Date(base.getTime());
+        candidate.setUTCDate(candidate.getUTCDate() + 14);
+        nextPayDate = candidate;
+      }
+    } else if (plan === "monthly" || plan === "discount") {
+      const base = currentPayDate ?? startDate ?? completionDate;
+      if (base) {
+        historyAnchor = base;
+        nextPayDate = addMonths(base, 1);
+      }
+    } else {
+      const base = completionDate ?? currentPayDate ?? startDate;
+      if (base) {
+        historyAnchor = base;
+        nextPayDate = base;
+      }
+    }
+
     if (nextPayDate) {
       updates.payDate = nextPayDate.toISOString();
+    }
+
+    if (historyAnchor) {
+      const historyValue = historyAnchor.toISOString();
+      const existingHistory = Array.isArray(client.payHistory) ? client.payHistory : [];
+      if (!existingHistory.includes(historyValue)) {
+        updates.payHistory = [...existingHistory, historyValue];
+      }
     }
 
     const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
