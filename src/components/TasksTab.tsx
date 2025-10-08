@@ -13,19 +13,33 @@ import type { Area, Client, Currency, DB, Group, TaskItem } from "../types";
 type TaskSection = { key: string; label: string | null; tasks: TaskItem[] };
 const UNGROUPED_KEY = "__ungrouped__";
 
-const normalize = (value?: string | null) => value?.trim() ?? "";
+const canonicalize = (value?: string | null) => (value ?? "").trim();
+const normalizeKey = (value?: string | null) => {
+  const canonical = canonicalize(value);
+  return canonical ? canonical.toLocaleLowerCase() : "";
+};
 
 function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSection[] {
   const buckets = new Map<string, TaskItem[]>();
   const labels = new Map<string, string>();
   const order: string[] = [];
 
+  const normalizedAvailableLabels = new Map<string, string>();
+  availableGroups.forEach(groupName => {
+    const key = normalizeKey(groupName) || UNGROUPED_KEY;
+    const label = canonicalize(groupName) || "Без группы";
+    normalizedAvailableLabels.set(key, label);
+  });
+
   tasks.forEach(task => {
-    const normalizedGroup = normalize(task.group);
+    const normalizedGroup = normalizeKey(task.group);
     const key = normalizedGroup || UNGROUPED_KEY;
+    const canonicalGroup = canonicalize(task.group);
     if (!buckets.has(key)) {
       buckets.set(key, []);
-      labels.set(key, normalizedGroup || "Без группы");
+      const label =
+        normalizedAvailableLabels.get(key) ?? (canonicalGroup ? canonicalGroup : "Без группы");
+      labels.set(key, label);
       order.push(key);
     }
     buckets.get(key)!.push(task);
@@ -34,12 +48,12 @@ function buildTaskSections(tasks: TaskItem[], availableGroups: Group[]): TaskSec
   const sections: TaskSection[] = [];
 
   availableGroups.forEach(groupName => {
-    const normalizedGroup = normalize(groupName);
-    const key = normalizedGroup || UNGROUPED_KEY;
+    const canonicalGroup = canonicalize(groupName);
+    const key = normalizeKey(groupName) || UNGROUPED_KEY;
     const tasksInBucket = buckets.get(key);
     if (!tasksInBucket) return;
 
-    sections.push({ key, label: normalizedGroup || "Без группы", tasks: tasksInBucket });
+    sections.push({ key, label: canonicalGroup || "Без группы", tasks: tasksInBucket });
     buckets.delete(key);
     labels.delete(key);
 
@@ -107,7 +121,7 @@ export default function TasksTab({
   }, [area, groupsByArea]);
 
   const normalizedAvailableGroups = useMemo(
-    () => new Set(availableGroups.map(normalize)),
+    () => new Set(availableGroups.map(normalizeKey)),
     [availableGroups],
   );
 
@@ -116,7 +130,7 @@ export default function TasksTab({
       setGroup(null);
       return;
     }
-    if (area && group && !normalizedAvailableGroups.has(normalize(group))) {
+    if (area && group && !normalizedAvailableGroups.has(normalizeKey(group))) {
       setGroup(null);
     }
   }, [area, group, normalizedAvailableGroups]);
@@ -129,13 +143,13 @@ export default function TasksTab({
     }
   }, [area, group]);
 
-  const normalizedArea = useMemo(() => normalize(area), [area]);
-  const normalizedGroup = useMemo(() => normalize(group), [group]);
+  const normalizedArea = useMemo(() => normalizeKey(area), [area]);
+  const normalizedGroup = useMemo(() => normalizeKey(group), [group]);
 
   const matchesFilter = useCallback(
     (task: TaskItem) => {
-      if (normalizedArea && normalize(task.area) !== normalizedArea) return false;
-      if (normalizedGroup && normalize(task.group) !== normalizedGroup) return false;
+      if (normalizedArea && normalizeKey(task.area) !== normalizedArea) return false;
+      if (normalizedGroup && normalizeKey(task.group) !== normalizedGroup) return false;
       return true;
     },
     [normalizedArea, normalizedGroup],
