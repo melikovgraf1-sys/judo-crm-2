@@ -100,12 +100,19 @@ export default function GroupsTab({
     if (!area || !group) {
       return [];
     }
+    const matchesPeriod = (client: Client) => {
+      if (period.month == null) {
+        return isClientInPeriod(client, period) || isClientActiveInPeriod(client, period);
+      }
+      return isClientInPeriod(client, period);
+    };
+
     return db.clients.filter(c =>
       c.area === area &&
       c.group === group &&
       !isReserveArea(c.area) &&
       (pay === "all" || c.payStatus === pay) &&
-      (isClientInPeriod(c, period) || isClientActiveInPeriod(c, period)) &&
+      matchesPeriod(c) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))
     );
   }, [db.clients, area, group, pay, ui.search, search, period]);
@@ -278,11 +285,22 @@ export default function GroupsTab({
     const nextTasks = db.tasks.filter(t => t.id !== task.id);
     const nextArchive = [completed, ...db.tasksArchive];
     const payActual = client.payAmount ?? client.payActual;
+
+    const updates: Partial<Client> = {
+      payStatus: "действует",
+      payActual: payActual ?? undefined,
+    };
+
+    if (client.subscriptionPlan === "half-month") {
+      const source = client.payDate ? new Date(client.payDate) : new Date(todayISO());
+      if (!Number.isNaN(source.getTime())) {
+        source.setUTCDate(source.getUTCDate() + 14);
+        updates.payDate = source.toISOString();
+      }
+    }
+
     const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
-      [client.id]: {
-        payStatus: "действует",
-        payActual: payActual ?? undefined,
-      },
+      [client.id]: updates,
     });
     const next = {
       ...db,
