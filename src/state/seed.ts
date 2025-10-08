@@ -105,6 +105,20 @@ export function makeSeedDB(): DB {
     const manual = clientRequiresManualRemainingLessons({ group, subscriptionPlan });
     const start = new Date();
     start.setMonth(start.getMonth() - rnd(0, 6));
+    const placementId = `placement-${uid()}`;
+    const placement = {
+      id: placementId,
+      area,
+      group,
+      payStatus: "действует" as const,
+      status: "действующий" as const,
+      subscriptionPlan,
+      payDate: start.toISOString(),
+      payAmount: planMeta?.amount ?? rnd(50, 100),
+      payActual: planMeta?.amount ?? rnd(40, 100),
+      ...(manual ? { remainingLessons: rnd(4, 12) } : {}),
+    };
+
     return {
       id: uid(),
       firstName: fn,
@@ -118,14 +132,15 @@ export function makeSeedDB(): DB {
       group,
       startDate: start.toISOString(),
       payMethod: "перевод",
-      payStatus: "действует",
-      status: "действующий",
+      payStatus: placement.payStatus,
+      status: placement.status,
       statusUpdatedAt: start.toISOString(),
       subscriptionPlan,
-      payDate: start.toISOString(),
-      payAmount: planMeta?.amount ?? rnd(50, 100),
-      payActual: planMeta?.amount ?? rnd(40, 100),
-      remainingLessons: manual ? rnd(4, 12) : undefined,
+      payDate: placement.payDate,
+      payAmount: placement.payAmount,
+      payActual: placement.payActual,
+      remainingLessons: placement.remainingLessons,
+      placements: [placement],
     } as Client;
   });
 
