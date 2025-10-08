@@ -1,15 +1,13 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
-import { calcAgeYears, calcExperience, fmtDate, fmtMoney } from "../../state/utils";
+import { fmtDate, fmtMoney } from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
-import { getEffectiveRemainingLessons } from "../../state/lessons";
-import type { AttendanceEntry, Client, Currency, PerformanceEntry, ScheduleSlot, Settings } from "../../types";
+import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
 
 interface Props {
   client: Client;
   currency: Currency;
   currencyRates: Settings["currencyRates"];
-  schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
   onClose: () => void;
@@ -21,14 +19,12 @@ export default function ClientDetailsModal({
   client,
   currency,
   currencyRates,
-  schedule,
   attendance,
   performance,
   onClose,
   onEdit,
   onRemove,
 }: Props) {
-  const remaining = getEffectiveRemainingLessons(client, schedule);
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
   const attendanceEntries = useMemo(() => {
@@ -273,11 +269,11 @@ export default function ClientDetailsModal({
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoCell({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="text-slate-700 dark:text-slate-100">{value}</span>
+    <div className="flex justify-between gap-3">
+      <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-right text-slate-700 dark:text-slate-200">{value}</span>
     </div>
   );
 }

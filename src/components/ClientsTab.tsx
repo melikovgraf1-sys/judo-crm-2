@@ -22,7 +22,7 @@ import {
   type DuplicateField,
   type DuplicateMatchDetail,
 } from "../state/clients";
-import type { Client, ClientFormValues, DB, TaskItem, UIState } from "../types";
+import type { Area, Client, ClientFormValues, DB, Group, TaskItem, UIState } from "../types";
 
 type ClientsTabProps = {
   db: DB;

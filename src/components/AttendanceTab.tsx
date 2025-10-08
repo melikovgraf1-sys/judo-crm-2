@@ -715,7 +715,6 @@ export default function AttendanceTab({
           client={selected}
           currency={currency}
           currencyRates={db.settings.currencyRates}
-          schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}
           onEdit={startEdit}
