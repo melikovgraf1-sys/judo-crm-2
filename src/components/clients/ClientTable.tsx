@@ -303,26 +303,26 @@ export default function ClientTable({
                 Оплатил
               </button>
             )}
+          <button
+            onClick={event => {
+              event.stopPropagation();
+              onCreateTask(client);
+            }}
+            className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+          >
+            Создать задачу
+          </button>
+          {onRemove && (
             <button
               onClick={event => {
                 event.stopPropagation();
-                onCreateTask(client);
+                onRemove(client.id);
               }}
-              className="px-2 py-1 text-xs rounded-md border border-sky-200 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
             >
-              Создать задачу
+              Удалить
             </button>
-            {onRemove && (
-              <button
-                onClick={event => {
-                  event.stopPropagation();
-                  onRemove(client.id);
-                }}
-                className="px-2 py-1 text-xs rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
-              >
-                Удалить
-              </button>
-            )}
+          )}
           </>
         );
       },
