@@ -6,6 +6,7 @@ import {
 } from "./payments";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const MAX_LOOKAHEAD_DAYS = 366 * 2;
 
 export function requiresManualRemainingLessons(group: string): boolean {
   return isIndividualGroup(group) || isAdultGroup(group);
@@ -47,9 +48,11 @@ export function estimateGroupRemainingLessonsByParams(
 
   const from = new Date(today);
   from.setHours(0, 0, 0, 0);
-  until.setHours(23, 59, 59, 999);
+  const exclusiveUntil = new Date(until.getTime());
+  exclusiveUntil.setDate(exclusiveUntil.getDate() - 1);
+  exclusiveUntil.setHours(23, 59, 59, 999);
 
-  if (until < from) {
+  if (exclusiveUntil < from) {
     return 0;
   }
 
@@ -62,7 +65,11 @@ export function estimateGroupRemainingLessonsByParams(
   }
 
   let total = 0;
-  for (let cursor = new Date(from); cursor <= until; cursor = new Date(cursor.getTime() + MS_IN_DAY)) {
+  for (
+    let cursor = new Date(from);
+    cursor <= exclusiveUntil;
+    cursor = new Date(cursor.getTime() + MS_IN_DAY)
+  ) {
     const weekday = isoWeekday(cursor);
     const sessions = sessionsPerWeekday.get(weekday);
     if (sessions) {
@@ -86,6 +93,72 @@ export function getEffectiveRemainingLessons(
   }
 
   return estimateGroupRemainingLessons(client, schedule, today);
+}
+
+const buildSessionsPerWeekday = (schedule: ScheduleSlot[], area: Area, group: Group) => {
+  const relevant = schedule.filter(slot => slot.area === area && slot.group === group);
+  if (!relevant.length) {
+    return null;
+  }
+
+  const sessionsPerWeekday = new Map<number, number>();
+  for (const slot of relevant) {
+    sessionsPerWeekday.set(slot.weekday, (sessionsPerWeekday.get(slot.weekday) ?? 0) + 1);
+  }
+
+  return sessionsPerWeekday;
+};
+
+function findNthSessionDate(
+  sessionsPerWeekday: Map<number, number>,
+  start: Date,
+  occurrence: number,
+): Date | null {
+  if (!occurrence || occurrence < 1) {
+    return null;
+  }
+
+  let count = 0;
+  let cursor = new Date(start.getTime());
+  cursor.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < MAX_LOOKAHEAD_DAYS; i += 1) {
+    const weekday = isoWeekday(cursor);
+    const sessions = sessionsPerWeekday.get(weekday) ?? 0;
+    if (sessions > 0) {
+      for (let k = 0; k < sessions; k += 1) {
+        count += 1;
+        if (count === occurrence) {
+          return cursor;
+        }
+      }
+    }
+    cursor = new Date(cursor.getTime() + MS_IN_DAY);
+  }
+
+  return null;
+}
+
+export function calculateManualPayDate(
+  area: Area,
+  group: Group,
+  remainingLessons: number,
+  schedule: ScheduleSlot[],
+  referenceDate: Date = new Date(),
+): Date | null {
+  const sessionsPerWeekday = buildSessionsPerWeekday(schedule, area, group);
+  if (!sessionsPerWeekday) {
+    return null;
+  }
+
+  const normalizedRemaining = Math.max(0, Math.floor(remainingLessons));
+  const occurrencesToFind = normalizedRemaining + 1;
+
+  const start = new Date(referenceDate.getTime());
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() + 1);
+
+  return findNthSessionDate(sessionsPerWeekday, start, occurrencesToFind);
 }
 
 type EarliestSlot = { time: string; weekday: number };
