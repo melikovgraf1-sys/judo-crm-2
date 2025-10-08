@@ -32,7 +32,51 @@ export default function ClientDetailsModal({
   onRemove,
 }: Props) {
   const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
+  const placements = client.placements?.length
+    ? client.placements
+    : [
+        {
+          id: client.id,
+          area: client.area,
+          group: client.group,
+          payStatus: client.payStatus,
+          status: client.status,
+          subscriptionPlan: client.subscriptionPlan,
+          payDate: client.payDate,
+          payAmount: client.payAmount,
+          payActual: client.payActual,
+          remainingLessons: client.remainingLessons,
+        },
+      ];
+
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
+
+  const derivedRemainingLessons = (() => {
+    if (typeof totalRemainingLessons === "number") {
+      return totalRemainingLessons;
+    }
+
+    const candidates: Array<number | string | undefined | null> = [
+      client.remainingLessons,
+      ...placements.map(place => place.remainingLessons),
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === "number" && Number.isFinite(candidate)) {
+        return candidate < 0 ? 0 : candidate;
+      }
+
+      if (typeof candidate === "string") {
+        const parsed = Number.parseInt(candidate, 10);
+        if (!Number.isNaN(parsed)) {
+          return parsed < 0 ? 0 : parsed;
+        }
+      }
+    }
+
+    return null;
+  })();
+
   const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
 
   const attendanceEntries = useMemo(() => {
@@ -52,23 +96,6 @@ export default function ClientDetailsModal({
   const attendedCount = attendanceEntries.filter(entry => entry.came).length;
   const successfulCount = performanceEntries.filter(entry => entry.successful).length;
 
-  const placements = client.placements?.length
-    ? client.placements
-    : [
-        {
-          id: client.id,
-          area: client.area,
-          group: client.group,
-          payStatus: client.payStatus,
-          status: client.status,
-          subscriptionPlan: client.subscriptionPlan,
-          payDate: client.payDate,
-          payAmount: client.payAmount,
-          payActual: client.payActual,
-          remainingLessons: client.remainingLessons,
-        },
-      ];
-
   const placementsSummary = placements.map(place => `${place.area} · ${place.group}`).join(", ");
 
   return (
@@ -82,11 +109,14 @@ export default function ClientDetailsModal({
             <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {placementsSummary}
             </div>
-            {client.status && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-200">
-                  {client.status}
-                </span>
+            {(client.payMethod || client.status) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {client.payMethod ? (
+                  <ClientBadge label="Способ оплаты" value={client.payMethod} />
+                ) : null}
+                {client.status ? (
+                  <ClientBadge label="Статус клиента" value={client.status} />
+                ) : null}
               </div>
             )}
           </div>
@@ -128,6 +158,8 @@ export default function ClientDetailsModal({
               <ClientInfoRow label="Telegram" value={client.telegram || "—"} />
               <ClientInfoRow label="Instagram" value={client.instagram || "—"} />
               <ClientInfoRow label="Канал" value={client.channel} />
+              <ClientInfoRow label="Способ оплаты" value={client.payMethod || "—"} />
+              <ClientInfoRow label="Статус клиента" value={client.status || "—"} />
               <ClientInfoRow label="Родитель" value={client.parentName || "—"} />
               <ClientInfoRow label="Дата рождения" value={client.birthDate?.slice(0, 10) || "—"} />
               <ClientInfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
@@ -149,7 +181,7 @@ export default function ClientDetailsModal({
               />
               <ClientInfoRow
                 label="Остаток занятий"
-                value={totalRemainingLessons != null ? String(totalRemainingLessons) : "—"}
+                value={derivedRemainingLessons != null ? String(derivedRemainingLessons) : "—"}
               />
             </div>
             <div className="space-y-2">
@@ -291,6 +323,15 @@ function ClientInfoRow({ label, value }: { label: string; value: React.ReactNode
       <span className="font-medium text-slate-500 dark:text-slate-400">{label}</span>
       <span className="text-right text-slate-700 dark:text-slate-200">{value}</span>
     </div>
+  );
+}
+
+function ClientBadge({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+      <span>{label}</span>
+      <span className="text-sm normal-case">{value}</span>
+    </span>
   );
 }
 

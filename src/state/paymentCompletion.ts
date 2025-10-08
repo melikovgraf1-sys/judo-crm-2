@@ -111,8 +111,18 @@ export function resolvePaymentCompletion({
   } else if (plan === "monthly" || plan === "discount") {
     const base = currentPayDate ?? startDate ?? completionDate;
     if (base) {
-      historyAnchor = base;
       nextPayDate = addMonths(base, 1);
+    }
+
+    if (completionDate && currentPayDate) {
+      historyAnchor =
+        completionDate.getTime() < currentPayDate.getTime() ? completionDate : currentPayDate;
+    } else if (completionDate) {
+      historyAnchor = completionDate;
+    } else if (currentPayDate) {
+      historyAnchor = currentPayDate;
+    } else if (startDate) {
+      historyAnchor = startDate;
     }
   } else {
     const base = completionDate ?? currentPayDate ?? startDate;
