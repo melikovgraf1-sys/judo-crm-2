@@ -88,7 +88,14 @@ export default function ClientTable({
   performance,
   billingPeriod,
 }: Props) {
-  const [selected, setSelected] = useState<Client | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedClient = useMemo(() => {
+    if (!selectedId) {
+      return null;
+    }
+
+    return list.find(client => client.id === selectedId) ?? null;
+  }, [list, selectedId]);
   const remainingMap = useMemo(() => {
     const map = new Map<string, number | null>();
     list.forEach(client => {
@@ -596,7 +603,7 @@ export default function ClientTable({
                 alignItems: "center",
               }}
               className="group cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
-              onClick={() => setSelected(row.client)}
+              onClick={() => setSelectedId(row.client.id)}
             >
               <td className="p-2 text-center text-slate-500">{row.index + 1}</td>
               {activeColumns.map(column => (
@@ -609,16 +616,16 @@ export default function ClientTable({
         />
       </div>
 
-      {selected && (
+      {selectedClient && (
         <ClientDetailsModal
-          client={selected}
+          client={selectedClient}
           currency={currency}
           currencyRates={currencyRates}
           attendance={attendance}
           performance={performance}
           onEdit={onEdit}
           onRemove={onRemove}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
         />
       )}
     </div>
