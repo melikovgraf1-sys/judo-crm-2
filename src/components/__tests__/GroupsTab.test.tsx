@@ -590,6 +590,49 @@ test('half-month subscription advances payDate by 14 days on payment completion'
   );
 });
 
+test('weekly subscription advances payDate by one calendar month on payment completion', async () => {
+  const db = makeDB();
+  db.clients = [
+    makeClient({
+      id: 'weekly',
+      firstName: 'Неделя',
+      payStatus: 'задолженность',
+      subscriptionPlan: 'weekly',
+      payDate: '2024-02-01T00:00:00.000Z',
+      payAmount: 27.5,
+    }),
+  ];
+  db.tasks = [
+    {
+      id: 'task-weekly',
+      title: 'Оплата клиента — Неделя',
+      due: '2024-02-01T00:00:00.000Z',
+      status: 'open',
+      topic: 'оплата',
+      assigneeType: 'client',
+      assigneeId: 'weekly',
+    },
+  ];
+
+  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  const monthInput = screen.getByLabelText('Фильтр по месяцу');
+  fireEvent.change(monthInput, { target: { value: '2' } });
+
+  const row = await screen.findByText('Неделя');
+  const tableRow = row.closest('tr');
+  expect(tableRow).not.toBeNull();
+  const payButton = await within(tableRow!).findByRole('button', { name: 'Оплатил' });
+
+  await userEvent.click(payButton);
+
+  await waitFor(() => {
+    const updated = getDB().clients[0];
+    expect(updated.payStatus).toBe('действует');
+    expect(updated.payDate).toBe('2024-03-01T00:00:00.000Z');
+  });
+});
+
 test('individual group allows custom payment amount', async () => {
   const db = makeDB();
   db.settings.groups = ['Group1', 'индивидуальные'];

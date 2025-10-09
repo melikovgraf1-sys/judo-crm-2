@@ -3,6 +3,7 @@ import { applyClientStatusAutoTransition } from "./clientLifecycle";
 
 export const SUBSCRIPTION_PLANS: { value: SubscriptionPlan; label: string; amount: number | null }[] = [
   { value: "monthly", label: "Месячный абонемент", amount: 55 },
+  { value: "weekly", label: "Раз в неделю", amount: 27.5 },
   { value: "half-month", label: "Полмесяца абонемент", amount: 27.5 },
   { value: "discount", label: "Скидка", amount: null },
   { value: "single", label: "Разовое занятие", amount: null },

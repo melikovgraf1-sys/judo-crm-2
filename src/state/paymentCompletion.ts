@@ -108,7 +108,7 @@ export function resolvePaymentCompletion({
       candidate.setUTCDate(candidate.getUTCDate() + 14);
       nextPayDate = candidate;
     }
-  } else if (plan === "monthly" || plan === "discount") {
+  } else if (plan === "monthly" || plan === "weekly" || plan === "discount") {
     const base = currentPayDate ?? startDate ?? completionDate;
     if (base) {
       nextPayDate = addMonths(base, 1);
