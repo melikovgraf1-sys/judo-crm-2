@@ -686,7 +686,7 @@ export function useAppState(): AppState {
           return;
         }
 
-        if (placement.payStatus !== "ожидание") {
+        if (placement.payStatus === "задолженность") {
           return;
         }
 
