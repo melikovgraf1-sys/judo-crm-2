@@ -342,6 +342,7 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
     const updatedPlacements = normalizedPlacements.map(placement => ({
       ...placement,
       payStatus: "ожидание" as const,
+      payActual: undefined,
     }));
     const updatedClient: Client = {
       ...client,

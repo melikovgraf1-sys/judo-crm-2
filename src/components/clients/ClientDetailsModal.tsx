@@ -8,6 +8,7 @@ import {
 } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
 import type { ScheduleSlot as ScheduleSlotType } from "../../types";
+import { getClientPlacementDisplayStatus, getClientPlacementsWithFallback } from "./paymentStatus";
 
 const { calcAgeYears, calcExperience, fmtDate, fmtMoney } = utils;
 
@@ -35,23 +36,8 @@ export default function ClientDetailsModal({
   onRemove,
 }: Props) {
   const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
-  const placements = client.placements?.length
-    ? client.placements
-    : [
-        {
-          id: client.id,
-          area: client.area,
-          group: client.group,
-          payStatus: client.payStatus,
-          status: client.status,
-          subscriptionPlan: client.subscriptionPlan,
-          payDate: client.payDate,
-          payAmount: client.payAmount,
-          payActual: client.payActual,
-          remainingLessons: client.remainingLessons,
-          frozenLessons: client.frozenLessons,
-        },
-      ];
+  const placements = getClientPlacementsWithFallback(client);
+  const hasWaitingStatus = getClientPlacementDisplayStatus(client) === "ожидание";
 
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
 
@@ -251,7 +237,9 @@ export default function ClientDetailsModal({
                         <ClientPlacementInfoCell
                           label="Факт оплаты"
                           value={
-                            place.payActual != null
+                            hasWaitingStatus
+                              ? "—"
+                              : place.payActual != null
                               ? fmtMoney(place.payActual, currency, currencyRates)
                               : "—"
                           }

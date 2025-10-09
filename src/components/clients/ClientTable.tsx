@@ -19,6 +19,7 @@ import type {
   TaskItem,
 } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
+import { getClientPlacementDisplayStatus } from "./paymentStatus";
 
 type Props = {
   list: Client[];
@@ -159,7 +160,7 @@ export default function ClientTable({
   };
 
   const getDisplayPayStatus = (client: Client): string => {
-    const placementStatus = getPlacementDisplayStatus(client);
+    const placementStatus = getClientPlacementDisplayStatus(client);
     if (!billingPeriod || billingPeriod.month == null) {
       return placementStatus;
     }
@@ -354,7 +355,7 @@ export default function ClientTable({
       label: "Факт оплаты",
       width: "minmax(130px, max-content)",
       renderCell: client => {
-        const placementStatus = getPlacementDisplayStatus(client);
+        const placementStatus = getClientPlacementDisplayStatus(client);
         if (placementStatus === "ожидание") {
           return "—";
         }
@@ -365,7 +366,7 @@ export default function ClientTable({
         return client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—";
       },
       sortValue: client => {
-        const placementStatus = getPlacementDisplayStatus(client);
+        const placementStatus = getClientPlacementDisplayStatus(client);
         if (placementStatus === "ожидание") {
           return 0;
         }
@@ -404,7 +405,7 @@ export default function ClientTable({
         const openTask = openPaymentTasks?.[client.id];
         const showReserveButton = Boolean(onReserve && !isReserveArea(client.area));
         const canSetWaiting =
-          onSetWaiting && getPlacementDisplayStatus(client) !== "ожидание";
+          onSetWaiting && getClientPlacementDisplayStatus(client) !== "ожидание";
         return (
           <>
             {openTask && onCompletePaymentTask && (

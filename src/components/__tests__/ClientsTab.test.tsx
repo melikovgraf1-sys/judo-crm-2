@@ -303,6 +303,46 @@ test('waiting action moves client to ожидание and clears pay actual disp
   expect(updatedClient?.payStatus).toBe('ожидание');
   expect(updatedClient?.payActual).toBeUndefined();
   expect(updatedClient?.placements?.[0]?.payStatus).toBe('ожидание');
+  expect(updatedClient?.placements?.[0]?.payActual).toBeUndefined();
 
   await waitFor(() => expect(screen.queryByRole('button', { name: 'ожидание' })).not.toBeInTheDocument());
+});
+
+test('client details hide fact payment when overall status is ожидание', async () => {
+  const client = makeClient({
+    id: 'c-details-wait',
+    firstName: 'Олег',
+    payStatus: 'ожидание',
+    payActual: 55,
+    placements: [
+      {
+        id: 'pl-c-details-wait',
+        area: 'Area1',
+        group: 'Group1',
+        payStatus: 'ожидание',
+        status: 'действующий',
+        subscriptionPlan: 'monthly',
+        payDate: '2024-01-10T00:00:00.000Z',
+        payAmount: 55,
+        payActual: 55,
+        remainingLessons: 5,
+      },
+    ],
+  });
+
+  const Wrapper = () => {
+    const [state, setState] = React.useState({ ...makeDB(), clients: [client] });
+    return <ClientsTab db={state} setDB={setState} ui={makeUI()} setUI={() => {}} />;
+  };
+
+  render(<Wrapper />);
+
+  await userEvent.click(screen.getByText('Олег Иванов'));
+
+  const factLabels = await screen.findAllByText('Факт оплаты');
+  const firstFactRow = factLabels[0]?.closest('div');
+  expect(firstFactRow).toBeTruthy();
+  if (firstFactRow) {
+    expect(within(firstFactRow).getByText('—')).toBeInTheDocument();
+  }
 });
