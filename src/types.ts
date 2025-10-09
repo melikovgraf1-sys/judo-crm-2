@@ -12,7 +12,7 @@ export type PaymentMethod = "наличные" | "перевод";
 
 export type PaymentStatus = "ожидание" | "действует" | "задолженность";
 
-export type SubscriptionPlan = "monthly" | "half-month" | "discount" | "single";
+export type SubscriptionPlan = "monthly" | "weekly" | "half-month" | "discount" | "single";
 
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
 
