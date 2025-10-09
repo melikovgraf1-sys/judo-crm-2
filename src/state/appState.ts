@@ -302,6 +302,7 @@ function normalizeGroupsInDB(db: DB): DB {
             payAmount: basePlacements[0].payAmount ?? client.payAmount,
             payActual: basePlacements[0].payActual ?? client.payActual,
             remainingLessons: basePlacements[0].remainingLessons ?? client.remainingLessons,
+            frozenLessons: basePlacements[0].frozenLessons ?? client.frozenLessons,
           },
           ...basePlacements.slice(1),
         ]
@@ -317,6 +318,7 @@ function normalizeGroupsInDB(db: DB): DB {
             payAmount: client.payAmount,
             payActual: client.payActual,
             remainingLessons: client.remainingLessons,
+            frozenLessons: client.frozenLessons,
           },
         ];
 
@@ -335,6 +337,7 @@ function normalizeGroupsInDB(db: DB): DB {
         ...(placement.payAmount != null ? { payAmount: placement.payAmount } : {}),
         ...(placement.payActual != null ? { payActual: placement.payActual } : {}),
         ...(placement.remainingLessons != null ? { remainingLessons: placement.remainingLessons } : {}),
+        ...(placement.frozenLessons != null ? { frozenLessons: placement.frozenLessons } : {}),
       };
     });
 
@@ -351,6 +354,7 @@ function normalizeGroupsInDB(db: DB): DB {
       ...(primary.payAmount != null ? { payAmount: primary.payAmount } : {}),
       ...(primary.payActual != null ? { payActual: primary.payActual } : {}),
       ...(primary.remainingLessons != null ? { remainingLessons: primary.remainingLessons } : {}),
+      ...(primary.frozenLessons != null ? { frozenLessons: primary.frozenLessons } : {}),
       placements: normalizedPlacements,
     };
   });
@@ -682,7 +686,7 @@ export function useAppState(): AppState {
           return;
         }
 
-        if (placement.payStatus !== "ожидание") {
+        if (placement.payStatus === "задолженность") {
           return;
         }
 
@@ -750,6 +754,9 @@ export function useAppState(): AppState {
             ...(updatedPlacement.payActual != null ? { payActual: updatedPlacement.payActual } : {}),
             ...(updatedPlacement.remainingLessons != null
               ? { remainingLessons: updatedPlacement.remainingLessons }
+              : {}),
+            ...(updatedPlacement.frozenLessons != null
+              ? { frozenLessons: updatedPlacement.frozenLessons }
               : {}),
           };
         }

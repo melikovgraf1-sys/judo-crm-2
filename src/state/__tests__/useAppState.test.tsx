@@ -169,6 +169,7 @@ describe('useAppState with local persistence', () => {
       },
     ];
 
+    const legacyTaskId = legacy.tasks[0]?.id;
     if (legacy.tasks.length > 0) {
       legacy.tasks[0].group = '9-14';
     }
@@ -201,7 +202,10 @@ describe('useAppState with local persistence', () => {
     expect(result.current.db.leads[0].group).toBe('11 лет и старше');
     expect(result.current.db.leadsArchive[0].group).toBe('7–10 лет');
     expect(result.current.db.leadHistory[0].group).toBe('11 лет и старше');
-    expect(result.current.db.tasks[0].group).toBe('11 лет и старше');
+    if (legacyTaskId) {
+      const legacyTask = result.current.db.tasks.find(task => task.id === legacyTaskId);
+      expect(legacyTask?.group).toBe('11 лет и старше');
+    }
     expect(result.current.db.tasksArchive[0].group).toBe('7–10 лет');
 
     for (const area of result.current.db.settings.areas) {
@@ -287,7 +291,15 @@ describe('useAppState with local persistence', () => {
       { ...shared, id: 'client-a', firstName: 'Анна', parentName: 'Мария', payDate: FIXED_TODAY, payAmount: 100 },
       { ...shared, id: 'client-b', firstName: 'Борис', payDate: FIXED_TODAY, payAmount: 120 },
       { ...shared, id: 'client-with-task', firstName: 'Виктор', payDate: FIXED_TODAY, payAmount: 55 },
-      { ...shared, id: 'client-active', firstName: 'Дмитрий', payDate: FIXED_TODAY, payAmount: 80, payStatus: 'действует' },
+      {
+        ...shared,
+        id: 'client-active',
+        firstName: 'Дмитрий',
+        payDate: FIXED_TODAY,
+        payAmount: 80,
+        payActual: 75,
+        payStatus: 'действует',
+      },
       { ...shared, id: 'client-other', firstName: 'Глеб', payDate: '2024-05-09T00:00:00.000Z' },
     ];
 
@@ -311,7 +323,7 @@ describe('useAppState with local persistence', () => {
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-a')).toHaveLength(1);
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-b')).toHaveLength(1);
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-with-task')).toHaveLength(1);
-        expect(openPaymentTasks.filter(task => task.assigneeId === 'client-active')).toHaveLength(0);
+        expect(openPaymentTasks.filter(task => task.assigneeId === 'client-active')).toHaveLength(1);
         expect(openPaymentTasks.filter(task => task.assigneeId === 'client-other')).toHaveLength(0);
       });
 
@@ -325,7 +337,10 @@ describe('useAppState with local persistence', () => {
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-a')).toHaveLength(1);
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-b')).toHaveLength(1);
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-with-task')).toHaveLength(1);
-      expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-active')).toHaveLength(0);
+      expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-active')).toHaveLength(1);
+
+      const activeClient = result.current.db.clients.find(client => client.id === 'client-active');
+      expect(activeClient?.payActual).toBe(75);
       expect(persistedPaymentTasks.filter((task: TaskItem) => task.assigneeId === 'client-other')).toHaveLength(0);
     } finally {
       seedSpy.mockRestore();

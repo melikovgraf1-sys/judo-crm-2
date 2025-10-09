@@ -72,6 +72,7 @@ const normalizePlacement = (
     ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
     ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
     ...(placement.payDate ? { payDate: parseDateInput(placement.payDate) } : {}),
+    ...(previous?.frozenLessons != null ? { frozenLessons: previous.frozenLessons } : {}),
   };
 };
 
@@ -160,6 +161,7 @@ export function transformClientFormValues(
     ...(primary.payAmount != null ? { payAmount: primary.payAmount } : {}),
     ...(primary.payActual != null ? { payActual: primary.payActual } : {}),
     ...(primary.remainingLessons != null ? { remainingLessons: primary.remainingLessons } : {}),
+    ...(primary.frozenLessons != null ? { frozenLessons: primary.frozenLessons } : {}),
     placements: normalizedPlacements,
     ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
     ...(parentName.trim() ? { parentName: parentName.trim() } : {}),

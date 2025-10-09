@@ -17,6 +17,7 @@ export function getClientPlacements(client: Client): ClientPlacement[] {
       payAmount: client.payAmount,
       payActual: client.payActual,
       remainingLessons: client.remainingLessons,
+      frozenLessons: client.frozenLessons,
     },
   ];
 }
