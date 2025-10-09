@@ -218,6 +218,7 @@ export default function ClientDetailsModal({
                   const planLabel = place.subscriptionPlan
                     ? getSubscriptionPlanMeta(place.subscriptionPlan)?.label ?? "—"
                     : "—";
+                  const frozenLessons = place.frozenLessons ?? client.frozenLessons ?? 0;
                   return (
                     <div
                       key={`${place.id}-${place.area}-${place.group}`}
@@ -254,6 +255,7 @@ export default function ClientDetailsModal({
                               : "—"
                           }
                         />
+                        <ClientPlacementInfoCell label="Заморозка" value={String(frozenLessons)} />
                       </dl>
                     </div>
                   );
@@ -285,8 +287,18 @@ export default function ClientDetailsModal({
               entries={attendanceEntries.map(entry => ({
                 id: entry.id,
                 date: fmtDate(entry.date),
-                value: entry.came ? "пришёл" : "отсутствовал",
-                tone: entry.came ? "success" : "warning",
+                value:
+                  entry.status === "frozen"
+                    ? "заморозка"
+                    : entry.came
+                    ? "пришёл"
+                    : "отсутствовал",
+                tone:
+                  entry.status === "frozen"
+                    ? "info"
+                    : entry.came
+                    ? "success"
+                    : "warning",
               }))}
             />
           </div>
@@ -385,7 +397,7 @@ function ClientHistoryList({
   entries,
   emptyText,
 }: {
-  entries: { id: string; date: string; value: string; tone: "success" | "warning" }[];
+  entries: { id: string; date: string; value: string; tone: "success" | "warning" | "info" }[];
   emptyText: string;
 }) {
   if (!entries.length) {
@@ -400,7 +412,9 @@ function ClientHistoryList({
           className={`rounded-md border px-3 py-2 text-sm ${
             entry.tone === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
-              : "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              : entry.tone === "warning"
+              ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+              : "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200"
           }`}
         >
           <div className="text-xs uppercase tracking-wide">{entry.date}</div>

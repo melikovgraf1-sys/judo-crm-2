@@ -319,23 +319,68 @@ export default function AttendanceTab({
     if (!client) return;
     const manual = clientRequiresManualRemainingLessons(client);
 
-    const applyManualUpdate = (target: Client, nextRemaining: number): Client => {
-      const current = target.remainingLessons ?? 0;
-      if (nextRemaining === current) {
+    const adjustClient = (target: Client, deltaRemaining: number, deltaFrozen: number): Client => {
+      if (!deltaRemaining && !deltaFrozen) {
         return target;
       }
+
+      const currentFrozen = target.frozenLessons ?? 0;
+      const nextFrozen = Math.max(0, currentFrozen + deltaFrozen);
+      const frozenChanged = nextFrozen !== currentFrozen;
+
+      if (!manual) {
+        if (!frozenChanged) {
+          return target;
+        }
+        const updated: Client = { ...target, frozenLessons: nextFrozen };
+        if (Array.isArray(target.placements) && target.placements.length) {
+          updated.placements = target.placements.map(place => {
+            if (place.area === target.area && place.group === target.group) {
+              return { ...place, frozenLessons: nextFrozen };
+            }
+            return place;
+          });
+        }
+        return updated;
+      }
+
+      const currentRemaining = target.remainingLessons ?? 0;
+      const nextRemaining = Math.max(0, currentRemaining + deltaRemaining);
+      const remainingChanged = nextRemaining !== currentRemaining;
+
+      if (!remainingChanged && !frozenChanged) {
+        return target;
+      }
+
       const referenceISO = selectedDateISO ?? todayISO();
       const referenceDate = new Date(referenceISO);
-      const due = calculateManualPayDate(target.area, target.group, nextRemaining, db.schedule, referenceDate);
+      const due = calculateManualPayDate(
+        target.area,
+        target.group,
+        nextRemaining + nextFrozen,
+        db.schedule,
+        referenceDate,
+      );
       const dueISO = due?.toISOString();
-      const updated: Client = { ...target, remainingLessons: nextRemaining };
+
+      const updated: Client = {
+        ...target,
+        remainingLessons: nextRemaining,
+        frozenLessons: nextFrozen,
+      };
+
       if (dueISO) {
         updated.payDate = dueISO;
       }
+
       if (Array.isArray(target.placements) && target.placements.length) {
         updated.placements = target.placements.map(place => {
           if (place.area === target.area && place.group === target.group) {
-            const nextPlace = { ...place, remainingLessons: nextRemaining };
+            const nextPlace = {
+              ...place,
+              remainingLessons: nextRemaining,
+              frozenLessons: nextFrozen,
+            };
             if (dueISO) {
               nextPlace.payDate = dueISO;
             }
@@ -344,68 +389,75 @@ export default function AttendanceTab({
           return place;
         });
       }
+
       return updated;
     };
 
-    if (mark && mark.came === false) {
-      const next = {
-        ...db,
-        attendance: db.attendance.filter(entry => entry.id !== mark.id),
-        clients: db.clients,
-      };
+    const applyClientAdjustments = (deltaRemaining: number, deltaFrozen: number) =>
+      db.clients.map(c => (c.id === clientId ? adjustClient(c, deltaRemaining, deltaFrozen) : c));
+
+    const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
+
+    if (!mark) {
+      const entry: AttendanceEntry = { id: uid(), clientId, date: desiredDate, came: true, status: "came" };
+      const nextClients = applyClientAdjustments(manual ? -1 : 0, 0);
+      const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
       const result = await commitDBUpdate(next, setDB);
-      if (!result.ok) {
-        if (result.reason === "error") {
-          window.alert(
-            "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-          );
-        }
-        return;
+      if (!result.ok && result.reason === "error") {
+        window.alert(
+          "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
       }
-    } else if (mark) {
-      const updated = { ...mark, came: false };
-      const nextClients = !manual
-        ? db.clients
-        : db.clients.map(c => {
-            if (c.id !== clientId) return c;
-            const current = c.remainingLessons ?? 0;
-            const nextRemaining = Math.max(0, current + 1);
-            return applyManualUpdate(c, nextRemaining);
-          });
+      return;
+    }
+
+    const currentStatus = mark.status ?? (mark.came ? "came" : "absent");
+
+    if (currentStatus === "came") {
+      const updated: AttendanceEntry = { ...mark, came: false, status: "absent" };
+      const nextClients = applyClientAdjustments(manual ? 1 : 0, 0);
       const next = {
         ...db,
         attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
         clients: nextClients,
       };
       const result = await commitDBUpdate(next, setDB);
-      if (!result.ok) {
-        if (result.reason === "error") {
-          window.alert(
-            "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-          );
-        }
-        return;
+      if (!result.ok && result.reason === "error") {
+        window.alert(
+          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
       }
-    } else {
-      const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
-      const entry: AttendanceEntry = { id: uid(), clientId, date: desiredDate, came: true };
-      const nextClients = !manual
-        ? db.clients
-        : db.clients.map(c => {
-            if (c.id !== clientId) return c;
-            const current = c.remainingLessons ?? 0;
-            const nextRemaining = Math.max(0, current - 1);
-            return applyManualUpdate(c, nextRemaining);
-          });
-      const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
+      return;
+    }
+
+    if (currentStatus === "absent") {
+      const updated: AttendanceEntry = { ...mark, came: false, status: "frozen" };
+      const nextClients = applyClientAdjustments(0, 1);
+      const next = {
+        ...db,
+        attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
+        clients: nextClients,
+      };
       const result = await commitDBUpdate(next, setDB);
-      if (!result.ok) {
-        if (result.reason === "error") {
-          window.alert(
-            "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-          );
-        }
+      if (!result.ok && result.reason === "error") {
+        window.alert(
+          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
       }
+      return;
+    }
+
+    const nextClients = applyClientAdjustments(0, -1);
+    const next = {
+      ...db,
+      attendance: db.attendance.filter(entry => entry.id !== mark.id),
+      clients: nextClients,
+    };
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
+      window.alert(
+        "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+      );
     }
   }, [db, marksForSelectedDate, selectedDate, selectedDateISO, setDB]);
 
@@ -449,12 +501,23 @@ export default function AttendanceTab({
         cellClassName: "",
         renderCell: (client: Client) => {
           const mark = marksForSelectedDate.get(client.id);
-          const label = mark?.came ? "пришёл" : mark ? "не пришёл" : "не отмечено";
-          const tone = mark?.came
-            ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
-            : mark
-            ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
-            : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
+          const status = mark?.status ?? (mark ? (mark.came ? "came" : "absent") : null);
+          const label =
+            status === "came"
+              ? "пришёл"
+              : status === "absent"
+              ? "не пришёл"
+              : status === "frozen"
+              ? "заморозка"
+              : "не отмечено";
+          const tone =
+            status === "came"
+              ? "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700"
+              : status === "absent"
+              ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700"
+              : status === "frozen"
+              ? "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-700"
+              : "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700";
           return (
             <div className="flex justify-start">
               <button
@@ -473,7 +536,11 @@ export default function AttendanceTab({
         sortValue: (client: Client) => {
           const mark = marksForSelectedDate.get(client.id);
           if (!mark) return 0;
-          return mark.came ? 2 : 1;
+          const status = mark.status ?? (mark.came ? "came" : "absent");
+          if (status === "came") return 3;
+          if (status === "absent") return 2;
+          if (status === "frozen") return 1;
+          return 0;
         },
       },
     ];

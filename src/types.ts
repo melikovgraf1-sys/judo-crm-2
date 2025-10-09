@@ -27,6 +27,7 @@ export interface ClientPlacement {
   payAmount?: number;
   payActual?: number;
   remainingLessons?: number;
+  frozenLessons?: number;
 }
 
 export type LeadStage = "Очередь" | "Задержка" | "Пробное" | "Ожидание оплаты";
@@ -72,6 +73,7 @@ export interface Client {
   payAmount?: number;
   payActual?: number;
   remainingLessons?: number;
+  frozenLessons?: number;
   placements: ClientPlacement[];
   payHistory?: string[];
   // Автополя (рассчитываются на лету)
@@ -107,11 +109,14 @@ export interface ClientPlacementFormValues {
   remainingLessons: string;
 }
 
+export type AttendanceStatus = "came" | "absent" | "frozen";
+
 export interface AttendanceEntry {
   id: string;
   clientId: string;
   date: string; // ISO
   came: boolean;
+  status?: AttendanceStatus;
   sourceArea?: Area; // для отработок
 }
 
