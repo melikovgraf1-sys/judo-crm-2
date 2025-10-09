@@ -12,6 +12,7 @@ import type {
   Client,
   ClientStatus,
   Currency,
+  PaymentStatus,
   PerformanceEntry,
   ScheduleSlot,
   Settings,
@@ -114,6 +115,48 @@ export default function ClientTable({
       return client.payStatus === "действует";
     }
     return paidInPeriodMap?.get(client.id) ?? false;
+  };
+
+  const getPlacementPayStatuses = (client: Client): PaymentStatus[] => {
+    const placements = Array.isArray(client.placements) && client.placements.length > 0
+      ? client.placements
+      : [
+          {
+            id: client.id,
+            area: client.area,
+            group: client.group,
+            payStatus: client.payStatus,
+            status: client.status,
+            subscriptionPlan: client.subscriptionPlan,
+            payDate: client.payDate,
+            payAmount: client.payAmount,
+            payActual: client.payActual,
+            remainingLessons: client.remainingLessons,
+          },
+        ];
+
+    const unique = new Set<PaymentStatus>();
+    placements.forEach(place => {
+      if (place.payStatus) {
+        unique.add(place.payStatus);
+      }
+    });
+
+    return unique.size > 0 ? Array.from(unique) : [client.payStatus];
+  };
+
+  const getPlacementDisplayStatus = (client: Client): PaymentStatus => {
+    const statuses = getPlacementPayStatuses(client);
+    if (statuses.includes("задолженность")) {
+      return "задолженность";
+    }
+    if (statuses.includes("ожидание")) {
+      return "ожидание";
+    }
+    if (statuses.includes("действует")) {
+      return "действует";
+    }
+    return client.payStatus;
   };
 
   const getDisplayPayStatus = (client: Client): string => {

@@ -224,6 +224,8 @@ const SUBSCRIPTION_PLAN_ALIASES: Record<string, SubscriptionPlan> = SUBSCRIPTION
   {
     "месячный": "monthly",
     "месячныйабонемент": "monthly",
+    "развнеделю": "weekly",
+    "развнеделюабонемент": "weekly",
     "halfmonth": "half-month",
     "полмесяца": "half-month",
     "полмесяцаабонемент": "half-month",
