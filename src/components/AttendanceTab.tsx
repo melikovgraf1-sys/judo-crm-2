@@ -8,7 +8,12 @@ import ColumnSettings from "./ColumnSettings";
 import { compareValues, toggleSort } from "./tableUtils";
 import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
-import { buildGroupsByArea, calculateManualPayDate, clientRequiresManualRemainingLessons } from "../state/lessons";
+import {
+  buildGroupsByArea,
+  calculateManualPayDate,
+  clientRequiresManualRemainingLessons,
+  estimateGroupRemainingLessonsByParams,
+} from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
 import { isReserveArea } from "../state/areas";
 import type {
@@ -328,21 +333,55 @@ export default function AttendanceTab({
       const nextFrozen = Math.max(0, currentFrozen + deltaFrozen);
       const frozenChanged = nextFrozen !== currentFrozen;
 
-      if (!manual) {
-        if (!frozenChanged) {
-          return target;
-        }
-        const updated: Client = { ...target, frozenLessons: nextFrozen };
-        if (Array.isArray(target.placements) && target.placements.length) {
-          updated.placements = target.placements.map(place => {
-            if (place.area === target.area && place.group === target.group) {
-              return { ...place, frozenLessons: nextFrozen };
-            }
-            return place;
-          });
-        }
-        return updated;
+    if (!manual) {
+      if (!frozenChanged) {
+        return target;
       }
+
+      const referenceISO = selectedDateISO ?? todayISO();
+      const referenceDate = new Date(referenceISO);
+
+      const scheduledLessonsRemaining = estimateGroupRemainingLessonsByParams(
+        target.area,
+        target.group,
+        target.payDate,
+        db.schedule,
+        referenceDate,
+      );
+
+      const activeLessonsRemaining =
+        scheduledLessonsRemaining != null ? Math.max(0, scheduledLessonsRemaining - currentFrozen) : null;
+
+      const totalLessonsToCover = activeLessonsRemaining != null ? activeLessonsRemaining + nextFrozen : null;
+
+      const dueDate =
+        totalLessonsToCover != null
+          ? calculateManualPayDate(target.area, target.group, totalLessonsToCover, db.schedule, referenceDate)
+          : null;
+
+      const dueISO = dueDate?.toISOString();
+
+      const updated: Client = {
+        ...target,
+        frozenLessons: nextFrozen,
+        ...(dueISO ? { payDate: dueISO } : {}),
+      };
+
+      if (Array.isArray(target.placements) && target.placements.length) {
+        updated.placements = target.placements.map(place => {
+          if (place.area === target.area && place.group === target.group) {
+            const nextPlace = { ...place, frozenLessons: nextFrozen };
+            if (dueISO) {
+              nextPlace.payDate = dueISO;
+            }
+            return nextPlace;
+          }
+          return place;
+        });
+      }
+
+      return updated;
+    }
 
       const currentRemaining = target.remainingLessons ?? 0;
       const nextRemaining = Math.max(0, currentRemaining + deltaRemaining);

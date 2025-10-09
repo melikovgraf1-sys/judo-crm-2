@@ -49,10 +49,18 @@ export default function ClientDetailsModal({
           payAmount: client.payAmount,
           payActual: client.payActual,
           remainingLessons: client.remainingLessons,
+          frozenLessons: client.frozenLessons,
         },
       ];
 
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
+
+  const totalFrozenLessons = placements.reduce(
+    (sum, place) => sum + Math.max(0, place.frozenLessons ?? 0),
+    0,
+  );
+  const displayedFrozenLessons =
+    totalFrozenLessons || Math.max(0, client.frozenLessons ?? 0);
 
   const deriveRemainingLessons = (
     value: number | string | undefined | null,
@@ -207,6 +215,7 @@ export default function ClientDetailsModal({
               <ClientInfoRow label="Возраст" value={client.birthDate ? `${calcAgeYears(client.birthDate)} лет` : "—"} />
               <ClientInfoRow label="Дата начала" value={client.startDate?.slice(0, 10) || "—"} />
               <ClientInfoRow label="Опыт" value={client.startDate ? calcExperience(client.startDate) : "—"} />
+              <ClientInfoRow label="Заморозка" value={String(displayedFrozenLessons)} />
             </div>
 
             <div className="space-y-2">
