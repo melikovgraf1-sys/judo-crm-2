@@ -18,6 +18,7 @@ import type {
   TaskItem,
 } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
+import { getClientPlacementDisplayStatus } from "./paymentStatus";
 
 type Props = {
   list: Client[];
@@ -26,6 +27,7 @@ type Props = {
   onEdit: (c: Client) => void;
   onRemove?: (id: string) => void;
   onCreateTask: (client: Client) => void;
+  onSetWaiting?: (client: Client) => void;
   openPaymentTasks?: Record<string, TaskItem | undefined>;
   onCompletePaymentTask?: (client: Client, task: TaskItem) => void;
   onRemovePaymentTask?: (client: Client, task: TaskItem) => void;
@@ -75,6 +77,7 @@ export default function ClientTable({
   onEdit,
   onRemove,
   onCreateTask,
+  onSetWaiting,
   openPaymentTasks,
   onCompletePaymentTask,
   onRemovePaymentTask,
@@ -114,11 +117,12 @@ export default function ClientTable({
   };
 
   const getDisplayPayStatus = (client: Client): string => {
+    const placementStatus = getClientPlacementDisplayStatus(client);
     if (!billingPeriod || billingPeriod.month == null) {
-      return client.payStatus;
+      return placementStatus;
     }
-    if (client.payStatus === "задолженность") {
-      return "задолженность";
+    if (placementStatus === "задолженность" || placementStatus === "ожидание") {
+      return placementStatus;
     }
     return isPaidInSelectedPeriod(client) ? "действует" : "ожидание";
   };
@@ -308,6 +312,10 @@ export default function ClientTable({
       label: "Факт оплаты",
       width: "minmax(130px, max-content)",
       renderCell: client => {
+        const placementStatus = getClientPlacementDisplayStatus(client);
+        if (placementStatus === "ожидание") {
+          return "—";
+        }
         const paid = isPaidInSelectedPeriod(client);
         if (billingPeriod?.month != null && !paid) {
           return "—";
@@ -315,6 +323,10 @@ export default function ClientTable({
         return client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—";
       },
       sortValue: client => {
+        const placementStatus = getClientPlacementDisplayStatus(client);
+        if (placementStatus === "ожидание") {
+          return 0;
+        }
         const paid = isPaidInSelectedPeriod(client);
         if (billingPeriod?.month != null && !paid) {
           return 0;
@@ -349,6 +361,8 @@ export default function ClientTable({
       renderCell: client => {
         const openTask = openPaymentTasks?.[client.id];
         const showReserveButton = Boolean(onReserve && !isReserveArea(client.area));
+        const canSetWaiting =
+          onSetWaiting && getClientPlacementDisplayStatus(client) !== "ожидание";
         return (
           <>
             {openTask && onCompletePaymentTask && (
@@ -371,6 +385,17 @@ export default function ClientTable({
                 className="px-2 py-1 text-xs rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:bg-slate-800 dark:hover:bg-slate-700"
               >
                 Удалить задачу
+              </button>
+            )}
+            {canSetWaiting && (
+              <button
+                onClick={event => {
+                  event.stopPropagation();
+                  onSetWaiting?.(client);
+                }}
+                className="px-2 py-1 text-xs rounded-md border border-amber-200 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+              >
+                ожидание
               </button>
             )}
             {!openTask && (
@@ -421,6 +446,7 @@ export default function ClientTable({
     onReserve,
     openPaymentTasks,
     remainingMap,
+    onSetWaiting,
   ]);
 
   const columnIds = useMemo(() => columns.map(column => column.id), [columns]);

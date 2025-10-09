@@ -335,6 +335,43 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
     }
   };
 
+  const moveClientToWaitingStatus = async (client: Client) => {
+    const normalizedPlacements = Array.isArray(client.placements)
+      ? client.placements
+      : [];
+    const updatedPlacements = normalizedPlacements.map(placement => ({
+      ...placement,
+      payStatus: "ожидание" as const,
+      payActual: undefined,
+    }));
+    const updatedClient: Client = {
+      ...client,
+      payStatus: "ожидание",
+      payActual: undefined,
+      placements: updatedPlacements,
+    };
+    const nextClients = db.clients.map(entry =>
+      entry.id === client.id ? updatedClient : entry,
+    );
+    const next = {
+      ...db,
+      clients: nextClients,
+      changelog: [
+        ...db.changelog,
+        {
+          id: uid(),
+          who: "UI",
+          what: `Статус оплаты клиента ${client.firstName} → ожидание`,
+          when: todayISO(),
+        },
+      ],
+    };
+    const result = await commitDBUpdate(next, setDB);
+    if (!result.ok && result.reason === "error") {
+      window.alert("Не удалось обновить статус оплаты. Проверьте доступ к базе данных.");
+    }
+  };
+
   const removeClient = async (id: string) => {
     if (!window.confirm("Удалить клиента?")) return;
     const next = {
@@ -525,6 +562,7 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
           onEdit={startEdit}
           onRemove={removeClient}
           onCreateTask={createPaymentTask}
+          onSetWaiting={moveClientToWaitingStatus}
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}
