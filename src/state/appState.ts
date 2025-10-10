@@ -564,40 +564,64 @@ function usePersistentState<T>(
   defaultValue: T,
   delay: number = 300,
 ): [T, Dispatch<SetStateAction<T>>] {
+  const hasWindow = typeof window !== "undefined";
+  const storageAvailable = hasWindow && typeof window.localStorage !== "undefined";
+
   const [state, setState] = useState<T>(() => {
+    if (!storageAvailable) {
+      return defaultValue;
+    }
     try {
-      const raw = localStorage.getItem(key);
+      const raw = window.localStorage.getItem(key);
       if (raw != null) {
         return JSON.parse(raw) as T;
       }
     } catch {}
-    localStorage.setItem(key, JSON.stringify(defaultValue));
+    try {
+      window.localStorage.setItem(key, JSON.stringify(defaultValue));
+    } catch {}
     return defaultValue;
   });
 
-  const timeoutRef = useRef<number | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const flush = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+  const clearScheduledTimeout = useCallback(() => {
+    if (!hasWindow) {
+      return;
+    }
+    if (timeoutRef.current != null) {
+      window.clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+  }, [hasWindow]);
+
+  const flush = useCallback(() => {
+    if (!storageAvailable) {
+      return;
+    }
+    clearScheduledTimeout();
     try {
-      localStorage.setItem(key, JSON.stringify(state));
+      window.localStorage.setItem(key, JSON.stringify(state));
     } catch {}
-  }, [key, state]);
+  }, [clearScheduledTimeout, key, state, storageAvailable]);
 
   useEffect(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (!storageAvailable || !hasWindow) {
+      return;
+    }
+
+    clearScheduledTimeout();
+
     timeoutRef.current = window.setTimeout(() => {
       try {
-        localStorage.setItem(key, JSON.stringify(state));
+        window.localStorage.setItem(key, JSON.stringify(state));
       } catch {}
     }, delay);
+
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      clearScheduledTimeout();
     };
-  }, [state, key, delay]);
+  }, [state, key, delay, storageAvailable, hasWindow, clearScheduledTimeout]);
 
   useEffect(() => {
     return () => {
