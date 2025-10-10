@@ -87,7 +87,7 @@ export function getEffectiveRemainingLessons(
 ): number | null {
   if (clientRequiresManualRemainingLessons(client)) {
     if (typeof client.remainingLessons === "number") {
-      return client.remainingLessons < 0 ? 0 : client.remainingLessons;
+      return client.remainingLessons;
     }
     return null;
   }

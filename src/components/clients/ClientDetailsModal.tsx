@@ -52,13 +52,13 @@ export default function ClientDetailsModal({
     value: number | string | undefined | null,
   ): number | null => {
     if (typeof value === "number" && Number.isFinite(value)) {
-      return value < 0 ? 0 : value;
+      return value;
     }
 
     if (typeof value === "string") {
       const parsed = Number.parseInt(value, 10);
       if (!Number.isNaN(parsed)) {
-        return parsed < 0 ? 0 : parsed;
+        return parsed;
       }
     }
 

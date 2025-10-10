@@ -384,7 +384,7 @@ export default function AttendanceTab({
     }
 
       const currentRemaining = target.remainingLessons ?? 0;
-      const nextRemaining = Math.max(0, currentRemaining + deltaRemaining);
+      const nextRemaining = currentRemaining + deltaRemaining;
       const remainingChanged = nextRemaining !== currentRemaining;
 
       if (!remainingChanged && !frozenChanged) {
