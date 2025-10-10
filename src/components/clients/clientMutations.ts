@@ -150,6 +150,26 @@ export function transformClientFormValues(
   const statusUpdatedAt = statusChanged ? todayISO() : editing?.statusUpdatedAt;
   const normalizedComment = comment.trim();
 
+  const previousPayHistory = Array.isArray(editing?.payHistory)
+    ? editing!.payHistory.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+    : [];
+
+  let nextPayHistory = previousPayHistory;
+
+  const primaryFormPlacement = placements[0];
+  const payActualProvided = Boolean(primaryFormPlacement?.payActual?.trim().length);
+  const payDateProvided = Boolean(primaryFormPlacement?.payDate?.trim().length);
+
+  if (primary.payStatus === "действует" && (payActualProvided || payDateProvided)) {
+    const parsedPayDate = parseDateInput(primaryFormPlacement?.payDate ?? "");
+    const fallbackDate = primary.payDate ?? todayISO();
+    const historyEntry = parsedPayDate || fallbackDate;
+
+    if (historyEntry && !nextPayHistory.includes(historyEntry)) {
+      nextPayHistory = [...nextPayHistory, historyEntry];
+    }
+  }
+
   return {
     ...base,
     area: primary.area,
@@ -171,6 +191,7 @@ export function transformClientFormValues(
     ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
     ...(normalizedComment ? { comment: normalizedComment } : {}),
     ...(statusUpdatedAt ? { statusUpdatedAt } : {}),
+    ...(nextPayHistory.length ? { payHistory: nextPayHistory } : {}),
     birthDate: parseDateInput(data.birthDate),
     startDate: parseDateInput(data.startDate),
   };
