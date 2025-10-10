@@ -1129,11 +1129,14 @@ export function useAppState(): AppState {
       placements: [primaryPlacement],
     } as Client;
     const next = { ...db, clients: [c, ...db.clients] };
-    if (await commitDBUpdate(next, setDB)) {
+    const result = await commitDBUpdate(next, setDB);
+    if (result.ok) {
       setQuickOpen(false);
       setUI(prev => ({ ...prev, pendingClientId: c.id }));
       navigate("/clients");
       push("Клиент создан", "success");
+    } else if (result.reason === "conflict") {
+      push(DB_CONFLICT_MESSAGE, "warning");
     } else {
       push("Не удалось сохранить клиента", "error");
     }
@@ -1160,9 +1163,12 @@ export function useAppState(): AppState {
       updatedAt: todayISO(),
     } as Lead;
     const next = { ...db, leads: [l, ...db.leads] };
-    if (await commitDBUpdate(next, setDB)) {
+    const result = await commitDBUpdate(next, setDB);
+    if (result.ok) {
       setQuickOpen(false);
       push("Лид создан", "success");
+    } else if (result.reason === "conflict") {
+      push(DB_CONFLICT_MESSAGE, "warning");
     } else {
       push("Не удалось сохранить лида", "error");
     }
@@ -1181,9 +1187,12 @@ export function useAppState(): AppState {
       group: db.settings.groups[0],
     } as TaskItem;
     const next = { ...db, tasks: [t, ...db.tasks], tasksArchive: db.tasksArchive };
-    if (await commitDBUpdate(next, setDB)) {
+    const result = await commitDBUpdate(next, setDB);
+    if (result.ok) {
       setQuickOpen(false);
       push("Задача создана", "success");
+    } else if (result.reason === "conflict") {
+      push(DB_CONFLICT_MESSAGE, "warning");
     } else {
       push("Не удалось сохранить задачу", "error");
     }
