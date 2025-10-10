@@ -305,6 +305,68 @@ test('update: edits client name', async () => {
   await waitFor(() => expect(screen.getByText(/^New/)).toBeInTheDocument());
 });
 
+test('update: editing payment keeps active status visible for selected month', async () => {
+  const db = makeDB();
+  db.clients = [
+    makeClient({
+      id: 'c-pay',
+      firstName: 'Оплатил',
+      payStatus: 'ожидание',
+      payActual: undefined,
+      payAmount: 60,
+      payDate: '2024-01-05T00:00:00.000Z',
+      payHistory: [],
+      phone: '12345',
+    }),
+  ];
+
+  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  const row = await screen.findByText('Оплатил');
+  const tableRow = row.closest('tr');
+  expect(tableRow).not.toBeNull();
+
+  await userEvent.click(row);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Редактировать' })).toBeInTheDocument());
+  await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
+
+  const modal = screen.getByText('Редактирование клиента').parentElement;
+  const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select');
+  const payDateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input');
+  const payActualInput = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input');
+
+  await userEvent.selectOptions(payStatusSelect, 'действует');
+  fireEvent.change(payDateInput, { target: { value: '2024-02-05' } });
+  await userEvent.clear(payActualInput);
+  await userEvent.type(payActualInput, '60');
+
+  const save = within(modal).getByRole('button', { name: 'Сохранить' });
+  await waitFor(() => expect(save).toBeEnabled());
+  await userEvent.click(save);
+
+  await waitFor(() => expect(getDB().clients[0].payStatus).toBe('действует'));
+  await waitFor(() => expect(getDB().clients[0].payHistory).toContain('2024-02-05T00:00:00.000Z'));
+  await waitFor(() => expect(getDB().clients[0].payActual).toBe(60));
+
+  const monthInput = screen.getByLabelText('Фильтр по месяцу');
+  fireEvent.change(monthInput, { target: { value: '2' } });
+
+  const columnSettingsButton = screen.getByRole('button', { name: 'Настроить столбцы' });
+  await userEvent.click(columnSettingsButton);
+  const factColumnCheckbox = screen.getByRole('checkbox', { name: 'Факт оплаты' });
+  if (!(factColumnCheckbox as HTMLInputElement).checked) {
+    await userEvent.click(factColumnCheckbox);
+  }
+  await userEvent.click(columnSettingsButton);
+
+  const updatedRow = await screen.findByText('Оплатил');
+  const updatedTableRow = updatedRow.closest('tr');
+  expect(updatedTableRow).not.toBeNull();
+
+  await waitFor(() => expect(within(updatedTableRow!).getByText('действует')).toBeInTheDocument());
+  await waitFor(() => expect(within(updatedTableRow!).getByText('60 EUR')).toBeInTheDocument());
+});
+
 test('update: moving client between groups clears manual-only fields', async () => {
   const db = makeDB();
   db.settings.groups.push('индивидуальные');
