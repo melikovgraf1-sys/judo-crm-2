@@ -680,6 +680,7 @@ export default function TasksTab({
           currencyRates={db.settings.currencyRates}
           attendance={attendance}
           performance={performance}
+          billingPeriod={undefined}
           onClose={() => setViewClientId(null)}
         />
       )}

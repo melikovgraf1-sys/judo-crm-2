@@ -623,6 +623,7 @@ export default function ClientTable({
           currencyRates={currencyRates}
           attendance={attendance}
           performance={performance}
+          billingPeriod={billingPeriod}
           onEdit={onEdit}
           onRemove={onRemove}
           onClose={() => setSelectedId(null)}
