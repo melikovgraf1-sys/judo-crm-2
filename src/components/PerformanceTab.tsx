@@ -450,6 +450,7 @@ export default function PerformanceTab({
           currencyRates={db.settings.currencyRates}
           attendance={db.attendance}
           performance={db.performance}
+          billingPeriod={undefined}
           onEdit={startEdit}
           onClose={() => setSelected(null)}
         />

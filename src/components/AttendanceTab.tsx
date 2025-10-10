@@ -852,6 +852,7 @@ export default function AttendanceTab({
           currencyRates={db.settings.currencyRates}
           attendance={db.attendance}
           performance={db.performance}
+          billingPeriod={undefined}
           onEdit={startEdit}
           onClose={() => setSelected(null)}
         />

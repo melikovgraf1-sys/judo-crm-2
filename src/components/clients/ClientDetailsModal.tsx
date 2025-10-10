@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import * as utils from "../../state/utils";
 import { getSubscriptionPlanMeta } from "../../state/payments";
+import { matchesPeriod, type PeriodFilter } from "../../state/period";
 import {
   estimateGroupRemainingLessonsByParams,
   getEffectiveRemainingLessons,
@@ -19,6 +20,7 @@ interface Props {
   schedule?: ScheduleSlotType[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
+  billingPeriod?: PeriodFilter;
   onClose: () => void;
   onEdit?: (client: Client) => void;
   onRemove?: (id: string) => void;
@@ -31,13 +33,41 @@ export default function ClientDetailsModal({
   schedule: scheduleProp = [],
   attendance,
   performance,
+  billingPeriod,
   onClose,
   onEdit,
   onRemove,
 }: Props) {
   const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
   const placements = getClientPlacementsWithFallback(client);
-  const hasWaitingStatus = getClientPlacementDisplayStatus(client) === "ожидание";
+  const payHistory = useMemo(
+    () => (Array.isArray(client.payHistory) ? client.payHistory : []),
+    [client.payHistory],
+  );
+
+  const paidInSelectedPeriod = useMemo(() => {
+    if (!billingPeriod || billingPeriod.month == null) {
+      return client.payStatus === "действует";
+    }
+
+    return payHistory.some(entry => matchesPeriod(entry, billingPeriod));
+  }, [billingPeriod, client.payStatus, payHistory]);
+
+  const displayPayStatus = useMemo(() => {
+    const placementStatus = getClientPlacementDisplayStatus(client);
+
+    if (!billingPeriod || billingPeriod.month == null) {
+      return placementStatus;
+    }
+
+    if (placementStatus === "задолженность" || placementStatus === "ожидание") {
+      return placementStatus;
+    }
+
+    return paidInSelectedPeriod ? "действует" : "ожидание";
+  }, [billingPeriod, client, paidInSelectedPeriod]);
+
+  const hasWaitingStatus = displayPayStatus === "ожидание";
 
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
 
@@ -145,13 +175,16 @@ export default function ClientDetailsModal({
             <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {placementsSummary}
             </div>
-            {(client.payMethod || client.status) && (
+            {(client.payMethod || client.status || displayPayStatus) && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {client.payMethod ? (
                   <ClientBadge label="Способ оплаты" value={client.payMethod} />
                 ) : null}
                 {client.status ? (
                   <ClientBadge label="Статус клиента" value={client.status} />
+                ) : null}
+                {displayPayStatus ? (
+                  <ClientBadge label="Статус оплаты" value={displayPayStatus} />
                 ) : null}
               </div>
             )}
@@ -223,7 +256,7 @@ export default function ClientDetailsModal({
                         {place.area} · {place.group}
                       </div>
                       <dl className="mt-3 grid gap-1 text-slate-600 dark:text-slate-300">
-                        <ClientPlacementInfoCell label="Статус оплаты" value={place.payStatus ?? "—"} />
+                        <ClientPlacementInfoCell label="Статус оплаты" value={displayPayStatus || "—"} />
                         <ClientPlacementInfoCell label="Форма абонемента" value={planLabel} />
                         <ClientPlacementInfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
                         <ClientPlacementInfoCell
@@ -237,7 +270,7 @@ export default function ClientDetailsModal({
                         <ClientPlacementInfoCell
                           label="Факт оплаты"
                           value={
-                            hasWaitingStatus
+                            hasWaitingStatus || (billingPeriod?.month != null && !paidInSelectedPeriod)
                               ? "—"
                               : place.payActual != null
                               ? fmtMoney(place.payActual, currency, currencyRates)
