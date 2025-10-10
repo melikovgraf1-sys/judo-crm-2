@@ -88,7 +88,7 @@ export function resolvePaymentCompletion({
 
   if (requiresManualRemainingLessons(targetPlacement.group)) {
     const currentRemaining = targetPlacement.remainingLessons ?? client.remainingLessons ?? 0;
-    nextRemainingLessons = Math.max(0, currentRemaining + manualLessonsIncrement);
+    nextRemainingLessons = currentRemaining + manualLessonsIncrement;
     const baseDate = completionDate ?? currentPayDate ?? startDate ?? new Date();
     const manualDue = calculateManualPayDate(
       targetPlacement.area ?? client.area,

@@ -89,6 +89,25 @@ describe("transformClientFormValues", () => {
     });
   });
 
+  it("preserves negative remaining lessons for manual groups", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      placements: [
+        {
+          ...basePlacement(),
+          id: "pl-debt",
+          group: "индивидуальные",
+          remainingLessons: "-3",
+        },
+      ],
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result.remainingLessons).toBe(-3);
+    expect(result.placements[0].remainingLessons).toBe(-3);
+  });
+
   it("allows manual remaining lessons for single visit plan", () => {
     const data: ClientFormValues = {
       ...baseFormValues,

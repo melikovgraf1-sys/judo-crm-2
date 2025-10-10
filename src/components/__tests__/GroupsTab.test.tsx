@@ -656,7 +656,7 @@ test('individual group allows custom payment amount', async () => {
   fireEvent.change(birthDate, { target: { value: '2010-01-01' } });
   fireEvent.change(startDate, { target: { value: '2024-01-01' } });
 
-  await waitFor(() => expect(payAmount).toHaveValue(125));
+  await waitFor(() => expect(payAmount).toHaveValue(130));
   await userEvent.clear(payAmount);
   await userEvent.type(payAmount, '200');
 

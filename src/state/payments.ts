@@ -50,7 +50,7 @@ export function shouldAllowCustomPayAmount(group: string): boolean {
 
 export function getDefaultPayAmount(group: string): number | null {
   if (isIndividualGroup(group)) {
-    return 125;
+    return 130;
   }
   if (isAdultGroup(group)) {
     return null;
