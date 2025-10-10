@@ -583,7 +583,7 @@ function usePersistentState<T>(
     return defaultValue;
   });
 
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<number | null>(null);
 
   const clearScheduledTimeout = useCallback(() => {
     if (!hasWindow) {
