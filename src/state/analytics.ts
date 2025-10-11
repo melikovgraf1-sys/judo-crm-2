@@ -1,7 +1,7 @@
 import { getDefaultPayAmount } from "./payments";
 import { convertMoney } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
-import type { Area, Client, Currency, DB, Lead, LeadLifecycleEvent } from "../types";
+import type { Area, Client, Currency, DB, Group, Lead, LeadLifecycleEvent } from "../types";
 
 const CANCELED_STATUSES = new Set(["отмена", "отменен", "отменён", "cancelled"]);
 
@@ -47,17 +47,20 @@ export type AnalyticsFavorite =
   | {
       kind: "metric";
       area: AreaScope;
+      group: Group | null;
       metric: MetricKey;
       projection: ProjectionKey;
     }
   | {
       kind: "athlete";
       area: AreaScope;
+      group: Group | null;
       metric: AthleteMetricKey;
     }
   | {
       kind: "lead";
       area: AreaScope;
+      group: Group | null;
       metric: LeadMetricKey;
     };
 
@@ -115,6 +118,7 @@ export const LEAD_METRIC_LABELS: Record<LeadMetricKey, string> = {
 
 export type AnalyticsSnapshot = {
   area: AreaScope;
+  group: Group | null;
   metrics: Record<MetricKey, MetricSnapshot>;
   capacity: number;
   rent: number;
@@ -125,13 +129,23 @@ export type AnalyticsSnapshot = {
 
 export function encodeFavorite(favorite: AnalyticsFavorite): string {
   const areaPart = favorite.area === "all" ? "*" : encodeURIComponent(favorite.area);
+  const groupPart = favorite.group ? encodeURIComponent(favorite.group) : "*";
   switch (favorite.kind) {
     case "metric":
-      return [areaPart, favorite.metric, favorite.projection].join(FAVORITE_SEPARATOR);
+      if (!favorite.group) {
+        return [areaPart, favorite.metric, favorite.projection].join(FAVORITE_SEPARATOR);
+      }
+      return ["metric", areaPart, groupPart, favorite.metric, favorite.projection].join(FAVORITE_SEPARATOR);
     case "athlete":
-      return ["athlete", areaPart, favorite.metric].join(FAVORITE_SEPARATOR);
+      if (!favorite.group) {
+        return ["athlete", areaPart, favorite.metric].join(FAVORITE_SEPARATOR);
+      }
+      return ["athlete", areaPart, groupPart, favorite.metric].join(FAVORITE_SEPARATOR);
     case "lead":
-      return ["lead", areaPart, favorite.metric].join(FAVORITE_SEPARATOR);
+      if (!favorite.group) {
+        return ["lead", areaPart, favorite.metric].join(FAVORITE_SEPARATOR);
+      }
+      return ["lead", areaPart, groupPart, favorite.metric].join(FAVORITE_SEPARATOR);
     default: {
       const exhaustiveCheck: never = favorite;
       return exhaustiveCheck;
@@ -144,29 +158,62 @@ export function decodeFavorite(id: string): AnalyticsFavorite | null {
   if (!parts.length) {
     return null;
   }
-  if (parts[0] === "metric" && parts.length === 4) {
+  if (parts[0] === "metric" && (parts.length === 5 || parts.length === 4)) {
+    if (parts.length === 5) {
+      const [, areaPart, groupPart, metric, projection] = parts as [
+        "metric",
+        string,
+        string,
+        MetricKey,
+        ProjectionKey,
+      ];
+      if (!METRIC_LABELS[metric] || !PROJECTION_LABELS[projection]) {
+        return null;
+      }
+      const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+      const group = groupPart === "*" ? null : (decodeURIComponent(groupPart) as Group);
+      return { kind: "metric", area, group, metric, projection };
+    }
     const [, areaPart, metric, projection] = parts as ["metric", string, MetricKey, ProjectionKey];
     if (!METRIC_LABELS[metric] || !PROJECTION_LABELS[projection]) {
       return null;
     }
     const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
-    return { kind: "metric", area, metric, projection };
+    return { kind: "metric", area, group: null, metric, projection };
   }
-  if (parts[0] === "athlete" && parts.length === 3) {
+  if (parts[0] === "athlete" && (parts.length === 4 || parts.length === 3)) {
+    if (parts.length === 4) {
+      const [, areaPart, groupPart, metric] = parts as ["athlete", string, string, AthleteMetricKey];
+      if (!ATHLETE_METRIC_LABELS[metric]) {
+        return null;
+      }
+      const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+      const group = groupPart === "*" ? null : (decodeURIComponent(groupPart) as Group);
+      return { kind: "athlete", area, group, metric };
+    }
     const [, areaPart, metric] = parts as ["athlete", string, AthleteMetricKey];
     if (!ATHLETE_METRIC_LABELS[metric]) {
       return null;
     }
     const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
-    return { kind: "athlete", area, metric };
+    return { kind: "athlete", area, group: null, metric };
   }
-  if (parts[0] === "lead" && parts.length === 3) {
+  if (parts[0] === "lead" && (parts.length === 4 || parts.length === 3)) {
+    if (parts.length === 4) {
+      const [, areaPart, groupPart, metric] = parts as ["lead", string, string, LeadMetricKey];
+      if (!LEAD_METRIC_LABELS[metric]) {
+        return null;
+      }
+      const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
+      const group = groupPart === "*" ? null : (decodeURIComponent(groupPart) as Group);
+      return { kind: "lead", area, group, metric };
+    }
     const [, areaPart, metric] = parts as ["lead", string, LeadMetricKey];
     if (!LEAD_METRIC_LABELS[metric]) {
       return null;
     }
     const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
-    return { kind: "lead", area, metric };
+    return { kind: "lead", area, group: null, metric };
   }
   if (parts.length === 3) {
     const [areaPart, metric, projection] = parts as [string, MetricKey, ProjectionKey];
@@ -174,7 +221,7 @@ export function decodeFavorite(id: string): AnalyticsFavorite | null {
       return null;
     }
     const area = areaPart === "*" ? "all" : (decodeURIComponent(areaPart) as Area);
-    return { kind: "metric", area, metric, projection };
+    return { kind: "metric", area, group: null, metric, projection };
   }
   return null;
 }
@@ -265,12 +312,25 @@ function maxRevenueForArea(db: DB, area: Area): number {
   }, 0);
 }
 
+function maxRevenueForGroup(db: DB, area: Area, group: string): number {
+  const limit = groupLimit(db, area, group);
+  if (!limit) {
+    return 0;
+  }
+  const price = deriveGroupPrice(db, group);
+  return price * limit;
+}
+
 function rentForAreas(db: DB, areas: Area[]): number {
   return areas.reduce((sum, area) => sum + ensureNumber(db.settings.rentByAreaEUR?.[area] ?? 0), 0);
 }
 
 function coachSalaryForAreas(db: DB, areas: Area[]): number {
   return areas.reduce((sum, area) => sum + ensureNumber(db.settings.coachSalaryByAreaEUR?.[area] ?? 0), 0);
+}
+
+export function getAnalyticsGroups(db: DB, area: Area): Group[] {
+  return groupsForArea(db, area).sort((a, b) => a.localeCompare(b));
 }
 
 export function getAnalyticsAreas(db: DB): AreaScope[] {
@@ -280,7 +340,12 @@ export function getAnalyticsAreas(db: DB): AreaScope[] {
   return ["all", ...Array.from(unique)];
 }
 
-export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: PeriodFilter): AnalyticsSnapshot {
+export function computeAnalyticsSnapshot(
+  db: DB,
+  area: AreaScope,
+  period?: PeriodFilter,
+  group?: Group | null,
+): AnalyticsSnapshot {
   const activeAreas = collectActiveAreas(db);
   const relevantAreas = area === "all" ? activeAreas : activeAreas.includes(area) ? [area] : [];
   if (!relevantAreas.length && area !== "all") {
@@ -288,9 +353,14 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
   }
 
   const relevantAreaSet = new Set(relevantAreas);
+  const scopedGroup = area === "all" ? null : group ?? null;
+  const hasGroupScope = area !== "all" && typeof scopedGroup === "string" && scopedGroup.length > 0;
   const periodClients = db.clients.filter(client => {
     const inScope = area === "all" ? relevantAreaSet.has(client.area) : client.area === area;
     if (!inScope) {
+      return false;
+    }
+    if (hasGroupScope && client.group !== scopedGroup) {
       return false;
     }
     if (!period) {
@@ -301,13 +371,17 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
   const rosterClients = periodClients.filter(client => !isCanceledStatus(client.status));
   const actualClients = rosterClients.filter(client => client.payStatus === "действует");
 
-  const capacity = relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
+  const capacity = hasGroupScope
+    ? groupLimit(db, area as Area, scopedGroup as string)
+    : relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
   const rent = rentForAreas(db, relevantAreas);
   const coachSalary = coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce((sum, client) => sum + getClientActualAmount(client), 0);
   const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientForecastAmount(client), 0);
-  const maxRevenue = relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
+  const maxRevenue = hasGroupScope
+    ? maxRevenueForGroup(db, area as Area, scopedGroup as string)
+    : relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
 
   const totalExpenses = rent + coachSalary;
 
@@ -382,6 +456,45 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
   };
 
   const leadHistoryEntries = ensureLeadHistoryEntries(db.leadHistory);
+  const leadsById = new Map<string, Lead>();
+  db.leads.forEach(lead => {
+    leadsById.set(lead.id, lead);
+  });
+  db.leadsArchive.forEach(lead => {
+    leadsById.set(lead.id, lead);
+  });
+
+  const matchesLeadScope = (leadArea?: Area | null, leadGroup?: Group | null): boolean => {
+    if (area === "all") {
+      return true;
+    }
+    if (leadArea !== area) {
+      return false;
+    }
+    if (!hasGroupScope) {
+      return true;
+    }
+    return leadGroup === scopedGroup;
+  };
+
+  const matchesLeadScopeById = (leadId: string): boolean => {
+    const lead = leadsById.get(leadId);
+    if (!lead) {
+      return area === "all";
+    }
+    return matchesLeadScope(lead.area ?? null, lead.group ?? null);
+  };
+
+  const scopedHistoryEntries = leadHistoryEntries.filter(entry => {
+    if (matchesLeadScope(entry.area ?? null, entry.group ?? null)) {
+      return true;
+    }
+    if (entry.area || entry.group) {
+      return false;
+    }
+    return matchesLeadScopeById(entry.leadId);
+  });
+
   const creationMap = new Map<string, string>();
   const pushCreation = (leadId: string, value?: string | null) => {
     if (!leadId || !value || creationMap.has(leadId)) {
@@ -390,11 +503,17 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     creationMap.set(leadId, value);
   };
   const pushLead = (lead: Lead) => {
+    if (!matchesLeadScope(lead.area ?? null, lead.group ?? null)) {
+      return;
+    }
     pushCreation(lead.id, lead.createdAt ?? lead.updatedAt ?? null);
   };
   db.leads.forEach(pushLead);
   db.leadsArchive.forEach(pushLead);
-  leadHistoryEntries.forEach(entry => {
+  scopedHistoryEntries.forEach(entry => {
+    if (!matchesLeadScope(entry.area ?? null, entry.group ?? null) && !matchesLeadScopeById(entry.leadId)) {
+      return;
+    }
     pushCreation(entry.leadId, entry.createdAt ?? entry.resolvedAt);
   });
 
@@ -403,16 +522,21 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     : creationMap.size;
 
   const resolvedInPeriod = period
-    ? leadHistoryEntries.filter(entry => matchesPeriod(entry.resolvedAt, period))
-    : leadHistoryEntries;
+    ? scopedHistoryEntries.filter(entry => matchesPeriod(entry.resolvedAt, period))
+    : scopedHistoryEntries;
   const convertedCount = resolvedInPeriod.filter(entry => entry.outcome === "converted").length;
   let canceledCount = resolvedInPeriod.filter(entry => entry.outcome === "canceled").length;
 
-  const historyLeadIds = new Set(leadHistoryEntries.map(entry => entry.leadId));
+  const historyLeadIds = new Set(scopedHistoryEntries.map(entry => entry.leadId));
   const legacyCanceled = period
-    ? db.leadsArchive.filter(lead => !historyLeadIds.has(lead.id) && matchesPeriod(lead.updatedAt ?? lead.createdAt, period))
-        .length
-    : db.leadsArchive.filter(lead => !historyLeadIds.has(lead.id)).length;
+    ? db.leadsArchive.filter(
+        lead =>
+          !historyLeadIds.has(lead.id) &&
+          matchesLeadScope(lead.area ?? null, lead.group ?? null) &&
+          matchesPeriod(lead.updatedAt ?? lead.createdAt, period),
+      ).length
+    : db.leadsArchive.filter(lead => !historyLeadIds.has(lead.id) && matchesLeadScope(lead.area ?? null, lead.group ?? null))
+        .length;
   canceledCount += legacyCanceled;
 
   const leadStats: LeadStats = {
@@ -421,7 +545,7 @@ export function computeAnalyticsSnapshot(db: DB, area: AreaScope, period?: Perio
     canceled: canceledCount,
   };
 
-  return { area, metrics, capacity, rent, coachSalary, athleteStats, leadStats };
+  return { area, group: hasGroupScope ? (scopedGroup as Group) : null, metrics, capacity, rent, coachSalary, athleteStats, leadStats };
 }
 
 export type FavoriteSummary = {
@@ -518,8 +642,9 @@ export function buildFavoriteSummaries(db: DB, currency: Currency, period?: Peri
     if (!decoded) {
       continue;
     }
-    const snapshot = computeAnalyticsSnapshot(db, decoded.area, period);
+    const snapshot = computeAnalyticsSnapshot(db, decoded.area, period, decoded.group ?? null);
     const areaLabel = decoded.area === "all" ? "Все районы" : decoded.area;
+    const scopeLabel = decoded.area === "all" || !decoded.group ? areaLabel : `${areaLabel} · ${decoded.group}`;
     if (decoded.kind === "metric") {
       const metric = snapshot.metrics[decoded.metric];
       if (!metric) {
@@ -527,19 +652,19 @@ export function buildFavoriteSummaries(db: DB, currency: Currency, period?: Peri
       }
       const value = metric.values[decoded.projection];
       const formatted = formatMetricValue(value, metric.unit, currency, rates);
-      const title = `${PROJECTION_LABELS[decoded.projection]} · ${METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
+      const title = `${PROJECTION_LABELS[decoded.projection]} · ${METRIC_LABELS[decoded.metric]} — ${scopeLabel}`;
       summaries.push({ id, title, value: formatted, accent: METRIC_ACCENTS[decoded.metric] });
       continue;
     }
     if (decoded.kind === "athlete") {
       const formatted = formatAthleteMetricValue(decoded.metric, snapshot.athleteStats);
-      const title = `Спортсмены · ${ATHLETE_METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
+      const title = `Спортсмены · ${ATHLETE_METRIC_LABELS[decoded.metric]} — ${scopeLabel}`;
       summaries.push({ id, title, value: formatted, accent: ATHLETE_METRIC_ACCENTS[decoded.metric] });
       continue;
     }
     if (decoded.kind === "lead") {
       const formatted = formatLeadMetricValue(decoded.metric, snapshot.leadStats);
-      const title = `Лиды · ${LEAD_METRIC_LABELS[decoded.metric]} — ${areaLabel}`;
+      const title = `Лиды · ${LEAD_METRIC_LABELS[decoded.metric]} — ${scopeLabel}`;
       summaries.push({ id, title, value: formatted, accent: LEAD_METRIC_ACCENTS[decoded.metric] });
     }
   }
