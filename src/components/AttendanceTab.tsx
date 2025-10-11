@@ -314,17 +314,8 @@ export default function AttendanceTab({
 
   const selectedDateISO = useMemo(() => toMiddayISO(selectedDate), [selectedDate]);
   const selectedDateLabel = useMemo(() => (selectedDateISO ? fmtDate(selectedDateISO) : ""), [selectedDateISO]);
-  const cycleMark = useCallback(async (clientId: string) => {
-    if (!selectedDate) {
-      window.alert("Выберите дату для отметки посещаемости.");
-      return;
-    }
-    const mark = marksForSelectedDate.get(clientId);
-    const client = db.clients.find(c => c.id === clientId);
-    if (!client) return;
-    const manual = clientRequiresManualRemainingLessons(client);
-
-    const adjustClient = (target: Client, deltaRemaining: number, deltaFrozen: number): Client => {
+  const adjustAttendanceClient = useCallback(
+    (target: Client, manual: boolean, deltaRemaining: number, deltaFrozen: number): Client => {
       if (!deltaRemaining && !deltaFrozen) {
         return target;
       }
@@ -333,55 +324,55 @@ export default function AttendanceTab({
       const nextFrozen = Math.max(0, currentFrozen + deltaFrozen);
       const frozenChanged = nextFrozen !== currentFrozen;
 
-    if (!manual) {
-      if (!frozenChanged) {
-        return target;
-      }
+      if (!manual) {
+        if (!frozenChanged) {
+          return target;
+        }
 
-      const referenceISO = selectedDateISO ?? todayISO();
-      const referenceDate = new Date(referenceISO);
+        const referenceISO = selectedDateISO ?? todayISO();
+        const referenceDate = new Date(referenceISO);
 
-      const scheduledLessonsRemaining = estimateGroupRemainingLessonsByParams(
-        target.area,
-        target.group,
-        target.payDate,
-        db.schedule,
-        referenceDate,
-      );
+        const scheduledLessonsRemaining = estimateGroupRemainingLessonsByParams(
+          target.area,
+          target.group,
+          target.payDate,
+          db.schedule,
+          referenceDate,
+        );
 
-      const activeLessonsRemaining =
-        scheduledLessonsRemaining != null ? Math.max(0, scheduledLessonsRemaining - currentFrozen) : null;
+        const activeLessonsRemaining =
+          scheduledLessonsRemaining != null ? Math.max(0, scheduledLessonsRemaining - currentFrozen) : null;
 
-      const totalLessonsToCover = activeLessonsRemaining != null ? activeLessonsRemaining + nextFrozen : null;
+        const totalLessonsToCover = activeLessonsRemaining != null ? activeLessonsRemaining + nextFrozen : null;
 
-      const dueDate =
-        totalLessonsToCover != null
-          ? calculateManualPayDate(target.area, target.group, totalLessonsToCover, db.schedule, referenceDate)
-          : null;
+        const dueDate =
+          totalLessonsToCover != null
+            ? calculateManualPayDate(target.area, target.group, totalLessonsToCover, db.schedule, referenceDate)
+            : null;
 
-      const dueISO = dueDate?.toISOString();
+        const dueISO = dueDate?.toISOString();
 
-      const updated: Client = {
-        ...target,
-        frozenLessons: nextFrozen,
-        ...(dueISO ? { payDate: dueISO } : {}),
-      };
+        const updated: Client = {
+          ...target,
+          frozenLessons: nextFrozen,
+          ...(dueISO ? { payDate: dueISO } : {}),
+        };
 
-      if (Array.isArray(target.placements) && target.placements.length) {
-        updated.placements = target.placements.map(place => {
-          if (place.area === target.area && place.group === target.group) {
-            const nextPlace = { ...place, frozenLessons: nextFrozen };
-            if (dueISO) {
-              nextPlace.payDate = dueISO;
+        if (Array.isArray(target.placements) && target.placements.length) {
+          updated.placements = target.placements.map(place => {
+            if (place.area === target.area && place.group === target.group) {
+              const nextPlace = { ...place, frozenLessons: nextFrozen };
+              if (dueISO) {
+                nextPlace.payDate = dueISO;
+              }
+              return nextPlace;
             }
-            return nextPlace;
-          }
-          return place;
-        });
-      }
+            return place;
+          });
+        }
 
-      return updated;
-    }
+        return updated;
+      }
 
       const currentRemaining = target.remainingLessons ?? 0;
       const nextRemaining = currentRemaining + deltaRemaining;
@@ -430,75 +421,174 @@ export default function AttendanceTab({
       }
 
       return updated;
-    };
+    },
+    [db.schedule, selectedDateISO],
+  );
 
-    const applyClientAdjustments = (deltaRemaining: number, deltaFrozen: number) =>
-      db.clients.map(c => (c.id === clientId ? adjustClient(c, deltaRemaining, deltaFrozen) : c));
+  const cycleMark = useCallback(
+    async (clientId: string) => {
+      if (!selectedDate) {
+        window.alert("Выберите дату для отметки посещаемости.");
+        return;
+      }
+      const mark = marksForSelectedDate.get(clientId);
+      const client = db.clients.find(c => c.id === clientId);
+      if (!client) return;
+      const manual = clientRequiresManualRemainingLessons(client);
+
+      const applyClientAdjustments = (deltaRemaining: number, deltaFrozen: number) =>
+        db.clients.map(c =>
+          c.id === clientId ? adjustAttendanceClient(c, manual, deltaRemaining, deltaFrozen) : c,
+        );
+
+      const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
+
+      if (!mark) {
+        const entry: AttendanceEntry = { id: uid(), clientId, date: desiredDate, came: true, status: "came" };
+        const nextClients = applyClientAdjustments(manual ? -1 : 0, 0);
+        const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
+        const result = await commitDBUpdate(next, setDB);
+        if (!result.ok && result.reason === "error") {
+          window.alert(
+            "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
+      }
+
+      const currentStatus = mark.status ?? (mark.came ? "came" : "absent");
+
+      if (currentStatus === "came") {
+        const updated: AttendanceEntry = { ...mark, came: false, status: "absent" };
+        const nextClients = applyClientAdjustments(manual ? 1 : 0, 0);
+        const next = {
+          ...db,
+          attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
+          clients: nextClients,
+        };
+        const result = await commitDBUpdate(next, setDB);
+        if (!result.ok && result.reason === "error") {
+          window.alert(
+            "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
+      }
+
+      if (currentStatus === "absent") {
+        const updated: AttendanceEntry = { ...mark, came: false, status: "frozen" };
+        const nextClients = applyClientAdjustments(0, 1);
+        const next = {
+          ...db,
+          attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
+          clients: nextClients,
+        };
+        const result = await commitDBUpdate(next, setDB);
+        if (!result.ok && result.reason === "error") {
+          window.alert(
+            "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+          );
+        }
+        return;
+      }
+
+      const nextClients = applyClientAdjustments(0, -1);
+      const next = {
+        ...db,
+        attendance: db.attendance.filter(entry => entry.id !== mark.id),
+        clients: nextClients,
+      };
+      const result = await commitDBUpdate(next, setDB);
+      if (!result.ok && result.reason === "error") {
+        window.alert(
+          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        );
+      }
+    },
+    [adjustAttendanceClient, db, marksForSelectedDate, selectedDate, setDB],
+  );
+
+  const markAllAsCame = useCallback(async () => {
+    if (!area || !group) {
+      window.alert("Выберите район и группу для массовой отметки.");
+      return;
+    }
+
+    if (!selectedDate) {
+      window.alert("Выберите дату для отметки посещаемости.");
+      return;
+    }
+
+    if (!list.length) {
+      return;
+    }
 
     const desiredDate = toMiddayISO(selectedDate) ?? new Date().toISOString();
 
-    if (!mark) {
-      const entry: AttendanceEntry = { id: uid(), clientId, date: desiredDate, came: true, status: "came" };
-      const nextClients = applyClientAdjustments(manual ? -1 : 0, 0);
-      const next = { ...db, attendance: [entry, ...db.attendance], clients: nextClients };
-      const result = await commitDBUpdate(next, setDB);
-      if (!result.ok && result.reason === "error") {
-        window.alert(
-          "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
+    const newEntries: AttendanceEntry[] = [];
+    const attendanceUpdates = new Map<string, AttendanceEntry>();
+    const clientAdjustments = new Map<string, { manual: boolean; deltaRemaining: number; deltaFrozen: number }>();
+    let changed = false;
+
+    for (const client of list) {
+      const mark = marksForSelectedDate.get(client.id);
+      const manual = clientRequiresManualRemainingLessons(client);
+
+      if (!mark) {
+        const entry: AttendanceEntry = {
+          id: uid(),
+          clientId: client.id,
+          date: desiredDate,
+          came: true,
+          status: "came",
+        };
+        newEntries.push(entry);
+        clientAdjustments.set(client.id, { manual, deltaRemaining: manual ? -1 : 0, deltaFrozen: 0 });
+        changed = true;
+        continue;
       }
+
+      const currentStatus = mark.status ?? (mark.came ? "came" : "absent");
+      if (currentStatus === "came") {
+        continue;
+      }
+
+      const deltaFrozen = currentStatus === "frozen" ? -1 : 0;
+      const deltaRemaining = manual ? -1 : 0;
+      attendanceUpdates.set(mark.id, { ...mark, came: true, status: "came" });
+      clientAdjustments.set(client.id, { manual, deltaRemaining, deltaFrozen });
+      changed = true;
+    }
+
+    if (!changed) {
       return;
     }
 
-    const currentStatus = mark.status ?? (mark.came ? "came" : "absent");
+    const updatedAttendance = db.attendance.map(entry => attendanceUpdates.get(entry.id) ?? entry);
+    const nextAttendance = newEntries.length ? [...newEntries, ...updatedAttendance] : updatedAttendance;
 
-    if (currentStatus === "came") {
-      const updated: AttendanceEntry = { ...mark, came: false, status: "absent" };
-      const nextClients = applyClientAdjustments(manual ? 1 : 0, 0);
-      const next = {
-        ...db,
-        attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
-        clients: nextClients,
-      };
-      const result = await commitDBUpdate(next, setDB);
-      if (!result.ok && result.reason === "error") {
-        window.alert(
-          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
+    const nextClients = db.clients.map(client => {
+      const adjustment = clientAdjustments.get(client.id);
+      if (!adjustment) {
+        return client;
       }
-      return;
-    }
+      const { manual, deltaRemaining, deltaFrozen } = adjustment;
+      return adjustAttendanceClient(client, manual, deltaRemaining, deltaFrozen);
+    });
 
-    if (currentStatus === "absent") {
-      const updated: AttendanceEntry = { ...mark, came: false, status: "frozen" };
-      const nextClients = applyClientAdjustments(0, 1);
-      const next = {
-        ...db,
-        attendance: db.attendance.map(entry => (entry.id === mark.id ? updated : entry)),
-        clients: nextClients,
-      };
-      const result = await commitDBUpdate(next, setDB);
-      if (!result.ok && result.reason === "error") {
-        window.alert(
-          "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
-        );
-      }
-      return;
-    }
-
-    const nextClients = applyClientAdjustments(0, -1);
     const next = {
       ...db,
-      attendance: db.attendance.filter(entry => entry.id !== mark.id),
+      attendance: nextAttendance,
       clients: nextClients,
     };
+
     const result = await commitDBUpdate(next, setDB);
     if (!result.ok && result.reason === "error") {
       window.alert(
-        "Не удалось обновить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
+        "Не удалось сохранить отметку посещаемости. Изменение сохранено локально, проверьте доступ к базе данных.",
       );
     }
-  }, [db, marksForSelectedDate, selectedDate, selectedDateISO, setDB]);
+  }, [adjustAttendanceClient, area, db, group, list, marksForSelectedDate, selectedDate, setDB]);
 
   const columns: ColumnConfig[] = useMemo(() => {
     return [
@@ -584,6 +674,17 @@ export default function AttendanceTab({
       },
     ];
   }, [cycleMark, marksForSelectedDate, selectedDateLabel]);
+
+  const hasMarkableClients = useMemo(() => {
+    if (!list.length) {
+      return false;
+    }
+    return list.some(client => {
+      const mark = marksForSelectedDate.get(client.id);
+      const status = mark?.status ?? (mark ? (mark.came ? "came" : "absent") : null);
+      return status !== "came";
+    });
+  }, [list, marksForSelectedDate]);
 
   const columnIds = useMemo(() => columns.map(column => column.id), [columns]);
   const { visibleColumns, setVisibleColumns, sort, setSort } = usePersistentTableSettings(
@@ -682,6 +783,14 @@ export default function AttendanceTab({
         <div className="text-xs text-slate-500">Сегодня: {fmtDate(new Date().toISOString())}</div>
         <div className="text-xs text-slate-500">Отмечаем: {selectedDateLabel || "—"}</div>
         <div className="grow" />
+        <button
+          type="button"
+          onClick={markAllAsCame}
+          className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!area || !group || !selectedDate || !list.length || !hasMarkableClients}
+        >
+          Добавить всех
+        </button>
         <ColumnSettings
           options={columns.map(column => ({ id: column.id, label: column.label }))}
           value={visibleColumns}
