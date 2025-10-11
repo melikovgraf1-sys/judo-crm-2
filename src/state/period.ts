@@ -1,5 +1,6 @@
 import { todayISO } from "./utils";
-import type { AttendanceEntry, Client, DB, Lead, PerformanceEntry } from "../types";
+import type { AttendanceEntry, Client, DB, Lead, PaymentFact, PerformanceEntry } from "../types";
+import { getPaymentFactComparableDate } from "./paymentFacts";
 
 export type PeriodFilter = {
   year: number;
@@ -90,26 +91,33 @@ function matchesParts(year: number, month: number | null, period: PeriodFilter):
   return month === period.month;
 }
 
-export function matchesPeriod(value: string | null | undefined, period: PeriodFilter): boolean {
+export function matchesPeriod(
+  value: string | PaymentFact | null | undefined,
+  period: PeriodFilter,
+): boolean {
   if (!value) {
     return false;
   }
-  const year = parseYearPart(value);
+  const iso = typeof value === "string" ? value : getPaymentFactComparableDate(value);
+  if (!iso) {
+    return false;
+  }
+  const year = parseYearPart(iso);
   if (year == null) {
     return false;
   }
-  const month = parseMonthPart(value);
+  const month = parseMonthPart(iso);
   return matchesParts(year, month, period);
 }
 
 export function isClientInPeriod(client: Client, period: PeriodFilter): boolean {
-  const checkpoints: (string | null | undefined)[] = [
+  const checkpoints: (string | PaymentFact | null | undefined)[] = [
     client.payDate,
     ...(Array.isArray(client.payHistory) ? client.payHistory : []),
     client.startDate,
   ];
 
-  return checkpoints.some(value => matchesPeriod(value ?? null, period));
+  return checkpoints.some(value => matchesPeriod(value, period));
 }
 
 export function isClientActiveInPeriod(client: Client, period: PeriodFilter): boolean {
@@ -178,8 +186,15 @@ export function formatMonthInput(period: PeriodFilter): string {
 
 export function collectAvailableYears(db: DB): number[] {
   const years = new Set<number>();
-  const push = (value?: string | null) => {
-    const parsed = parseYearPart(value ?? undefined);
+  const push = (value?: string | PaymentFact | null) => {
+    let iso: string | undefined;
+    if (typeof value === "string") {
+      iso = value;
+    } else if (value) {
+      iso = getPaymentFactComparableDate(value) ?? undefined;
+    }
+
+    const parsed = parseYearPart(iso ?? undefined);
     if (parsed != null) {
       years.add(parsed);
     }
@@ -188,6 +203,9 @@ export function collectAvailableYears(db: DB): number[] {
   db.clients?.forEach?.(client => {
     push(client.payDate);
     push(client.startDate);
+    if (Array.isArray(client.payHistory)) {
+      client.payHistory.forEach(push);
+    }
   });
   db.leads?.forEach?.(lead => {
     push(lead.createdAt);
