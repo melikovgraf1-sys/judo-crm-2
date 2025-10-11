@@ -200,6 +200,34 @@ describe("transformClientFormValues", () => {
     expect(result.placements[0]).not.toHaveProperty("payActual");
   });
 
+  it("forces active status and syncs amounts for discount plan", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      placements: [
+        {
+          ...basePlacement(),
+          id: "pl-discount",
+          subscriptionPlan: "discount",
+          payStatus: "задолженность",
+          payAmount: "",
+          payActual: "13",
+        },
+      ],
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result.payStatus).toBe("действует");
+    expect(result.payAmount).toBe(13);
+    expect(result.payActual).toBe(13);
+    expect(result.placements[0]).toMatchObject({
+      subscriptionPlan: "discount",
+      payStatus: "действует",
+      payAmount: 13,
+      payActual: 13,
+    });
+  });
+
   it("allows clearing comment when editing", () => {
     const data: ClientFormValues = {
       ...baseFormValues,

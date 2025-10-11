@@ -29,12 +29,14 @@ const normalizePlacement = (
   placement: ClientPlacementFormValues,
   previous?: ClientPlacement,
 ): ClientPlacement => {
-  const resolvedPayAmount = resolvePayAmount(
+  let resolvedPayAmount = resolvePayAmount(
     placement.payAmount,
     placement.group,
     placement.subscriptionPlan,
     previous?.payAmount,
   );
+
+  const isDiscountPlan = placement.subscriptionPlan === "discount";
 
   const resolvedPayActual = (() => {
     const normalized = placement.payActual.trim();
@@ -47,6 +49,10 @@ const normalizePlacement = (
     }
     return parsed;
   })();
+
+  if (isDiscountPlan && resolvedPayActual != null) {
+    resolvedPayAmount = resolvedPayActual;
+  }
 
   let resolvedRemaining: number | undefined = previous?.remainingLessons;
   if (
@@ -65,7 +71,7 @@ const normalizePlacement = (
     id: ensurePlacementId(placement, previous),
     area: placement.area,
     group: placement.group,
-    payStatus: placement.payStatus,
+    payStatus: isDiscountPlan ? "действует" : placement.payStatus,
     status: placement.status,
     subscriptionPlan: placement.subscriptionPlan,
     ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
