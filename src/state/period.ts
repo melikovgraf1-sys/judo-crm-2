@@ -1,5 +1,6 @@
 import { todayISO } from "./utils";
-import type { AttendanceEntry, Client, DB, Lead, PerformanceEntry } from "../types";
+import type { AttendanceEntry, Client, DB, Lead, PaymentFact, PerformanceEntry } from "../types";
+import { getPaymentFactComparableDate } from "./paymentFacts";
 
 export type PeriodFilter = {
   year: number;
@@ -90,15 +91,22 @@ function matchesParts(year: number, month: number | null, period: PeriodFilter):
   return month === period.month;
 }
 
-export function matchesPeriod(value: string | null | undefined, period: PeriodFilter): boolean {
+export function matchesPeriod(
+  value: string | PaymentFact | null | undefined,
+  period: PeriodFilter,
+): boolean {
   if (!value) {
     return false;
   }
-  const year = parseYearPart(value);
+  const iso = typeof value === "string" ? value : getPaymentFactComparableDate(value);
+  if (!iso) {
+    return false;
+  }
+  const year = parseYearPart(iso);
   if (year == null) {
     return false;
   }
-  const month = parseMonthPart(value);
+  const month = parseMonthPart(iso);
   return matchesParts(year, month, period);
 }
 

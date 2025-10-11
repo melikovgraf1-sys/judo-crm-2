@@ -7,6 +7,7 @@ import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney }
 import { getClientRecurringPayDate, matchesPeriod, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
 import { isReserveArea } from "../../state/areas";
+import { normalizePaymentFacts } from "../../state/paymentFacts";
 import type {
   AttendanceEntry,
   Client,
@@ -110,7 +111,7 @@ export default function ClientTable({
     }
     const map = new Map<string, boolean>();
     list.forEach(client => {
-      const history = Array.isArray(client.payHistory) ? client.payHistory : [];
+      const history = normalizePaymentFacts(client.payHistory);
       const paid = history.some(entry => matchesPeriod(entry, billingPeriod));
       map.set(client.id, paid);
     });

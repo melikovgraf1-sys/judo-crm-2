@@ -9,6 +9,11 @@ import {
 } from "../../state/lessons";
 import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
 import type { ScheduleSlot as ScheduleSlotType } from "../../types";
+import {
+  getPaymentFactComparableDate,
+  getPaymentFactPlanLabel,
+  normalizePaymentFacts,
+} from "../../state/paymentFacts";
 import { getClientPlacementDisplayStatus, getClientPlacementsWithFallback } from "./paymentStatus";
 
 const { calcAgeYears, calcExperience, fmtDate, fmtMoney } = utils;
@@ -40,8 +45,8 @@ export default function ClientDetailsModal({
 }: Props) {
   const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
   const placements = getClientPlacementsWithFallback(client);
-  const payHistory = useMemo(
-    () => (Array.isArray(client.payHistory) ? client.payHistory : []),
+  const paymentFacts = useMemo(
+    () => normalizePaymentFacts(client.payHistory),
     [client.payHistory],
   );
 
@@ -50,8 +55,8 @@ export default function ClientDetailsModal({
       return client.payStatus === "действует";
     }
 
-    return payHistory.some(entry => matchesPeriod(entry, billingPeriod));
-  }, [billingPeriod, client.payStatus, payHistory]);
+    return paymentFacts.some(entry => matchesPeriod(entry, billingPeriod));
+  }, [billingPeriod, client.payStatus, paymentFacts]);
 
   const displayPayStatus = useMemo(() => {
     const placementStatus = getClientPlacementDisplayStatus(client);
@@ -143,7 +148,9 @@ export default function ClientDetailsModal({
     return { ...place, effectiveRemainingLessons: null };
   });
 
-  const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
+  const [section, setSection] = useState<"info" | "attendance" | "performance" | "payments">(
+    "info",
+  );
 
   const attendanceEntries = useMemo(() => {
     return attendance
@@ -158,6 +165,53 @@ export default function ClientDetailsModal({
       .slice()
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [performance, client.id]);
+
+  const sortedPaymentFacts = useMemo(() => {
+    const toTimestamp = (value: string | null) => {
+      if (!value) return Number.NEGATIVE_INFINITY;
+      const parsed = new Date(value);
+      const time = parsed.getTime();
+      return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
+    };
+
+    return paymentFacts
+      .slice()
+      .sort((a, b) => toTimestamp(getPaymentFactComparableDate(b)) - toTimestamp(getPaymentFactComparableDate(a)));
+  }, [paymentFacts]);
+
+  const paymentFactEntries = useMemo(
+    () =>
+      sortedPaymentFacts.map(fact => {
+        const comparableDate = getPaymentFactComparableDate(fact);
+        const displayDate = comparableDate ? fmtDate(comparableDate) : "—";
+        const areaGroup = [fact.area, fact.group].filter(Boolean).join(" · ") || "—";
+        const amount =
+          typeof fact.amount === "number" ? fmtMoney(fact.amount, currency, currencyRates) : null;
+        const plan = getPaymentFactPlanLabel(fact.subscriptionPlan);
+        return {
+          id: fact.id,
+          date: displayDate,
+          amount,
+          areaGroup,
+          plan,
+          period: fact.periodLabel,
+        };
+      }),
+    [sortedPaymentFacts, currency, currencyRates],
+  );
+
+  const paymentFactsCount = paymentFacts.length;
+  const lastPaymentFact = sortedPaymentFacts[0];
+  const lastPaymentDate = lastPaymentFact
+    ? (() => {
+        const iso = getPaymentFactComparableDate(lastPaymentFact);
+        return iso ? fmtDate(iso) : "—";
+      })()
+    : "—";
+  const lastPaymentAmount =
+    typeof lastPaymentFact?.amount === "number"
+      ? fmtMoney(lastPaymentFact.amount, currency, currencyRates)
+      : null;
 
   const attendedCount = attendanceEntries.filter(entry => entry.came).length;
   const successfulCount = performanceEntries.filter(entry => entry.successful).length;
@@ -198,16 +252,17 @@ export default function ClientDetailsModal({
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: "info", label: "Информация" },
-            { id: "attendance", label: "Посещаемость" },
-            { id: "performance", label: "Успеваемость" },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSection(tab.id as typeof section)}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "info", label: "Информация" },
+              { id: "attendance", label: "Посещаемость" },
+              { id: "performance", label: "Успеваемость" },
+              { id: "payments", label: "Факты оплат" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSection(tab.id as typeof section)}
               className={`px-3 py-1 rounded-full border text-xs font-semibold transition ${
                 section === tab.id
                   ? "border-sky-500 bg-sky-100 text-sky-700 dark:border-sky-400 dark:bg-sky-900/30 dark:text-sky-200"
@@ -334,6 +389,20 @@ export default function ClientDetailsModal({
           </div>
         )}
 
+        {section === "payments" && (
+          <div className="space-y-2">
+            <ClientSummaryPill label="Фактов" value={paymentFactsCount} />
+            <ClientSummaryPill label="Последняя оплата" value={lastPaymentDate} />
+            {lastPaymentAmount ? (
+              <ClientSummaryPill label="Сумма последней оплаты" value={lastPaymentAmount} />
+            ) : null}
+            <ClientPaymentFactsList
+              emptyText="Пока нет фактов оплат"
+              entries={paymentFactEntries}
+            />
+          </div>
+        )}
+
         {section === "performance" && (
           <div className="space-y-2">
             <ClientSummaryPill label="Оценок" value={performanceEntries.length} />
@@ -449,6 +518,52 @@ function ClientHistoryList({
         >
           <div className="text-xs uppercase tracking-wide">{entry.date}</div>
           <div className="font-semibold">{entry.value}</div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ClientPaymentFactsList({
+  entries,
+  emptyText,
+}: {
+  entries: {
+    id: string;
+    date: string;
+    amount: string | null;
+    areaGroup: string;
+    plan?: string;
+    period?: string | null;
+  }[];
+  emptyText: string;
+}) {
+  if (!entries.length) {
+    return <div className="text-sm text-slate-500 dark:text-slate-400">{emptyText}</div>;
+  }
+
+  return (
+    <ul className="max-h-60 space-y-2 overflow-y-auto pr-1">
+      {entries.map(entry => (
+        <li
+          key={entry.id}
+          className="rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <span>{entry.date}</span>
+            {entry.period ? <span>{entry.period}</span> : null}
+          </div>
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <span className="font-semibold text-slate-700 dark:text-slate-100">{entry.areaGroup}</span>
+            {entry.amount ? (
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {entry.amount}
+              </span>
+            ) : null}
+          </div>
+          {entry.plan ? (
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.plan}</div>
+          ) : null}
         </li>
       ))}
     </ul>
