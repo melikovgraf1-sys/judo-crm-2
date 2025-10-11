@@ -172,12 +172,13 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
       ...prepared,
       coachId: prepared.coachId ?? db.staff.find(staffMember => staffMember.role === "Тренер")?.id,
     };
+    const finalClient = applyClientStatusAutoTransition(client);
     const next = {
       ...db,
-      clients: [client, ...db.clients],
+      clients: [finalClient, ...db.clients],
       changelog: [
         ...db.changelog,
-        { id: uid(), who: "UI", what: `Создан клиент ${client.firstName}`, when: todayISO() },
+        { id: uid(), who: "UI", what: `Создан клиент ${finalClient.firstName}`, when: todayISO() },
       ],
     };
     const result = await commitDBUpdate(next, setDB);
