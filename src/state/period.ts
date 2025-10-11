@@ -111,13 +111,13 @@ export function matchesPeriod(
 }
 
 export function isClientInPeriod(client: Client, period: PeriodFilter): boolean {
-  const checkpoints: (string | null | undefined)[] = [
+  const checkpoints: (string | PaymentFact | null | undefined)[] = [
     client.payDate,
     ...(Array.isArray(client.payHistory) ? client.payHistory : []),
     client.startDate,
   ];
 
-  return checkpoints.some(value => matchesPeriod(value ?? null, period));
+  return checkpoints.some(value => matchesPeriod(value, period));
 }
 
 export function isClientActiveInPeriod(client: Client, period: PeriodFilter): boolean {
@@ -186,8 +186,15 @@ export function formatMonthInput(period: PeriodFilter): string {
 
 export function collectAvailableYears(db: DB): number[] {
   const years = new Set<number>();
-  const push = (value?: string | null) => {
-    const parsed = parseYearPart(value ?? undefined);
+  const push = (value?: string | PaymentFact | null) => {
+    let iso: string | undefined;
+    if (typeof value === "string") {
+      iso = value;
+    } else if (value) {
+      iso = getPaymentFactComparableDate(value) ?? undefined;
+    }
+
+    const parsed = parseYearPart(iso ?? undefined);
     if (parsed != null) {
       years.add(parsed);
     }
@@ -196,6 +203,9 @@ export function collectAvailableYears(db: DB): number[] {
   db.clients?.forEach?.(client => {
     push(client.payDate);
     push(client.startDate);
+    if (Array.isArray(client.payHistory)) {
+      client.payHistory.forEach(push);
+    }
   });
   db.leads?.forEach?.(lead => {
     push(lead.createdAt);
