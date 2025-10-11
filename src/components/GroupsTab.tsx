@@ -7,6 +7,7 @@ import ClientForm from "./clients/ClientForm";
 import { fmtMoney, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
+import { applyClientStatusAutoTransition } from "../state/clientLifecycle";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailyPeriod, readDailySelection, writeDailyPeriod, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
@@ -185,10 +186,14 @@ export default function GroupsTab({
       if (!Object.prototype.hasOwnProperty.call(prepared, "comment")) {
         delete updated.comment;
       }
+      const finalClient = applyClientStatusAutoTransition(updated);
       const next = {
         ...db,
-        clients: db.clients.map(cl => (cl.id === editing.id ? updated : cl)),
-        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Обновлён клиент ${updated.firstName}`, when: todayISO() }],
+        clients: db.clients.map(cl => (cl.id === editing.id ? finalClient : cl)),
+        changelog: [
+          ...db.changelog,
+          { id: uid(), who: "UI", what: `Обновлён клиент ${finalClient.firstName}`, when: todayISO() },
+        ],
       };
       const result = await commitDBUpdate(next, setDB);
       if (!result.ok) {
@@ -203,10 +208,11 @@ export default function GroupsTab({
         ...prepared,
         coachId: db.staff.find(s => s.role === "Тренер")?.id,
       };
+      const finalClient = applyClientStatusAutoTransition(c);
       const next = {
         ...db,
-        clients: [c, ...db.clients],
-        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${c.firstName}`, when: todayISO() }],
+        clients: [finalClient, ...db.clients],
+        changelog: [...db.changelog, { id: uid(), who: "UI", what: `Создан клиент ${finalClient.firstName}`, when: todayISO() }],
       };
       const result = await commitDBUpdate(next, setDB);
       if (!result.ok) {
@@ -360,9 +366,27 @@ export default function GroupsTab({
     if (!window.confirm("Переместить клиента в резерв?")) return;
 
     const reserveGroup = db.settings.groups.includes(RESERVE_AREA_NAME) ? RESERVE_AREA_NAME : client.group;
-    const nextClients = db.clients.map(c =>
-      c.id === client.id ? { ...c, area: RESERVE_AREA_NAME, group: reserveGroup } : c,
-    );
+    const nextClients = db.clients.map(c => {
+      if (c.id !== client.id) {
+        return c;
+      }
+
+      const updated: Client = {
+        ...c,
+        area: RESERVE_AREA_NAME,
+        group: reserveGroup,
+      };
+
+      if (Array.isArray(c.placements) && c.placements.length) {
+        updated.placements = c.placements.map(place => ({
+          ...place,
+          area: RESERVE_AREA_NAME,
+          group: reserveGroup,
+        }));
+      }
+
+      return applyClientStatusAutoTransition(updated);
+    });
 
     const next = {
       ...db,
