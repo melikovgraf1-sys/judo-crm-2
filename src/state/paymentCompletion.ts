@@ -70,17 +70,19 @@ export function resolvePaymentCompletion({
   const targetPlacement = findTargetPlacement(placements, task);
 
   const payAmount = targetPlacement?.payAmount ?? client.payAmount;
+  const plan = targetPlacement?.subscriptionPlan ?? client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
   const resolvedPayActual = payAmount ?? targetPlacement?.payActual ?? client.payActual;
+  const resolvedPayAmount = plan === "discount" ? resolvedPayActual : payAmount;
 
   const updates: Partial<Client> = {
     payStatus: "действует",
     ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
+    ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
   };
 
   const completionDate = toUTCDate(completedAt);
   const currentPayDate = toUTCDate(targetPlacement?.payDate ?? client.payDate ?? null);
   const startDate = toUTCDate(client.startDate ?? null);
-  const plan = targetPlacement?.subscriptionPlan ?? client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
 
   let historyAnchor: Date | null = null;
   let nextPayDate: Date | null = null;
@@ -152,6 +154,7 @@ export function resolvePaymentCompletion({
     const nextPlacement: ClientPlacement = {
       ...targetPlacement,
       payStatus: "действует",
+      ...(resolvedPayAmount != null ? { payAmount: resolvedPayAmount } : {}),
       ...(updates.payActual != null ? { payActual: updates.payActual } : {}),
     };
 
