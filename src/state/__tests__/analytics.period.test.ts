@@ -108,6 +108,7 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.actual).toBe(130);
     expect(snapshot.metrics.revenue.values.forecast).toBe(130);
     expect(snapshot.athleteStats.total).toBe(2);
+    expect(snapshot.athleteStats.payments).toBe(2);
     expect(snapshot.athleteStats.attendanceRate).toBe(100);
   });
 
