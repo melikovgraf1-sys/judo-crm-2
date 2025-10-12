@@ -26,6 +26,7 @@ import { getClientPlacementDisplayStatus, getClientPlacementsWithFallback } from
 import ClientPaymentFactEditor, {
   type PaymentFactEditorValues,
 } from "./ClientPaymentFactEditor";
+import ClientPaymentFactViewer from "./ClientPaymentFactViewer";
 import type { PaymentFactsChangeContext } from "./paymentFactActions";
 
 const { calcAgeYears, calcExperience, fmtDate, fmtMoney, parseDateInput } = utils;
@@ -217,6 +218,7 @@ export default function ClientDetailsModal({
       }),
     [sortedPaymentFacts, currency, currencyRates],
   );
+  const [previewingFactId, setPreviewingFactId] = useState<string | null>(null);
   const [editingFactId, setEditingFactId] = useState<string | null>(null);
   const [pendingFactId, setPendingFactId] = useState<string | null>(null);
   const [savingFact, setSavingFact] = useState(false);
@@ -224,6 +226,10 @@ export default function ClientDetailsModal({
   const editingFact = useMemo(
     () => (editingFactId ? paymentFacts.find(fact => fact.id === editingFactId) ?? null : null),
     [editingFactId, paymentFacts],
+  );
+  const previewingFact = useMemo(
+    () => (previewingFactId ? paymentFacts.find(fact => fact.id === previewingFactId) ?? null : null),
+    [previewingFactId, paymentFacts],
   );
 
   const paymentFactAreas = useMemo(() => {
@@ -256,14 +262,14 @@ export default function ClientDetailsModal({
 
   const handleDeletePaymentFact = async (factId: string) => {
     if (!onPaymentFactsChange) {
-      return;
+      return false;
     }
     const target = paymentFacts.find(fact => fact.id === factId);
     if (!target) {
-      return;
+      return false;
     }
     if (!window.confirm("Удалить факт оплаты?")) {
-      return;
+      return false;
     }
     setPendingFactId(factId);
     try {
@@ -273,11 +279,15 @@ export default function ClientDetailsModal({
         factId,
       });
       if (result === false) {
-        return;
+        return false;
       }
       if (editingFactId === factId) {
         setEditingFactId(null);
       }
+      if (previewingFactId === factId) {
+        setPreviewingFactId(null);
+      }
+      return true;
     } finally {
       setPendingFactId(null);
     }
@@ -335,6 +345,15 @@ export default function ClientDetailsModal({
       setSavingFact(false);
       setPendingFactId(null);
     }
+  };
+
+  const handleOpenPaymentFact = (factId: string) => {
+    setPreviewingFactId(factId);
+  };
+
+  const handleEditPaymentFact = (factId: string) => {
+    setPreviewingFactId(null);
+    setEditingFactId(factId);
   };
 
   const paymentFactsCount = paymentFacts.length;
@@ -534,14 +553,15 @@ export default function ClientDetailsModal({
             {lastPaymentAmount ? (
               <ClientSummaryPill label="Сумма последней оплаты" value={lastPaymentAmount} />
             ) : null}
-            <ClientPaymentFactsList
-              emptyText="Пока нет фактов оплат"
-              entries={paymentFactEntries}
-              onEdit={canManagePaymentFacts ? setEditingFactId : undefined}
-              onDelete={canManagePaymentFacts ? handleDeletePaymentFact : undefined}
-              pendingId={pendingFactId}
-            />
-          </div>
+          <ClientPaymentFactsList
+            emptyText="Пока нет фактов оплат"
+            entries={paymentFactEntries}
+            onOpen={handleOpenPaymentFact}
+            onEdit={canManagePaymentFacts ? setEditingFactId : undefined}
+            onDelete={canManagePaymentFacts ? handleDeletePaymentFact : undefined}
+            pendingId={pendingFactId}
+          />
+        </div>
         )}
 
         {section === "performance" && (
@@ -606,6 +626,26 @@ export default function ClientDetailsModal({
               setEditingFactId(null);
             }
           }}
+        />
+      ) : null}
+      {previewingFact ? (
+        <ClientPaymentFactViewer
+          fact={previewingFact}
+          currency={currency}
+          currencyRates={currencyRates}
+          onClose={() => setPreviewingFactId(null)}
+          onEdit={canManagePaymentFacts ? () => handleEditPaymentFact(previewingFact.id) : undefined}
+          onDelete={
+            canManagePaymentFacts
+              ? async () => {
+                  const success = await handleDeletePaymentFact(previewingFact.id);
+                  if (success) {
+                    setPreviewingFactId(null);
+                  }
+                }
+              : undefined
+          }
+          deleting={pendingFactId === previewingFact.id}
         />
       ) : null}
     </>
@@ -683,6 +723,7 @@ function ClientHistoryList({
 function ClientPaymentFactsList({
   entries,
   emptyText,
+  onOpen,
   onEdit,
   onDelete,
   pendingId,
@@ -696,8 +737,9 @@ function ClientPaymentFactsList({
     period?: string | null;
   }[];
   emptyText: string;
+  onOpen?: (id: string) => void;
   onEdit?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => Promise<unknown> | unknown;
   pendingId?: string | null;
 }) {
   if (!entries.length) {
@@ -709,7 +751,14 @@ function ClientPaymentFactsList({
       {entries.map(entry => (
         <li
           key={entry.id}
-          className="rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800"
+          className={`rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm transition hover:border-sky-300 hover:shadow dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-500 ${
+            onOpen ? "cursor-pointer" : ""
+          }`}
+          onClick={() => {
+            if (onOpen) {
+              onOpen(entry.id);
+            }
+          }}
         >
           <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
             <span>{entry.date}</span>
@@ -731,7 +780,10 @@ function ClientPaymentFactsList({
               {onEdit ? (
                 <button
                   type="button"
-                  onClick={() => onEdit(entry.id)}
+                  onClick={event => {
+                    event.stopPropagation();
+                    onEdit(entry.id);
+                  }}
                   disabled={pendingId === entry.id}
                   className="rounded-md border border-slate-300 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
@@ -741,7 +793,10 @@ function ClientPaymentFactsList({
               {onDelete ? (
                 <button
                   type="button"
-                  onClick={() => onDelete(entry.id)}
+                  onClick={event => {
+                    event.stopPropagation();
+                    onDelete(entry.id);
+                  }}
                   disabled={pendingId === entry.id}
                   className="rounded-md border border-rose-200 px-2 py-1 font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-900/30"
                 >
