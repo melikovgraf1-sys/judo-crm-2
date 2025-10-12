@@ -296,7 +296,15 @@ function getClientForecastAmount(client: Client): number {
   return ensureNumber(client.payAmount ?? getDefaultPayAmount(client.group) ?? 0);
 }
 
-function getClientActualAmount(client: Client): number {
+function getClientActualAmount(client: Client, period?: PeriodFilter): number {
+  if (period) {
+    const history = Array.isArray(client.payHistory) ? client.payHistory : [];
+    const matchingFacts = history.filter(fact => matchesPeriod(fact, period));
+    if (!matchingFacts.length) {
+      return 0;
+    }
+    return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
+  }
   return ensureNumber(client.payActual ?? 0);
 }
 
@@ -380,7 +388,10 @@ export function computeAnalyticsSnapshot(
   const rent = rentForAreas(db, relevantAreas);
   const coachSalary = coachSalaryForAreas(db, relevantAreas);
 
-  const actualRevenue = actualClients.reduce((sum, client) => sum + getClientActualAmount(client), 0);
+  const actualRevenue = actualClients.reduce(
+    (sum, client) => sum + getClientActualAmount(client, period),
+    0,
+  );
   const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientForecastAmount(client), 0);
   const maxRevenue = hasGroupScope
     ? maxRevenueForGroup(db, area as Area, scopedGroup as string)
@@ -450,7 +461,7 @@ export function computeAnalyticsSnapshot(
 
   const athleteStats: AthleteStats = {
     total: rosterClients.length,
-    payments: rosterClients.filter(client => getClientActualAmount(client) > 0).length,
+    payments: rosterClients.filter(client => getClientActualAmount(client, period) > 0).length,
     new: rosterClients.filter(client => client.status === "новый").length,
     firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
     canceled: periodClients.filter(client => isCanceledStatus(client.status)).length,
