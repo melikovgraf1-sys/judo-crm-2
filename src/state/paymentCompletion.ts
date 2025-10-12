@@ -2,6 +2,12 @@ import { DEFAULT_SUBSCRIPTION_PLAN } from "./payments";
 import { calculateManualPayDate, requiresManualRemainingLessons } from "./lessons";
 import { getClientPlacements } from "./clients";
 import type { Client, ClientPlacement, ScheduleSlot, TaskItem } from "../types";
+import {
+  createPaymentFact,
+  getPaymentFactComparableDate,
+  normalizePaymentFacts,
+} from "./paymentFacts";
+import { uid } from "./utils";
 
 const toUTCDate = (value?: string | null): Date | null => {
   if (!value) {
@@ -138,11 +144,42 @@ export function resolvePaymentCompletion({
     updates.payDate = nextPayDate.toISOString();
   }
 
-  if (historyAnchor) {
-    const historyValue = historyAnchor.toISOString();
-    const existingHistory = Array.isArray(client.payHistory) ? client.payHistory : [];
-    if (!existingHistory.includes(historyValue)) {
-      updates.payHistory = [...existingHistory, historyValue];
+  const normalizedHistory = normalizePaymentFacts(client.payHistory);
+  const effectivePaidAt = historyAnchor
+    ? historyAnchor.toISOString()
+    : completionDate
+    ? completionDate.toISOString()
+    : currentPayDate
+    ? currentPayDate.toISOString()
+    : startDate
+    ? startDate.toISOString()
+    : null;
+  const recordedAtISO = completionDate ? completionDate.toISOString() : completedAt;
+
+  if (effectivePaidAt || recordedAtISO) {
+    const fact = createPaymentFact({
+      id: uid(),
+      area: targetPlacement?.area ?? client.area,
+      group: targetPlacement?.group ?? client.group,
+      paidAt: effectivePaidAt,
+      recordedAt: recordedAtISO,
+      amount: resolvedPayActual ?? resolvedPayAmount ?? null,
+      subscriptionPlan: plan,
+    });
+
+    const factDate = getPaymentFactComparableDate(fact);
+    const alreadyExists = normalizedHistory.some(existing => {
+      const existingDate = getPaymentFactComparableDate(existing);
+      return (
+        existingDate === factDate &&
+        existing.area === fact.area &&
+        existing.group === fact.group &&
+        (existing.subscriptionPlan ?? null) === (fact.subscriptionPlan ?? null)
+      );
+    });
+
+    if (!alreadyExists) {
+      updates.payHistory = [...normalizedHistory, fact];
     }
   }
 

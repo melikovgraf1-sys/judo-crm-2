@@ -345,7 +345,13 @@ test('update: editing payment keeps active status visible for selected month', a
   await userEvent.click(save);
 
   await waitFor(() => expect(getDB().clients[0].payStatus).toBe('действует'));
-  await waitFor(() => expect(getDB().clients[0].payHistory).toContain('2024-02-05T00:00:00.000Z'));
+  await waitFor(() =>
+    expect(
+      getDB().clients[0].payHistory?.some(
+        entry => entry && entry.paidAt === '2024-02-05T00:00:00.000Z',
+      ),
+    ).toBe(true),
+  );
   await waitFor(() => expect(getDB().clients[0].payActual).toBe(60));
 
   const monthInput = screen.getByLabelText('Фильтр по месяцу');
@@ -530,7 +536,9 @@ test('completes payment task and updates client payment data', async () => {
     expect(getDB().clients[0].payStatus).toBe('действует');
     expect(getDB().clients[0].payActual).toBe(55);
     expect(getDB().clients[0].payDate).toBe('2024-02-10T00:00:00.000Z');
-    expect(getDB().clients[0].payHistory).toEqual(['2024-01-01T00:00:00.000Z']);
+    const history = getDB().clients[0].payHistory;
+    expect(history).toHaveLength(1);
+    expect(history?.[0]?.paidAt).toBe('2024-01-01T00:00:00.000Z');
   });
   await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());
 
@@ -586,7 +594,11 @@ test('monthly subscription completed late keeps previous month visible', async (
 
   await waitFor(() => {
     expect(getDB().clients[0].payDate).toBe('2024-10-05T00:00:00.000Z');
-    expect(getDB().clients[0].payHistory).toContain('2024-09-05T00:00:00.000Z');
+    expect(
+      getDB().clients[0].payHistory?.some(
+        entry => entry && entry.paidAt === '2024-09-05T00:00:00.000Z',
+      ),
+    ).toBe(true);
   });
 
   await waitFor(() => expect(screen.getByText('Поздний')).toBeInTheDocument());

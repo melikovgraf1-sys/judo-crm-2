@@ -11,7 +11,17 @@ import { applyClientStatusAutoTransition } from "../state/clientLifecycle";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailyPeriod, readDailySelection, writeDailyPeriod, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { transformClientFormValues } from "./clients/clientMutations";
-import type { DB, UIState, Client, Area, Group, PaymentStatus, ClientFormValues, TaskItem } from "../types";
+import type {
+  DB,
+  UIState,
+  Client,
+  Area,
+  Group,
+  PaymentStatus,
+  ClientFormValues,
+  PaymentFact,
+  TaskItem,
+} from "../types";
 import { getClientPlacements } from "../state/clients";
 import { resolvePaymentCompletion } from "../state/paymentCompletion";
 import {
@@ -24,6 +34,10 @@ import {
 } from "../state/period";
 
 import { RESERVE_AREA_NAME, isReserveArea } from "../state/areas";
+import {
+  commitClientPaymentFactsChange,
+  type PaymentFactsChangeContext,
+} from "./clients/paymentFactActions";
 
 export default function GroupsTab({
   db,
@@ -403,6 +417,19 @@ export default function GroupsTab({
     }
   };
 
+  const handlePaymentFactsChange = (
+    clientId: string,
+    nextFacts: PaymentFact[],
+    context: PaymentFactsChangeContext,
+  ) =>
+    commitClientPaymentFactsChange({
+      db,
+      setDB,
+      clientId,
+      nextFacts,
+      action: context.action,
+    });
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <Breadcrumbs items={["Группы"]} />
@@ -438,6 +465,7 @@ export default function GroupsTab({
           attendance={db.attendance}
           performance={db.performance}
           billingPeriod={period}
+          onPaymentFactsChange={handlePaymentFactsChange}
         />
       </div>
       {modalOpen && (

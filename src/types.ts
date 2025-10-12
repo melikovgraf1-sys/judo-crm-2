@@ -14,6 +14,17 @@ export type PaymentStatus = "ожидание" | "действует" | "зад�
 
 export type SubscriptionPlan = "monthly" | "weekly" | "half-month" | "discount" | "single";
 
+export interface PaymentFact {
+  id: string;
+  area?: Area;
+  group?: Group;
+  paidAt?: string; // ISO
+  recordedAt?: string; // ISO
+  amount?: number;
+  subscriptionPlan?: SubscriptionPlan;
+  periodLabel?: string;
+}
+
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";
 
 export interface ClientPlacement {
@@ -75,7 +86,7 @@ export interface Client {
   remainingLessons?: number;
   frozenLessons?: number;
   placements: ClientPlacement[];
-  payHistory?: string[];
+  payHistory?: PaymentFact[];
   // Автополя (рассчитываются на лету)
 }
 
