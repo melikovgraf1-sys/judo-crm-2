@@ -13,6 +13,7 @@ import type {
   Client,
   ClientStatus,
   Currency,
+  PaymentFact,
   PaymentStatus,
   PerformanceEntry,
   ScheduleSlot,
@@ -21,6 +22,7 @@ import type {
 } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
 import { getClientPlacementDisplayStatus } from "./paymentStatus";
+import type { PaymentFactsChangeContext } from "./paymentFactActions";
 
 type Props = {
   list: Client[];
@@ -38,6 +40,11 @@ type Props = {
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
   billingPeriod?: PeriodFilter;
+  onPaymentFactsChange?: (
+    clientId: string,
+    nextFacts: PaymentFact[],
+    context: PaymentFactsChangeContext,
+  ) => Promise<boolean | void> | boolean | void;
 };
 
 type ColumnConfig = {
@@ -88,6 +95,7 @@ export default function ClientTable({
   attendance,
   performance,
   billingPeriod,
+  onPaymentFactsChange,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedClient = useMemo(() => {
@@ -627,6 +635,7 @@ export default function ClientTable({
           billingPeriod={billingPeriod}
           onEdit={onEdit}
           onRemove={onRemove}
+          onPaymentFactsChange={onPaymentFactsChange}
           onClose={() => setSelectedId(null)}
         />
       )}

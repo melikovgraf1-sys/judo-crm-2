@@ -8,8 +8,21 @@ import { commitDBUpdate } from "../state/appState";
 import { applyPaymentStatusRules } from "../state/payments";
 import { buildGroupsByArea } from "../state/lessons";
 import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
-import type { Area, Client, Currency, DB, Group, ScheduleSlot, TaskItem } from "../types";
+import type {
+  Area,
+  Client,
+  Currency,
+  DB,
+  Group,
+  PaymentFact,
+  ScheduleSlot,
+  TaskItem,
+} from "../types";
 import { resolvePaymentCompletion } from "../state/paymentCompletion";
+import {
+  commitClientPaymentFactsChange,
+  type PaymentFactsChangeContext,
+} from "./clients/paymentFactActions";
 
 type TaskSection = { key: string; label: string | null; tasks: TaskItem[] };
 type AreaGroupEntry = { label: Area; groups: Map<string, Group> };
@@ -199,6 +212,19 @@ export default function TasksTab({
     () => new Set(availableGroups.map(normalizeKey)),
     [availableGroups],
   );
+
+  const handlePaymentFactsChange = (
+    clientId: string,
+    nextFacts: PaymentFact[],
+    context: PaymentFactsChangeContext,
+  ) =>
+    commitClientPaymentFactsChange({
+      db,
+      setDB,
+      clientId,
+      nextFacts,
+      action: context.action,
+    });
 
   useEffect(() => {
     if (!area && group !== null) {
@@ -681,6 +707,7 @@ export default function TasksTab({
           attendance={attendance}
           performance={performance}
           billingPeriod={undefined}
+          onPaymentFactsChange={handlePaymentFactsChange}
           onClose={() => setViewClientId(null)}
         />
       )}

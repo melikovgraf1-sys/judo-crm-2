@@ -22,7 +22,20 @@ import {
   type DuplicateField,
   type DuplicateMatchDetail,
 } from "../state/clients";
-import type { Area, Client, ClientFormValues, DB, Group, TaskItem, UIState } from "../types";
+import type {
+  Area,
+  Client,
+  ClientFormValues,
+  DB,
+  Group,
+  PaymentFact,
+  TaskItem,
+  UIState,
+} from "../types";
+import {
+  commitClientPaymentFactsChange,
+  type PaymentFactsChangeContext,
+} from "./clients/paymentFactActions";
 
 type ClientsTabProps = {
   db: DB;
@@ -150,6 +163,19 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
         return nameA.localeCompare(nameB);
       });
   }, [db]);
+
+  const handlePaymentFactsChange = (
+    clientId: string,
+    nextFacts: PaymentFact[],
+    context: PaymentFactsChangeContext,
+  ) =>
+    commitClientPaymentFactsChange({
+      db,
+      setDB,
+      clientId,
+      nextFacts,
+      action: context.action,
+    });
 
   const openAddModal = () => {
     setEditing(null);
@@ -567,6 +593,7 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}
+          onPaymentFactsChange={handlePaymentFactsChange}
         />
       </div>
       {modalOpen && (
