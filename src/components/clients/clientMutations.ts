@@ -7,6 +7,11 @@ import {
 } from "../../state/payments";
 import { parseDateInput, todayISO, uid } from "../../state/utils";
 import { requiresManualRemainingLessons } from "../../state/lessons";
+import {
+  createPaymentFact,
+  getPaymentFactComparableDate,
+  normalizePaymentFacts,
+} from "../../state/paymentFacts";
 import type {
   Client,
   ClientFormValues,
@@ -156,9 +161,7 @@ export function transformClientFormValues(
   const statusUpdatedAt = statusChanged ? todayISO() : editing?.statusUpdatedAt;
   const normalizedComment = comment.trim();
 
-  const previousPayHistory = Array.isArray(editing?.payHistory)
-    ? editing!.payHistory.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
-    : [];
+  const previousPayHistory = normalizePaymentFacts(editing?.payHistory);
 
   let nextPayHistory = previousPayHistory;
 
@@ -168,11 +171,35 @@ export function transformClientFormValues(
 
   if (primary.payStatus === "действует" && (payActualProvided || payDateProvided)) {
     const parsedPayDate = parseDateInput(primaryFormPlacement?.payDate ?? "");
-    const fallbackDate = primary.payDate ?? todayISO();
+    const now = todayISO();
+    const fallbackDate = primary.payDate ?? now;
     const historyEntry = parsedPayDate || fallbackDate;
 
-    if (historyEntry && !nextPayHistory.includes(historyEntry)) {
-      nextPayHistory = [...nextPayHistory, historyEntry];
+    if (historyEntry) {
+      const candidate = createPaymentFact({
+        id: uid(),
+        area: primary.area,
+        group: primary.group,
+        paidAt: historyEntry,
+        recordedAt: now,
+        amount: primary.payActual ?? primary.payAmount ?? null,
+        subscriptionPlan: primary.subscriptionPlan,
+      });
+
+      const candidateDate = getPaymentFactComparableDate(candidate);
+      const duplicate = nextPayHistory.some(existing => {
+        const existingDate = getPaymentFactComparableDate(existing);
+        return (
+          existingDate === candidateDate &&
+          existing.area === candidate.area &&
+          existing.group === candidate.group &&
+          (existing.subscriptionPlan ?? null) === (candidate.subscriptionPlan ?? null)
+        );
+      });
+
+      if (!duplicate) {
+        nextPayHistory = [...nextPayHistory, candidate];
+      }
     }
   }
 

@@ -24,9 +24,14 @@ import type {
   Currency,
   DB,
   Group,
+  PaymentFact,
 } from "../types";
 import { readDailySelection, writeDailySelection, clearDailySelection } from "../state/filterPersistence";
 import { usePersistentTableSettings } from "../utils/tableSettings";
+import {
+  commitClientPaymentFactsChange,
+  type PaymentFactsChangeContext,
+} from "./clients/paymentFactActions";
 
 const DEFAULT_VISIBLE_COLUMNS = ["name", "area", "group", "mark"];
 const TABLE_SETTINGS_KEY = "attendance";
@@ -74,6 +79,19 @@ export default function AttendanceTab({
     if (!area) return [];
     return groupsByArea.get(area) ?? [];
   }, [area, groupsByArea]);
+
+  const handlePaymentFactsChange = (
+    clientId: string,
+    nextFacts: PaymentFact[],
+    context: PaymentFactsChangeContext,
+  ) =>
+    commitClientPaymentFactsChange({
+      db,
+      setDB,
+      clientId,
+      nextFacts,
+      action: context.action,
+    });
 
   useEffect(() => {
     if (area && group && !availableGroups.includes(group)) {
@@ -963,6 +981,7 @@ export default function AttendanceTab({
           performance={db.performance}
           billingPeriod={undefined}
           onEdit={startEdit}
+          onPaymentFactsChange={handlePaymentFactsChange}
           onClose={() => setSelected(null)}
         />
       )}
