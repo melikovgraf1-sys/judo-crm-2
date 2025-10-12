@@ -71,6 +71,7 @@ export type MetricSnapshot = {
 
 export type AthleteStats = {
   total: number;
+  payments: number;
   new: number;
   firstRenewals: number;
   canceled: number;
@@ -90,6 +91,7 @@ export type LeadMetricKey = keyof LeadStats;
 
 export const ATHLETE_METRIC_KEYS: AthleteMetricKey[] = [
   "total",
+  "payments",
   "new",
   "firstRenewals",
   "canceled",
@@ -102,6 +104,7 @@ export const LEAD_METRIC_KEYS: LeadMetricKey[] = ["created", "converted", "cance
 
 export const ATHLETE_METRIC_LABELS: Record<AthleteMetricKey, string> = {
   total: "Кол-во спортсменов",
+  payments: "Кол-во оплат",
   new: "Кол-во новых спортсменов",
   firstRenewals: "Кол-во первых продлений",
   canceled: "Кол-во отмененных клиентов",
@@ -447,6 +450,7 @@ export function computeAnalyticsSnapshot(
 
   const athleteStats: AthleteStats = {
     total: rosterClients.length,
+    payments: rosterClients.filter(client => getClientActualAmount(client) > 0).length,
     new: rosterClients.filter(client => client.status === "новый").length,
     firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
     canceled: periodClients.filter(client => isCanceledStatus(client.status)).length,
@@ -616,6 +620,7 @@ const METRIC_ACCENTS: Record<MetricKey, FavoriteSummary["accent"]> = {
 
 const ATHLETE_METRIC_ACCENTS: Record<AthleteMetricKey, FavoriteSummary["accent"]> = {
   total: "sky",
+  payments: "green",
   new: "sky",
   firstRenewals: "green",
   canceled: "slate",
