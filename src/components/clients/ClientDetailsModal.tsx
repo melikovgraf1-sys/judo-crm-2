@@ -7,11 +7,29 @@ import {
   estimateGroupRemainingLessonsByParams,
   getEffectiveRemainingLessons,
 } from "../../state/lessons";
-import type { AttendanceEntry, Client, Currency, PerformanceEntry, Settings } from "../../types";
-import type { ScheduleSlot as ScheduleSlotType } from "../../types";
+import type {
+  AttendanceEntry,
+  Client,
+  Currency,
+  PaymentFact,
+  PerformanceEntry,
+  ScheduleSlot as ScheduleSlotType,
+  Settings,
+} from "../../types";
+import {
+  createPaymentFact,
+  getPaymentFactComparableDate,
+  getPaymentFactPlanLabel,
+  normalizePaymentFacts,
+} from "../../state/paymentFacts";
 import { getClientPlacementDisplayStatus, getClientPlacementsWithFallback } from "./paymentStatus";
+import ClientPaymentFactEditor, {
+  type PaymentFactEditorValues,
+} from "./ClientPaymentFactEditor";
+import ClientPaymentFactViewer from "./ClientPaymentFactViewer";
+import type { PaymentFactsChangeContext } from "./paymentFactActions";
 
-const { calcAgeYears, calcExperience, fmtDate, fmtMoney } = utils;
+const { calcAgeYears, calcExperience, fmtDate, fmtMoney, parseDateInput } = utils;
 
 interface Props {
   client: Client;
@@ -24,6 +42,11 @@ interface Props {
   onClose: () => void;
   onEdit?: (client: Client) => void;
   onRemove?: (id: string) => void;
+  onPaymentFactsChange?: (
+    clientId: string,
+    nextFacts: PaymentFact[],
+    context: PaymentFactsChangeContext,
+  ) => Promise<boolean | void> | boolean | void;
 }
 
 export default function ClientDetailsModal({
@@ -37,11 +60,12 @@ export default function ClientDetailsModal({
   onClose,
   onEdit,
   onRemove,
+  onPaymentFactsChange,
 }: Props) {
   const normalizedSchedule = Array.isArray(scheduleProp) ? scheduleProp : [];
   const placements = getClientPlacementsWithFallback(client);
-  const payHistory = useMemo(
-    () => (Array.isArray(client.payHistory) ? client.payHistory : []),
+  const paymentFacts = useMemo(
+    () => normalizePaymentFacts(client.payHistory),
     [client.payHistory],
   );
 
@@ -50,8 +74,8 @@ export default function ClientDetailsModal({
       return client.payStatus === "действует";
     }
 
-    return payHistory.some(entry => matchesPeriod(entry, billingPeriod));
-  }, [billingPeriod, client.payStatus, payHistory]);
+    return paymentFacts.some(entry => matchesPeriod(entry, billingPeriod));
+  }, [billingPeriod, client.payStatus, paymentFacts]);
 
   const displayPayStatus = useMemo(() => {
     const placementStatus = getClientPlacementDisplayStatus(client);
@@ -143,7 +167,9 @@ export default function ClientDetailsModal({
     return { ...place, effectiveRemainingLessons: null };
   });
 
-  const [section, setSection] = useState<"info" | "attendance" | "performance">("info");
+  const [section, setSection] = useState<"info" | "attendance" | "performance" | "payments">(
+    "info",
+  );
 
   const attendanceEntries = useMemo(() => {
     return attendance
@@ -159,14 +185,199 @@ export default function ClientDetailsModal({
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [performance, client.id]);
 
+  const sortedPaymentFacts = useMemo(() => {
+    const toTimestamp = (value: string | null) => {
+      if (!value) return Number.NEGATIVE_INFINITY;
+      const parsed = new Date(value);
+      const time = parsed.getTime();
+      return Number.isFinite(time) ? time : Number.NEGATIVE_INFINITY;
+    };
+
+    return paymentFacts
+      .slice()
+      .sort((a, b) => toTimestamp(getPaymentFactComparableDate(b)) - toTimestamp(getPaymentFactComparableDate(a)));
+  }, [paymentFacts]);
+
+  const paymentFactEntries = useMemo(
+    () =>
+      sortedPaymentFacts.map(fact => {
+        const comparableDate = getPaymentFactComparableDate(fact);
+        const displayDate = comparableDate ? fmtDate(comparableDate) : "—";
+        const areaGroup = [fact.area, fact.group].filter(Boolean).join(" · ") || "—";
+        const amount =
+          typeof fact.amount === "number" ? fmtMoney(fact.amount, currency, currencyRates) : null;
+        const plan = getPaymentFactPlanLabel(fact.subscriptionPlan);
+        return {
+          id: fact.id,
+          date: displayDate,
+          amount,
+          areaGroup,
+          plan,
+          period: fact.periodLabel,
+        };
+      }),
+    [sortedPaymentFacts, currency, currencyRates],
+  );
+  const [previewingFactId, setPreviewingFactId] = useState<string | null>(null);
+  const [editingFactId, setEditingFactId] = useState<string | null>(null);
+  const [pendingFactId, setPendingFactId] = useState<string | null>(null);
+  const [savingFact, setSavingFact] = useState(false);
+
+  const editingFact = useMemo(
+    () => (editingFactId ? paymentFacts.find(fact => fact.id === editingFactId) ?? null : null),
+    [editingFactId, paymentFacts],
+  );
+  const previewingFact = useMemo(
+    () => (previewingFactId ? paymentFacts.find(fact => fact.id === previewingFactId) ?? null : null),
+    [previewingFactId, paymentFacts],
+  );
+
+  const paymentFactAreas = useMemo(() => {
+    const options = new Set<string>();
+    if (client.area) {
+      options.add(client.area);
+    }
+    placements.forEach(place => {
+      if (place.area) {
+        options.add(place.area);
+      }
+    });
+    return Array.from(options);
+  }, [client.area, placements]);
+
+  const paymentFactGroups = useMemo(() => {
+    const options = new Set<string>();
+    if (client.group) {
+      options.add(client.group);
+    }
+    placements.forEach(place => {
+      if (place.group) {
+        options.add(place.group);
+      }
+    });
+    return Array.from(options);
+  }, [client.group, placements]);
+
+  const canManagePaymentFacts = Boolean(onPaymentFactsChange);
+
+  const handleDeletePaymentFact = async (factId: string) => {
+    if (!onPaymentFactsChange) {
+      return false;
+    }
+    const target = paymentFacts.find(fact => fact.id === factId);
+    if (!target) {
+      return false;
+    }
+    if (!window.confirm("Удалить факт оплаты?")) {
+      return false;
+    }
+    setPendingFactId(factId);
+    try {
+      const nextFacts = paymentFacts.filter(fact => fact.id !== factId);
+      const result = await onPaymentFactsChange(client.id, nextFacts, {
+        action: "delete",
+        factId,
+      });
+      if (result === false) {
+        return false;
+      }
+      if (editingFactId === factId) {
+        setEditingFactId(null);
+      }
+      if (previewingFactId === factId) {
+        setPreviewingFactId(null);
+      }
+      return true;
+    } finally {
+      setPendingFactId(null);
+    }
+  };
+
+  const handleSubmitPaymentFact = async (values: PaymentFactEditorValues) => {
+    if (!onPaymentFactsChange || !editingFact) {
+      return;
+    }
+    setSavingFact(true);
+    setPendingFactId(editingFact.id);
+    try {
+      const normalizedPaidAt = parseDateInput(values.paidAt);
+      const normalizedRecordedAt = parseDateInput(values.recordedAt);
+      const amountValue = values.amount.trim();
+      const parsedAmount = amountValue.length ? Number.parseFloat(amountValue) : Number.NaN;
+      const amount = Number.isFinite(parsedAmount) ? parsedAmount : undefined;
+
+      const nextFactBase = createPaymentFact({
+        id: editingFact.id,
+        area: values.area.trim() ? values.area.trim() : undefined,
+        group: values.group.trim() ? values.group.trim() : undefined,
+        paidAt: normalizedPaidAt || undefined,
+        recordedAt: normalizedRecordedAt || undefined,
+        amount,
+        subscriptionPlan: values.subscriptionPlan || undefined,
+      });
+
+      const trimmedPeriod = values.periodLabel.trim();
+      const nextFact: PaymentFact = (() => {
+        if (trimmedPeriod.length) {
+          return { ...nextFactBase, periodLabel: trimmedPeriod };
+        }
+        if (!nextFactBase.periodLabel && editingFact.periodLabel) {
+          return { ...nextFactBase, periodLabel: editingFact.periodLabel };
+        }
+        return nextFactBase;
+      })();
+
+      const nextFacts = paymentFacts.map(fact =>
+        fact.id === nextFact.id ? nextFact : fact,
+      );
+
+      const result = await onPaymentFactsChange(client.id, nextFacts, {
+        action: "update",
+        factId: nextFact.id,
+      });
+
+      if (result === false) {
+        return;
+      }
+
+      setEditingFactId(null);
+    } finally {
+      setSavingFact(false);
+      setPendingFactId(null);
+    }
+  };
+
+  const handleOpenPaymentFact = (factId: string) => {
+    setPreviewingFactId(factId);
+  };
+
+  const handleEditPaymentFact = (factId: string) => {
+    setPreviewingFactId(null);
+    setEditingFactId(factId);
+  };
+
+  const paymentFactsCount = paymentFacts.length;
+  const lastPaymentFact = sortedPaymentFacts[0];
+  const lastPaymentDate = lastPaymentFact
+    ? (() => {
+        const iso = getPaymentFactComparableDate(lastPaymentFact);
+        return iso ? fmtDate(iso) : "—";
+      })()
+    : "—";
+  const lastPaymentAmount =
+    typeof lastPaymentFact?.amount === "number"
+      ? fmtMoney(lastPaymentFact.amount, currency, currencyRates)
+      : null;
+
   const attendedCount = attendanceEntries.filter(entry => entry.came).length;
   const successfulCount = performanceEntries.filter(entry => entry.successful).length;
 
   const placementsSummary = placements.map(place => `${place.area} · ${place.group}`).join(", ");
 
   return (
-    <Modal size="lg" onClose={onClose}>
-      <div className="flex flex-col gap-3">
+    <>
+      <Modal size="lg" onClose={onClose}>
+        <div className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-lg font-semibold text-slate-800 dark:text-slate-100">
@@ -198,16 +409,17 @@ export default function ClientDetailsModal({
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {[
-            { id: "info", label: "Информация" },
-            { id: "attendance", label: "Посещаемость" },
-            { id: "performance", label: "Успеваемость" },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSection(tab.id as typeof section)}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "info", label: "Информация" },
+              { id: "attendance", label: "Посещаемость" },
+              { id: "performance", label: "Успеваемость" },
+              { id: "payments", label: "Факты оплат" },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSection(tab.id as typeof section)}
               className={`px-3 py-1 rounded-full border text-xs font-semibold transition ${
                 section === tab.id
                   ? "border-sky-500 bg-sky-100 text-sky-700 dark:border-sky-400 dark:bg-sky-900/30 dark:text-sky-200"
@@ -334,6 +546,24 @@ export default function ClientDetailsModal({
           </div>
         )}
 
+        {section === "payments" && (
+          <div className="space-y-2">
+            <ClientSummaryPill label="Фактов" value={paymentFactsCount} />
+            <ClientSummaryPill label="Последняя оплата" value={lastPaymentDate} />
+            {lastPaymentAmount ? (
+              <ClientSummaryPill label="Сумма последней оплаты" value={lastPaymentAmount} />
+            ) : null}
+          <ClientPaymentFactsList
+            emptyText="Пока нет фактов оплат"
+            entries={paymentFactEntries}
+            onOpen={handleOpenPaymentFact}
+            onEdit={canManagePaymentFacts ? setEditingFactId : undefined}
+            onDelete={canManagePaymentFacts ? handleDeletePaymentFact : undefined}
+            pendingId={pendingFactId}
+          />
+        </div>
+        )}
+
         {section === "performance" && (
           <div className="space-y-2">
             <ClientSummaryPill label="Оценок" value={performanceEntries.length} />
@@ -382,8 +612,43 @@ export default function ClientDetailsModal({
             )}
           </div>
         )}
-      </div>
-    </Modal>
+        </div>
+      </Modal>
+      {editingFact && canManagePaymentFacts ? (
+        <ClientPaymentFactEditor
+          fact={editingFact}
+          availableAreas={paymentFactAreas}
+          availableGroups={paymentFactGroups}
+          saving={savingFact}
+          onSubmit={handleSubmitPaymentFact}
+          onClose={() => {
+            if (!savingFact) {
+              setEditingFactId(null);
+            }
+          }}
+        />
+      ) : null}
+      {previewingFact ? (
+        <ClientPaymentFactViewer
+          fact={previewingFact}
+          currency={currency}
+          currencyRates={currencyRates}
+          onClose={() => setPreviewingFactId(null)}
+          onEdit={canManagePaymentFacts ? () => handleEditPaymentFact(previewingFact.id) : undefined}
+          onDelete={
+            canManagePaymentFacts
+              ? async () => {
+                  const success = await handleDeletePaymentFact(previewingFact.id);
+                  if (success) {
+                    setPreviewingFactId(null);
+                  }
+                }
+              : undefined
+          }
+          deleting={pendingFactId === previewingFact.id}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -449,6 +714,97 @@ function ClientHistoryList({
         >
           <div className="text-xs uppercase tracking-wide">{entry.date}</div>
           <div className="font-semibold">{entry.value}</div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ClientPaymentFactsList({
+  entries,
+  emptyText,
+  onOpen,
+  onEdit,
+  onDelete,
+  pendingId,
+}: {
+  entries: {
+    id: string;
+    date: string;
+    amount: string | null;
+    areaGroup: string;
+    plan?: string;
+    period?: string | null;
+  }[];
+  emptyText: string;
+  onOpen?: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onDelete?: (id: string) => Promise<unknown> | unknown;
+  pendingId?: string | null;
+}) {
+  if (!entries.length) {
+    return <div className="text-sm text-slate-500 dark:text-slate-400">{emptyText}</div>;
+  }
+
+  return (
+    <ul className="max-h-60 space-y-2 overflow-y-auto pr-1">
+      {entries.map(entry => (
+        <li
+          key={entry.id}
+          className={`rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm transition hover:border-sky-300 hover:shadow dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-500 ${
+            onOpen ? "cursor-pointer" : ""
+          }`}
+          onClick={() => {
+            if (onOpen) {
+              onOpen(entry.id);
+            }
+          }}
+        >
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <span>{entry.date}</span>
+            {entry.period ? <span>{entry.period}</span> : null}
+          </div>
+          <div className="mt-2 flex items-baseline justify-between gap-3">
+            <span className="font-semibold text-slate-700 dark:text-slate-100">{entry.areaGroup}</span>
+            {entry.amount ? (
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {entry.amount}
+              </span>
+            ) : null}
+          </div>
+          {entry.plan ? (
+            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.plan}</div>
+          ) : null}
+          {(onEdit || onDelete) && (
+            <div className="mt-3 flex justify-end gap-2 text-xs">
+              {onEdit ? (
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation();
+                    onEdit(entry.id);
+                  }}
+                  disabled={pendingId === entry.id}
+                  className="rounded-md border border-slate-300 px-2 py-1 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                >
+                  Редактировать
+                </button>
+              ) : null}
+              {onDelete ? (
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation();
+                    onDelete(entry.id);
+                  }}
+                  disabled={pendingId === entry.id}
+                  className="rounded-md border border-rose-200 px-2 py-1 font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-900/30"
+                >
+                  Удалить
+                </button>
+              ) : null}
+            </div>
+          )}
         </li>
       ))}
     </ul>
