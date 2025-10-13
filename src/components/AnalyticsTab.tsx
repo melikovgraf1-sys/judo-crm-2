@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import Breadcrumbs from "./Breadcrumbs";
-import type { Area, Currency, DB } from "../types";
+import type { Area, Currency, DB, Group } from "../types";
 import { commitDBUpdate } from "../state/appState";
 import {
   ATHLETE_METRIC_KEYS,
@@ -16,6 +16,7 @@ import {
   formatLeadMetricValue,
   formatMetricValue,
   getAnalyticsAreas,
+  getAnalyticsGroups,
   type AnalyticsFavorite,
   type AreaScope,
   type MetricKey,
@@ -50,6 +51,18 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     }
     return areas[0] ?? "all";
   });
+  const [group, setGroup] = useState<Group | null>(() => {
+    const storedArea = storedSelection.area as Area | null;
+    const storedGroup = storedSelection.group as Group | null;
+    if (!storedArea || !storedGroup) {
+      return null;
+    }
+    if (!areas.includes(storedArea)) {
+      return null;
+    }
+    const available = getAnalyticsGroups(db, storedArea);
+    return available.includes(storedGroup) ? storedGroup : null;
+  });
   const [rentInput, setRentInput] = useState("0");
   const [coachSalaryInput, setCoachSalaryInput] = useState("0");
   const persistedPeriod = useMemo(() => readDailyPeriod("analytics"), []);
@@ -68,10 +81,10 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   useEffect(() => {
     if (area === "all") {
       clearDailySelection("analytics");
-    } else {
-      writeDailySelection("analytics", area, null);
+      return;
     }
-  }, [area]);
+    writeDailySelection("analytics", area, group ?? null);
+  }, [area, group]);
 
   const monthValue = formatMonthInput(period);
   const baseYears = useMemo(() => collectAvailableYears(db), [db]);
@@ -98,13 +111,28 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     if (!areas.includes(area)) {
       const fallback = areas[0] ?? "all";
       setArea(fallback);
-      if (fallback === "all") {
-        clearDailySelection("analytics");
-      } else {
-        writeDailySelection("analytics", fallback, null);
-      }
+      return;
     }
   }, [area, areas]);
+
+  const availableGroups = useMemo(() => {
+    if (area === "all") {
+      return [] as Group[];
+    }
+    return getAnalyticsGroups(db, area);
+  }, [area, db]);
+
+  useEffect(() => {
+    if (area === "all") {
+      if (group !== null) {
+        setGroup(null);
+      }
+      return;
+    }
+    if (group && !availableGroups.includes(group)) {
+      setGroup(null);
+    }
+  }, [area, availableGroups, group]);
 
   useEffect(() => {
     if (area === "all") {
@@ -118,8 +146,9 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     setCoachSalaryInput(typeof salaryValue === "number" && Number.isFinite(salaryValue) ? String(salaryValue) : "0");
   }, [area, db]);
 
-  const favorites = db.settings.analyticsFavorites ?? [];
-  const snapshot = useMemo(() => computeAnalyticsSnapshot(db, area, period), [db, area, period]);
+  const favorites = useMemo(() => db.settings.analyticsFavorites ?? [], [db.settings.analyticsFavorites]);
+  const scopeGroup = area === "all" ? null : group;
+  const snapshot = useMemo(() => computeAnalyticsSnapshot(db, area, period, scopeGroup), [db, area, period, scopeGroup]);
 
   const parseInputValue = useCallback((raw: string): number => {
     if (!raw.trim()) {
@@ -263,7 +292,11 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
           id="analytics-area"
           className="px-3 py-2 rounded-md border border-slate-300 bg-white text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={area}
-          onChange={event => setArea(event.target.value as AreaScope)}
+          onChange={event => {
+            const nextArea = event.target.value as AreaScope;
+            setArea(nextArea);
+            setGroup(null);
+          }}
         >
           {areas.map(option => (
             <option key={option} value={option}>
@@ -271,6 +304,29 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
             </option>
           ))}
         </select>
+        {area !== "all" && (
+          <>
+            <label htmlFor="analytics-group" className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              Группа
+            </label>
+            <select
+              id="analytics-group"
+              className="px-3 py-2 rounded-md border border-slate-300 bg-white text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+              value={scopeGroup ?? ""}
+              onChange={event => {
+                const value = event.target.value;
+                setGroup(value ? (value as Group) : null);
+              }}
+            >
+              <option value="">Все группы</option>
+              {availableGroups.map(option => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
         <span className="text-xs text-slate-500 dark:text-slate-400">
           Добавьте до шестнадцати показателей в избранное, чтобы видеть их на дашборде.
         </span>
@@ -338,7 +394,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
                       {METRIC_LABELS[metric]}
                     </th>
                     {PROJECTION_ORDER.map(projection => {
-                      const favorite = { kind: "metric" as const, area, metric, projection };
+                      const favorite = { kind: "metric" as const, area, group: scopeGroup ?? null, metric, projection };
                       const id = encodeFavorite(favorite);
                       const starred = favorites.includes(id);
                       return (
@@ -432,7 +488,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {athleteMetrics.map(item => {
-            const favorite = { kind: "athlete" as const, area, metric: item.key };
+            const favorite = { kind: "athlete" as const, area, group: scopeGroup ?? null, metric: item.key };
             const id = encodeFavorite(favorite);
             const starred = favorites.includes(id);
             return (
@@ -475,7 +531,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
         </div>
         <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
           {leadMetrics.map(item => {
-            const favorite = { kind: "lead" as const, area, metric: item.key };
+            const favorite = { kind: "lead" as const, area, group: scopeGroup ?? null, metric: item.key };
             const id = encodeFavorite(favorite);
             const starred = favorites.includes(id);
             return (

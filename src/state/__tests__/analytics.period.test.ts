@@ -37,6 +37,13 @@ describe("computeAnalyticsSnapshot with period", () => {
             remainingLessons: 0,
           },
         ],
+        payHistory: [
+          {
+            id: "fact-c1-2024-01",
+            paidAt: "2024-01-05T00:00:00.000Z",
+            amount: 60,
+          },
+        ],
       },
       {
         id: "c2",
@@ -67,6 +74,23 @@ describe("computeAnalyticsSnapshot with period", () => {
             payAmount: 70,
             payActual: 70,
             remainingLessons: 0,
+          },
+        ],
+        payHistory: [
+          {
+            id: "fact-c2-2023-10",
+            paidAt: "2023-10-05T00:00:00.000Z",
+            amount: 65,
+          },
+          {
+            id: "fact-c2-2023-11",
+            paidAt: "2023-11-05T00:00:00.000Z",
+            amount: 75,
+          },
+          {
+            id: "fact-c2-2024-01",
+            paidAt: "2024-01-05T00:00:00.000Z",
+            amount: 70,
           },
         ],
       },
@@ -108,6 +132,7 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.actual).toBe(130);
     expect(snapshot.metrics.revenue.values.forecast).toBe(130);
     expect(snapshot.athleteStats.total).toBe(2);
+    expect(snapshot.athleteStats.payments).toBe(2);
     expect(snapshot.athleteStats.attendanceRate).toBe(100);
   });
 
@@ -162,5 +187,38 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.profit.values.target).toBe(400);
     expect(snapshot.metrics.fill.values.target).toBe(100);
     expect(snapshot.metrics.athletes.values.target).toBe(10);
+  });
+
+  it("uses payment history amounts for October period", () => {
+    const db = buildDB();
+    const period: PeriodFilter = { year: 2023, month: 10 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(65);
+    expect(snapshot.athleteStats.payments).toBe(1);
+  });
+
+  it("uses payment history amounts for November period", () => {
+    const db = buildDB();
+    const period: PeriodFilter = { year: 2023, month: 11 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(75);
+    expect(snapshot.athleteStats.payments).toBe(1);
+  });
+
+  it("parses string payment amounts when summing revenue", () => {
+    const db = buildDB();
+    (db.clients[0].payHistory as any)?.push({
+      id: "fact-c1-2024-02-string",
+      paidAt: "2024-02-05T00:00:00.000Z",
+      amount: "85,50",
+    });
+
+    const period: PeriodFilter = { year: 2024, month: 2 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.revenue.values.actual).toBeCloseTo(85.5, 5);
+    expect(snapshot.athleteStats.payments).toBe(1);
   });
 });
