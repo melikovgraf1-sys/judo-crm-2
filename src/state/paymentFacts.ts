@@ -15,6 +15,27 @@ function normalizeISO(value?: string | null): string | undefined {
   return date.toISOString();
 }
 
+function normalizeAmount(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const sanitized = value.replace(/[\s\u00A0]/g, "").replace(/,/g, ".");
+    if (!sanitized.length) {
+      return undefined;
+    }
+    const filtered = sanitized.replace(/[^\d.+-]/g, "");
+    if (!filtered.length) {
+      return undefined;
+    }
+    const parsed = Number.parseFloat(filtered);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
 export function formatPaymentPeriod(
   plan: SubscriptionPlan | undefined,
   referenceDate?: string | null,
@@ -103,7 +124,7 @@ export function normalizePaymentFacts(source: unknown): PaymentFact[] {
           : `legacy-${index}-${normalizeISO(fact.paidAt ?? fact.recordedAt) ?? "unknown"}`;
         const normalizedPaidAt = normalizeISO(fact.paidAt);
         const normalizedRecordedAt = normalizeISO(fact.recordedAt);
-        const amount = typeof fact.amount === "number" ? fact.amount : undefined;
+        const amount = normalizeAmount(fact.amount);
         const plan = fact.subscriptionPlan;
         const periodLabel = fact.periodLabel
           ?? formatPaymentPeriod(plan, normalizedPaidAt ?? normalizedRecordedAt);
