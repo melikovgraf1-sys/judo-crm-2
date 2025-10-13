@@ -206,4 +206,19 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.actual).toBe(75);
     expect(snapshot.athleteStats.payments).toBe(1);
   });
+
+  it("parses string payment amounts when summing revenue", () => {
+    const db = buildDB();
+    (db.clients[0].payHistory as any)?.push({
+      id: "fact-c1-2024-02-string",
+      paidAt: "2024-02-05T00:00:00.000Z",
+      amount: "85,50",
+    });
+
+    const period: PeriodFilter = { year: 2024, month: 2 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.revenue.values.actual).toBeCloseTo(85.5, 5);
+    expect(snapshot.athleteStats.payments).toBe(1);
+  });
 });

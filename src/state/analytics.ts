@@ -1,4 +1,5 @@
 import { getDefaultPayAmount } from "./payments";
+import { normalizePaymentFacts } from "./paymentFacts";
 import { convertMoney } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
 import type { Area, Client, Currency, DB, Group, Lead, LeadLifecycleEvent } from "../types";
@@ -298,7 +299,7 @@ function getClientForecastAmount(client: Client): number {
 
 function getClientActualAmount(client: Client, period?: PeriodFilter): number {
   if (period) {
-    const history = Array.isArray(client.payHistory) ? client.payHistory : [];
+    const history = normalizePaymentFacts(client.payHistory);
     const matchingFacts = history.filter(fact => matchesPeriod(fact, period));
     if (!matchingFacts.length) {
       return 0;
