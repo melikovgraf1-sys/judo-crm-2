@@ -39,6 +39,21 @@ import {
   type PaymentFactsChangeContext,
 } from "./clients/paymentFactActions";
 
+export const clientMatchesGroup = (
+  client: Client,
+  area: Area | null,
+  group: Group | null,
+): boolean => {
+  if (!area || !group) {
+    return false;
+  }
+
+  return getClientPlacements(client).some(
+    placement =>
+      placement.area === area && placement.group === group && !isReserveArea(placement.area),
+  );
+};
+
 export default function GroupsTab({
   db,
   setDB,
@@ -121,9 +136,7 @@ export default function GroupsTab({
     };
 
     return db.clients.filter(c =>
-      c.area === area &&
-      c.group === group &&
-      !isReserveArea(c.area) &&
+      clientMatchesGroup(c, area, group) &&
       (pay === "all" || c.payStatus === pay) &&
       matchesPeriod(c) &&
       (!ui.search || `${c.firstName} ${c.lastName ?? ""} ${c.phone ?? ""}`.toLowerCase().includes(search))

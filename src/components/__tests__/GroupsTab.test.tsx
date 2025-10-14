@@ -313,6 +313,53 @@ test('shows paid status for the active placement even if other placements owe', 
   expect(db.clients[0].placements.find(place => place.group === 'Group2')?.payStatus).toBe('задолженность');
 });
 
+test('clients with multiple placements appear in each matching group', async () => {
+  const db = makeDB();
+  const client = makeClient({
+    id: 'multi-group',
+    firstName: 'МультиГруппа',
+    area: 'Area1',
+    group: 'Group1',
+  });
+
+  client.placements = [
+    {
+      id: 'pl-1',
+      area: 'Area1',
+      group: 'Group1',
+      payStatus: 'действует',
+      status: 'действующий',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-01-05T00:00:00.000Z',
+      payAmount: 55,
+      payActual: 55,
+      remainingLessons: 5,
+    },
+    {
+      id: 'pl-2',
+      area: 'Area1',
+      group: 'Group2',
+      payStatus: 'действует',
+      status: 'действующий',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-01-05T00:00:00.000Z',
+      payAmount: 55,
+      payActual: 55,
+      remainingLessons: 5,
+    },
+  ];
+
+  db.clients = [client];
+
+  renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  await waitFor(() => expect(screen.getByText('МультиГруппа')).toBeInTheDocument());
+
+  fireEvent.change(screen.getByLabelText('Фильтр по группе'), { target: { value: 'Group2' } });
+
+  await waitFor(() => expect(screen.getByText('МультиГруппа')).toBeInTheDocument());
+});
+
 test('hides clients assigned to reserve area', () => {
   const db = makeDB();
   db.settings.areas = [...db.settings.areas, 'резерв'];
