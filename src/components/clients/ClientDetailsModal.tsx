@@ -91,8 +91,6 @@ export default function ClientDetailsModal({
     return paidInSelectedPeriod ? "действует" : "ожидание";
   }, [billingPeriod, client, paidInSelectedPeriod]);
 
-  const hasWaitingStatus = displayPayStatus === "ожидание";
-
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
 
   const totalFrozenLessons = placements.reduce(
@@ -139,32 +137,58 @@ export default function ClientDetailsModal({
     return null;
   })();
 
-  const placementsWithRemaining = placements.map(place => {
+  const placementsWithDetails = placements.map(place => {
     const manual = deriveRemainingLessons(place.remainingLessons ?? null);
+    let effectiveRemainingLessons: number | null = null;
+
     if (manual != null) {
-      return { ...place, effectiveRemainingLessons: manual };
+      effectiveRemainingLessons = manual;
+    } else {
+      const estimated = estimateGroupRemainingLessonsByParams(
+        place.area,
+        place.group,
+        place.payDate,
+        normalizedSchedule,
+      );
+
+      if (estimated != null) {
+        effectiveRemainingLessons = estimated;
+      } else if (typeof totalRemainingLessons === "number") {
+        effectiveRemainingLessons = totalRemainingLessons;
+      } else if (derivedRemainingLessons != null) {
+        effectiveRemainingLessons = derivedRemainingLessons;
+      }
     }
 
-    const estimated = estimateGroupRemainingLessonsByParams(
-      place.area,
-      place.group,
-      place.payDate,
-      normalizedSchedule,
-    );
+    const placementFacts = paymentFacts.filter(fact => {
+      const matchesArea = !place.area || !fact.area || fact.area === place.area;
+      const matchesGroup = !place.group || !fact.group || fact.group === place.group;
+      return matchesArea && matchesGroup;
+    });
 
-    if (estimated != null) {
-      return { ...place, effectiveRemainingLessons: estimated };
-    }
+    const paidInSelectedPeriodForPlacement =
+      billingPeriod?.month != null
+        ? placementFacts.some(fact => matchesPeriod(fact, billingPeriod))
+        : true;
 
-    if (typeof totalRemainingLessons === "number") {
-      return { ...place, effectiveRemainingLessons: totalRemainingLessons };
-    }
+    const placementDisplayPayStatus = (() => {
+      if (!billingPeriod || billingPeriod.month == null) {
+        return place.payStatus;
+      }
 
-    if (derivedRemainingLessons != null) {
-      return { ...place, effectiveRemainingLessons: derivedRemainingLessons };
-    }
+      if (place.payStatus === "задолженность" || place.payStatus === "ожидание") {
+        return place.payStatus;
+      }
 
-    return { ...place, effectiveRemainingLessons: null };
+      return paidInSelectedPeriodForPlacement ? "действует" : "ожидание";
+    })();
+
+    return {
+      ...place,
+      effectiveRemainingLessons,
+      displayPayStatus: placementDisplayPayStatus,
+      paidInSelectedPeriod: paidInSelectedPeriodForPlacement,
+    };
   });
 
   const [section, setSection] = useState<"info" | "attendance" | "performance" | "payments">(
@@ -453,11 +477,14 @@ export default function ClientDetailsModal({
                 Тренировочные места
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {placementsWithRemaining.map(place => {
+                {placementsWithDetails.map(place => {
                   const planLabel = place.subscriptionPlan
                     ? getSubscriptionPlanMeta(place.subscriptionPlan)?.label ?? "—"
                     : "—";
                   const frozenLessons = place.frozenLessons ?? client.frozenLessons ?? 0;
+                  const hidePaymentFact =
+                    place.displayPayStatus === "ожидание" ||
+                    (billingPeriod?.month != null && !place.paidInSelectedPeriod);
                   return (
                     <div
                       key={`${place.id}-${place.area}-${place.group}`}
@@ -467,7 +494,10 @@ export default function ClientDetailsModal({
                         {place.area} · {place.group}
                       </div>
                       <dl className="mt-3 grid gap-1 text-slate-600 dark:text-slate-300">
-                        <ClientPlacementInfoCell label="Статус оплаты" value={displayPayStatus || "—"} />
+                        <ClientPlacementInfoCell
+                          label="Статус оплаты"
+                          value={place.displayPayStatus || "—"}
+                        />
                         <ClientPlacementInfoCell label="Форма абонемента" value={planLabel} />
                         <ClientPlacementInfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
                         <ClientPlacementInfoCell
@@ -481,7 +511,7 @@ export default function ClientDetailsModal({
                         <ClientPlacementInfoCell
                           label="Факт оплаты"
                           value={
-                            hasWaitingStatus || (billingPeriod?.month != null && !paidInSelectedPeriod)
+                            hidePaymentFact
                               ? "—"
                               : place.payActual != null
                               ? fmtMoney(place.payActual, currency, currencyRates)
