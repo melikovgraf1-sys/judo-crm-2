@@ -23,7 +23,7 @@ import type {
   Group,
 } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
-import { getClientPlacementDisplayStatus } from "./paymentStatus";
+import { getClientPlacementDisplayStatus, matchesPlacement } from "./paymentStatus";
 import type { PaymentFactsChangeContext } from "./paymentFactActions";
 
 type Props = {
@@ -152,10 +152,7 @@ export default function ClientTable({
         if (!matchesPeriod(entry, billingPeriod)) {
           return false;
         }
-        if (!placement) {
-          return true;
-        }
-        return entry.area === placement.area && entry.group === placement.group;
+        return matchesPlacement(placement, entry);
       });
       map.set(client.id, paid);
     });
