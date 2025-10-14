@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import VirtualizedTable from "../VirtualizedTable";
 import ClientDetailsModal from "./ClientDetailsModal";
 import ColumnSettings from "../ColumnSettings";
@@ -9,6 +9,7 @@ import { getEffectiveRemainingLessons } from "../../state/lessons";
 import { isReserveArea } from "../../state/areas";
 import { normalizePaymentFacts } from "../../state/paymentFacts";
 import type {
+  Area,
   AttendanceEntry,
   Client,
   ClientStatus,
@@ -19,6 +20,7 @@ import type {
   ScheduleSlot,
   Settings,
   TaskItem,
+  Group,
 } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
 import { getClientPlacementDisplayStatus } from "./paymentStatus";
@@ -45,6 +47,8 @@ type Props = {
     nextFacts: PaymentFact[],
     context: PaymentFactsChangeContext,
   ) => Promise<boolean | void> | boolean | void;
+  activeArea?: Area | null;
+  activeGroup?: Group | null;
 };
 
 type ColumnConfig = {
@@ -96,6 +100,8 @@ export default function ClientTable({
   performance,
   billingPeriod,
   onPaymentFactsChange,
+  activeArea,
+  activeGroup,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedClient = useMemo(() => {
@@ -113,6 +119,27 @@ export default function ClientTable({
     return map;
   }, [list, schedule]);
 
+  const getActivePlacement = useCallback(
+    (client: Client) => {
+      if (activeArea == null && activeGroup == null) {
+        return null;
+      }
+
+      if (!Array.isArray(client.placements)) {
+        return null;
+      }
+
+      return (
+        client.placements.find(placement => {
+          const matchesArea = activeArea == null || placement.area === activeArea;
+          const matchesGroup = activeGroup == null || placement.group === activeGroup;
+          return matchesArea && matchesGroup;
+        }) ?? null
+      );
+    },
+    [activeArea, activeGroup],
+  );
+
   const paidInPeriodMap = useMemo(() => {
     if (!billingPeriod || billingPeriod.month == null) {
       return null;
@@ -120,18 +147,29 @@ export default function ClientTable({
     const map = new Map<string, boolean>();
     list.forEach(client => {
       const history = normalizePaymentFacts(client.payHistory);
-      const paid = history.some(entry => matchesPeriod(entry, billingPeriod));
+      const placement = getActivePlacement(client);
+      const paid = history.some(entry => {
+        if (!matchesPeriod(entry, billingPeriod)) {
+          return false;
+        }
+        if (!placement) {
+          return true;
+        }
+        return entry.area === placement.area && entry.group === placement.group;
+      });
       map.set(client.id, paid);
     });
     return map;
-  }, [billingPeriod, list]);
+  }, [billingPeriod, getActivePlacement, list]);
 
-  const isPaidInSelectedPeriod = (client: Client): boolean => {
+  const isPaidInSelectedPeriod = useCallback((client: Client): boolean => {
+    const placement = getActivePlacement(client);
     if (!billingPeriod || billingPeriod.month == null) {
-      return client.payStatus === "действует";
+      const status = placement?.payStatus ?? client.payStatus;
+      return status === "действует";
     }
     return paidInPeriodMap?.get(client.id) ?? false;
-  };
+  }, [billingPeriod, getActivePlacement, paidInPeriodMap]);
 
   const getPlacementPayStatuses = (client: Client): PaymentStatus[] => {
     const placements = Array.isArray(client.placements) && client.placements.length > 0
@@ -175,27 +213,39 @@ export default function ClientTable({
     return client.payStatus;
   };
 
-  const getDisplayPayStatus = (client: Client): string => {
-    const placementStatus = getClientPlacementDisplayStatus(client);
-    if (!billingPeriod || billingPeriod.month == null) {
-      return placementStatus;
-    }
-    if (placementStatus === "задолженность" || placementStatus === "ожидание") {
-      return placementStatus;
-    }
-    return isPaidInSelectedPeriod(client) ? "действует" : "ожидание";
-  };
+  const getDisplayPayStatus = useCallback(
+    (client: Client): string => {
+      const placement = getActivePlacement(client);
+      const placementStatus = placement?.payStatus ?? null;
+      const aggregateStatus = getClientPlacementDisplayStatus(client);
+      const baseStatus = placementStatus ?? aggregateStatus;
 
-  const getPayStatusTone = (client: Client): string => {
-    const status = getDisplayPayStatus(client);
-    if (status === "действует") {
-      return "rounded-full bg-emerald-100 text-emerald-700";
-    }
-    if (status === "задолженность") {
-      return "rounded-full bg-rose-100 text-rose-700";
-    }
-    return "rounded-full bg-amber-100 text-amber-700";
-  };
+      if (!billingPeriod || billingPeriod.month == null) {
+        return placementStatus ?? aggregateStatus;
+      }
+
+      if (baseStatus === "задолженность" || baseStatus === "ожидание") {
+        return baseStatus;
+      }
+
+      return isPaidInSelectedPeriod(client) ? "действует" : "ожидание";
+    },
+    [billingPeriod, getActivePlacement, isPaidInSelectedPeriod],
+  );
+
+  const getPayStatusTone = useCallback(
+    (client: Client): string => {
+      const status = getDisplayPayStatus(client);
+      if (status === "действует") {
+        return "rounded-full bg-emerald-100 text-emerald-700";
+      }
+      if (status === "задолженность") {
+        return "rounded-full bg-rose-100 text-rose-700";
+      }
+      return "rounded-full bg-amber-100 text-amber-700";
+    },
+    [getDisplayPayStatus],
+  );
 
   const columns: ColumnConfig[] = useMemo(() => [
     {
@@ -498,6 +548,9 @@ export default function ClientTable({
     billingPeriod,
     currency,
     currencyRates,
+    getDisplayPayStatus,
+    getPayStatusTone,
+    isPaidInSelectedPeriod,
     onCompletePaymentTask,
     onRemovePaymentTask,
     onCreateTask,
