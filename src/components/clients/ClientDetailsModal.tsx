@@ -22,7 +22,11 @@ import {
   getPaymentFactPlanLabel,
   normalizePaymentFacts,
 } from "../../state/paymentFacts";
-import { getClientPlacementDisplayStatus, getClientPlacementsWithFallback } from "./paymentStatus";
+import {
+  getClientPlacementDisplayStatus,
+  getClientPlacementsWithFallback,
+  matchesPlacement,
+} from "./paymentStatus";
 import ClientPaymentFactEditor, {
   type PaymentFactEditorValues,
 } from "./ClientPaymentFactEditor";
@@ -160,11 +164,7 @@ export default function ClientDetailsModal({
       }
     }
 
-    const placementFacts = paymentFacts.filter(fact => {
-      const matchesArea = !place.area || !fact.area || fact.area === place.area;
-      const matchesGroup = !place.group || !fact.group || fact.group === place.group;
-      return matchesArea && matchesGroup;
-    });
+    const placementFacts = paymentFacts.filter(fact => matchesPlacement(place, fact));
 
     const paidInSelectedPeriodForPlacement =
       billingPeriod?.month != null

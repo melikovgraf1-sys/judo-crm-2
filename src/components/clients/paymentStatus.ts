@@ -1,4 +1,4 @@
-import type { Client, ClientPlacement, PaymentStatus } from "../../types";
+import type { Client, ClientPlacement, PaymentFact, PaymentStatus } from "../../types";
 
 export const getClientPlacementsWithFallback = (client: Client): ClientPlacement[] => {
   if (Array.isArray(client.placements) && client.placements.length > 0) {
@@ -58,4 +58,17 @@ export const getClientPlacementDisplayStatus = (client: Client): PaymentStatus =
 
 export const clientHasWaitingPaymentStatus = (client: Client): boolean => {
   return getClientPlacementDisplayStatus(client) === "ожидание";
+};
+
+type PlacementLike = Pick<ClientPlacement, "area" | "group"> | null | undefined;
+
+export const matchesPlacement = (placement: PlacementLike, fact: PaymentFact): boolean => {
+  if (!placement) {
+    return true;
+  }
+
+  const matchesArea = !placement.area || !fact.area || fact.area === placement.area;
+  const matchesGroup = !placement.group || !fact.group || fact.group === placement.group;
+
+  return matchesArea && matchesGroup;
 };
