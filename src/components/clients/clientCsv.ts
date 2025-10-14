@@ -2,6 +2,7 @@ import { parseCsv, stringifyCsv } from "../../utils/csv";
 import { downloadTextFile } from "../../utils/download";
 import { transformClientFormValues } from "./clientMutations";
 import { todayISO, uid } from "../../state/utils";
+import { normalizePaymentFacts } from "../../state/paymentFacts";
 import { findClientDuplicates, type DuplicateMatchDetail } from "../../state/clients";
 import type {
   Area,
@@ -12,6 +13,7 @@ import type {
   DB,
   Gender,
   Group,
+  PaymentFact,
   PaymentMethod,
   PaymentStatus,
   SubscriptionPlan,
@@ -43,6 +45,7 @@ export const CLIENT_CSV_HEADERS = [
   "payActual",
   "remainingLessons",
   "statusUpdatedAt",
+  "payHistory",
 ] as const;
 
 type ClientCsvColumn = (typeof CLIENT_CSV_HEADERS)[number];
@@ -105,6 +108,13 @@ const HEADER_ALIASES: HeaderAliasMap = {
   statusupdatedat: "statusUpdatedAt",
   "status_updated_at": "statusUpdatedAt",
   "обновление_статуса": "statusUpdatedAt",
+  payhistory: "payHistory",
+  "paymentfacts": "payHistory",
+  "payfacts": "payHistory",
+  "история_оплат": "payHistory",
+  "историяоплат": "payHistory",
+  "факты_оплат": "payHistory",
+  "фактыоплат": "payHistory",
 };
 
 const REQUIRED_COLUMNS: ClientCsvColumn[] = [
@@ -297,6 +307,9 @@ function rowToRecord(headerMap: Map<ClientCsvColumn, number>, row: string[]): Re
 }
 
 function clientToRow(client: Client): (string | number | null | undefined)[] {
+  const normalizedPayHistory = normalizePaymentFacts(client.payHistory);
+  const serializedPayHistory = normalizedPayHistory.length ? JSON.stringify(normalizedPayHistory) : "";
+
   return [
     client.firstName,
     client.lastName ?? "",
@@ -321,6 +334,7 @@ function clientToRow(client: Client): (string | number | null | undefined)[] {
     client.payActual != null ? client.payActual : "",
     client.remainingLessons != null ? client.remainingLessons : "",
     client.statusUpdatedAt ? client.statusUpdatedAt.slice(0, 10) : "",
+    serializedPayHistory,
   ];
 }
 
@@ -358,6 +372,7 @@ export function buildClientCsvTemplate(): string {
     "",
     "",
     "2024-10-10",
+    '[{"area":"Центр","group":"Младшая группа","paidAt":"2024-09-10","recordedAt":"2024-09-10","amount":12000,"subscriptionPlan":"monthly","periodLabel":"сентябрь 2024 г."}]',
   ];
 
   return stringifyCsv([[...CLIENT_CSV_HEADERS], commentRow]);
@@ -558,6 +573,38 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       hasError = true;
     }
 
+    const rawPayHistory = record.payHistory.trim();
+    const payHistoryProvided = rawPayHistory.length > 0;
+    let importedPayHistory: PaymentFact[] | undefined;
+
+    if (payHistoryProvided) {
+      try {
+        const parsed = JSON.parse(rawPayHistory) as unknown;
+        if (!Array.isArray(parsed)) {
+          errors.push(
+            `Строка ${lineNumber}: некорректный формат payHistory (ожидается JSON массив фактов оплат)`,
+          );
+          hasError = true;
+        } else {
+          const normalized = normalizePaymentFacts(parsed);
+          const meaningfulEntries = parsed.filter(entry => entry != null).length;
+          if (meaningfulEntries > 0 && normalized.length < meaningfulEntries) {
+            errors.push(
+              `Строка ${lineNumber}: часть фактов оплат в payHistory не распознана, проверьте данные`,
+            );
+            hasError = true;
+          } else {
+            importedPayHistory = normalized;
+          }
+        }
+      } catch (parseError) {
+        errors.push(
+          `Строка ${lineNumber}: некорректный JSON в payHistory (${(parseError as Error).message})`,
+        );
+        hasError = true;
+      }
+    }
+
     if (hasError) {
       continue;
     }
@@ -600,6 +647,14 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
     const derivedStatusUpdatedAt = statusUpdatedAt ?? client.startDate ?? client.statusUpdatedAt;
     if (derivedStatusUpdatedAt) {
       client.statusUpdatedAt = derivedStatusUpdatedAt;
+    }
+
+    if (payHistoryProvided) {
+      if (importedPayHistory && importedPayHistory.length) {
+        client.payHistory = importedPayHistory;
+      } else {
+        delete client.payHistory;
+      }
     }
     created.push(client);
   }
@@ -663,6 +718,25 @@ function mergeClientData(target: Client, source: Omit<Client, "id">) {
       if (primary.payAmount != null) target.payAmount = primary.payAmount;
       if (primary.payActual != null) target.payActual = primary.payActual;
       if (primary.remainingLessons != null) target.remainingLessons = primary.remainingLessons;
+    }
+  }
+
+  const existingFacts = normalizePaymentFacts(target.payHistory);
+  const incomingFacts = normalizePaymentFacts(source.payHistory);
+  if (existingFacts.length || incomingFacts.length) {
+    const combined = [...existingFacts];
+    const knownIds = new Set(existingFacts.map(fact => fact.id));
+    for (const fact of incomingFacts) {
+      if (!knownIds.has(fact.id)) {
+        combined.push(fact);
+        knownIds.add(fact.id);
+      }
+    }
+
+    if (combined.length) {
+      target.payHistory = combined;
+    } else if (target.payHistory) {
+      delete target.payHistory;
     }
   }
 }
