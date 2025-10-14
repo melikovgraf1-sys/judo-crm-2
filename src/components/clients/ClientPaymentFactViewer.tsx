@@ -26,7 +26,6 @@ export default function ClientPaymentFactViewer({
   deleting,
 }: Props) {
   const paidAt = fact.paidAt ? fmtDate(fact.paidAt) : "—";
-  const recordedAt = fact.recordedAt ? fmtDate(fact.recordedAt) : "—";
   const amount =
     typeof fact.amount === "number" ? fmtMoney(fact.amount, currency, currencyRates) : "—";
   const plan = getPaymentFactPlanLabel(fact.subscriptionPlan) ?? "—";
@@ -42,7 +41,6 @@ export default function ClientPaymentFactViewer({
           <FactRow label="Район" value={fact.area ?? "—"} />
           <FactRow label="Группа" value={fact.group ?? "—"} />
           <FactRow label="Дата оплаты" value={paidAt} />
-          <FactRow label="Дата фиксации" value={recordedAt} />
           <FactRow label="Сумма" value={amount} />
           <FactRow label="Форма абонемента" value={plan} />
           <FactRow label="Период" value={period} />

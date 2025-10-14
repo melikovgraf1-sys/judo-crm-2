@@ -8,7 +8,6 @@ export interface PaymentFactEditorValues {
   area: string;
   group: string;
   paidAt: string;
-  recordedAt: string;
   amount: string;
   subscriptionPlan: SubscriptionPlan | "";
   periodLabel: string;
@@ -64,7 +63,6 @@ export default function ClientPaymentFactEditor({
     area: fact.area ?? "",
     group: fact.group ?? "",
     paidAt: getDateInputValue(fact.paidAt),
-    recordedAt: getDateInputValue(fact.recordedAt),
     amount: fact.amount != null ? String(fact.amount) : "",
     subscriptionPlan: fact.subscriptionPlan ?? "",
     periodLabel: fact.periodLabel ?? "",
@@ -72,9 +70,9 @@ export default function ClientPaymentFactEditor({
 
   const recommendedPeriod = useMemo(() => {
     const plan = form.subscriptionPlan ? (form.subscriptionPlan as SubscriptionPlan) : undefined;
-    const reference = form.paidAt || form.recordedAt;
-    return formatPaymentPeriod(plan, reference || undefined);
-  }, [form.paidAt, form.recordedAt, form.subscriptionPlan]);
+    const reference = form.paidAt || undefined;
+    return formatPaymentPeriod(plan, reference);
+  }, [form.paidAt, form.subscriptionPlan]);
 
   const areaOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -108,7 +106,7 @@ export default function ClientPaymentFactEditor({
     return Array.from(unique);
   }, [availableGroups, fact.group, form.group]);
 
-  const referenceDate = form.paidAt || form.recordedAt || undefined;
+  const referenceDate = form.paidAt || undefined;
   const monthOptions = useMemo(
     () => getRecentMonths(referenceDate),
     [referenceDate],
@@ -148,7 +146,7 @@ export default function ClientPaymentFactEditor({
       setForm(prev => {
         const nextPlan = value ? (value as SubscriptionPlan | "") : "";
         const normalizedPlan = nextPlan ? (nextPlan as SubscriptionPlan) : undefined;
-        const reference = prev.paidAt || prev.recordedAt || undefined;
+        const reference = prev.paidAt || undefined;
         const previousRecommendation = prev.subscriptionPlan
           ? formatPaymentPeriod(prev.subscriptionPlan as SubscriptionPlan, reference)
           : undefined;
@@ -232,16 +230,6 @@ export default function ClientPaymentFactEditor({
               type="date"
               name="paidAt"
               value={form.paidAt}
-              onChange={handleChange}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-            <span className="font-medium text-slate-700 dark:text-slate-200">Дата фиксации</span>
-            <input
-              type="date"
-              name="recordedAt"
-              value={form.recordedAt}
               onChange={handleChange}
               className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
             />

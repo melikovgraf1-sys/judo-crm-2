@@ -301,7 +301,6 @@ export default function ClientDetailsModal({
     setPendingFactId(editingFact.id);
     try {
       const normalizedPaidAt = parseDateInput(values.paidAt);
-      const normalizedRecordedAt = parseDateInput(values.recordedAt);
       const amountValue = values.amount.trim();
       const parsedAmount = amountValue.length ? Number.parseFloat(amountValue) : Number.NaN;
       const amount = Number.isFinite(parsedAmount) ? parsedAmount : undefined;
@@ -311,7 +310,7 @@ export default function ClientDetailsModal({
         area: values.area.trim() ? values.area.trim() : undefined,
         group: values.group.trim() ? values.group.trim() : undefined,
         paidAt: normalizedPaidAt || undefined,
-        recordedAt: normalizedRecordedAt || undefined,
+        recordedAt: editingFact.recordedAt || undefined,
         amount,
         subscriptionPlan: values.subscriptionPlan || undefined,
       });
