@@ -466,6 +466,8 @@ export default function GroupsTab({
           performance={db.performance}
           billingPeriod={period}
           onPaymentFactsChange={handlePaymentFactsChange}
+          activeArea={area}
+          activeGroup={group}
         />
       </div>
       {modalOpen && (

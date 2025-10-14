@@ -260,6 +260,59 @@ test('filters clients by selected month', async () => {
   });
 });
 
+test('shows paid status for the active placement even if other placements owe', async () => {
+  const db = makeDB();
+  const client = makeClient({
+    id: 'multi',
+    firstName: 'Мульти',
+    payStatus: 'задолженность',
+    area: 'Area1',
+    group: 'Group1',
+  });
+
+  client.payAmount = 55;
+  client.payActual = 55;
+  client.payHistory = [
+    { id: 'fact-1', area: 'Area1', group: 'Group1', paidAt: '2024-01-10T00:00:00.000Z' },
+  ];
+  client.placements = [
+    {
+      id: 'pl-1',
+      area: 'Area1',
+      group: 'Group1',
+      payStatus: 'действует',
+      status: 'действующий',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-01-05T00:00:00.000Z',
+      payAmount: 55,
+      payActual: 55,
+      remainingLessons: 5,
+    },
+    {
+      id: 'pl-2',
+      area: 'Area1',
+      group: 'Group2',
+      payStatus: 'задолженность',
+      status: 'действующий',
+      subscriptionPlan: 'monthly',
+      payDate: '2024-01-05T00:00:00.000Z',
+      payAmount: 55,
+      payActual: 0,
+      remainingLessons: 5,
+    },
+  ];
+
+  db.clients = [client];
+
+  renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  const nameCell = await screen.findByText('Мульти');
+  const row = nameCell.closest('tr');
+  expect(row).not.toBeNull();
+  expect(within(row).getByText('действует')).toBeInTheDocument();
+  expect(db.clients[0].placements.find(place => place.group === 'Group2')?.payStatus).toBe('задолженность');
+});
+
 test('hides clients assigned to reserve area', () => {
   const db = makeDB();
   db.settings.areas = [...db.settings.areas, 'резерв'];
