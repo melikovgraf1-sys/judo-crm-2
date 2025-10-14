@@ -468,6 +468,7 @@ export default function GroupsTab({
           onPaymentFactsChange={handlePaymentFactsChange}
           activeArea={area}
           activeGroup={group}
+          resolveClient={clientId => db.clients.find(client => client.id === clientId) ?? null}
         />
       </div>
       {modalOpen && (
