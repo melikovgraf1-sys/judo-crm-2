@@ -49,6 +49,7 @@ type Props = {
   ) => Promise<boolean | void> | boolean | void;
   activeArea?: Area | null;
   activeGroup?: Group | null;
+  resolveClient?: (clientId: string) => Client | null;
 };
 
 type ColumnConfig = {
@@ -102,6 +103,7 @@ export default function ClientTable({
   onPaymentFactsChange,
   activeArea,
   activeGroup,
+  resolveClient,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedClient = useMemo(() => {
@@ -109,8 +111,15 @@ export default function ClientTable({
       return null;
     }
 
+    if (resolveClient) {
+      const resolved = resolveClient(selectedId);
+      if (resolved) {
+        return resolved;
+      }
+    }
+
     return list.find(client => client.id === selectedId) ?? null;
-  }, [list, selectedId]);
+  }, [list, resolveClient, selectedId]);
   const remainingMap = useMemo(() => {
     const map = new Map<string, number | null>();
     list.forEach(client => {

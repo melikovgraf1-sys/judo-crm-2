@@ -594,6 +594,7 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
           attendance={db.attendance}
           performance={db.performance}
           onPaymentFactsChange={handlePaymentFactsChange}
+          resolveClient={clientId => db.clients.find(client => client.id === clientId) ?? null}
         />
       </div>
       {modalOpen && (
