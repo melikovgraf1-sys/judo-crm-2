@@ -417,8 +417,54 @@ function coachSalaryForAreas(db: DB, areas: Area[]): number {
   return areas.reduce((sum, area) => sum + ensureNumber(db.settings.coachSalaryByAreaEUR?.[area] ?? 0), 0);
 }
 
+type EarliestSlot = { time: string; weekday: number };
+
 export function getAnalyticsGroups(db: DB, area: Area): Group[] {
-  return groupsForArea(db, area).sort((a, b) => a.localeCompare(b));
+  const groups = groupsForArea(db, area);
+  if (groups.length <= 1) {
+    return groups;
+  }
+
+  const earliestByGroup = new Map<Group, EarliestSlot>();
+  for (const slot of db.schedule) {
+    if (slot.area !== area) {
+      continue;
+    }
+
+    const candidate: EarliestSlot = { time: slot.time, weekday: slot.weekday };
+    const current = earliestByGroup.get(slot.group);
+    if (!current) {
+      earliestByGroup.set(slot.group, candidate);
+      continue;
+    }
+
+    const timeCompare = candidate.time.localeCompare(current.time);
+    if (timeCompare < 0 || (timeCompare === 0 && candidate.weekday < current.weekday)) {
+      earliestByGroup.set(slot.group, candidate);
+    }
+  }
+
+  return groups.sort((groupA, groupB) => {
+    const earliestA = earliestByGroup.get(groupA);
+    const earliestB = earliestByGroup.get(groupB);
+
+    if (earliestA && earliestB) {
+      const timeCompare = earliestA.time.localeCompare(earliestB.time);
+      if (timeCompare !== 0) {
+        return timeCompare;
+      }
+      const weekdayCompare = earliestA.weekday - earliestB.weekday;
+      if (weekdayCompare !== 0) {
+        return weekdayCompare;
+      }
+    } else if (earliestA) {
+      return -1;
+    } else if (earliestB) {
+      return 1;
+    }
+
+    return groupA.localeCompare(groupB);
+  });
 }
 
 export function getAnalyticsAreas(db: DB): AreaScope[] {
