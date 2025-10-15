@@ -149,6 +149,14 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
   const favorites = useMemo(() => db.settings.analyticsFavorites ?? [], [db.settings.analyticsFavorites]);
   const scopeGroup = area === "all" ? null : group;
   const snapshot = useMemo(() => computeAnalyticsSnapshot(db, area, period, scopeGroup), [db, area, period, scopeGroup]);
+  const hasGroupScope = area !== "all" && Boolean(scopeGroup);
+
+  const displayedMetrics = useMemo(() => {
+    if (!hasGroupScope) {
+      return METRIC_ORDER;
+    }
+    return METRIC_ORDER.filter(metric => metric !== "profit");
+  }, [hasGroupScope]);
 
   const parseInputValue = useCallback((raw: string): number => {
     if (!raw.trim()) {
@@ -251,15 +259,19 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
     [currency, currencyRates, snapshot.metrics],
   );
 
-  const formattedRent = useMemo(
-    () => formatMetricValue(snapshot.rent, "money", currency, currencyRates),
-    [snapshot.rent, currency, currencyRates],
-  );
+  const formattedRent = useMemo(() => {
+    if (hasGroupScope) {
+      return "—";
+    }
+    return formatMetricValue(snapshot.rent, "money", currency, currencyRates);
+  }, [currency, currencyRates, hasGroupScope, snapshot.rent]);
 
-  const formattedCoachSalary = useMemo(
-    () => formatMetricValue(snapshot.coachSalary, "money", currency, currencyRates),
-    [snapshot.coachSalary, currency, currencyRates],
-  );
+  const formattedCoachSalary = useMemo(() => {
+    if (hasGroupScope) {
+      return "—";
+    }
+    return formatMetricValue(snapshot.coachSalary, "money", currency, currencyRates);
+  }, [currency, currencyRates, hasGroupScope, snapshot.coachSalary]);
 
   const athleteMetrics = useMemo(
     () =>
@@ -386,7 +398,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {METRIC_ORDER.map(metric => {
+              {displayedMetrics.map(metric => {
                 const metricData = snapshot.metrics[metric];
                 return (
                   <tr key={metric} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/60">
@@ -440,7 +452,7 @@ export default function AnalyticsTab({ db, setDB, currency }: Props) {
             Зарплата тренера: <strong>{formattedCoachSalary}</strong>
           </span>
         </div>
-        {area !== "all" && (
+        {area !== "all" && !hasGroupScope && (
           <div className="flex flex-wrap items-end gap-4">
             <label className="flex flex-col text-sm font-medium text-slate-600 dark:text-slate-300">
               <span className="mb-1">Аренда (EUR)</span>

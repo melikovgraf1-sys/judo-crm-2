@@ -415,8 +415,8 @@ export function computeAnalyticsSnapshot(
   const capacity = hasGroupScope
     ? groupLimit(db, area as Area, scopedGroup as string)
     : relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
-  const rent = rentForAreas(db, relevantAreas);
-  const coachSalary = coachSalaryForAreas(db, relevantAreas);
+  const rent = hasGroupScope ? 0 : rentForAreas(db, relevantAreas);
+  const coachSalary = hasGroupScope ? 0 : coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce(
     (sum, client) => sum + getClientActualAmount(client, period),
@@ -427,11 +427,11 @@ export function computeAnalyticsSnapshot(
     ? maxRevenueForGroup(db, area as Area, scopedGroup as string)
     : relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
 
-  const totalExpenses = rent + coachSalary;
+  const totalExpenses = hasGroupScope ? 0 : rent + coachSalary;
 
-  const actualProfit = actualRevenue - totalExpenses;
-  const forecastProfit = forecastRevenue - totalExpenses;
-  const maxProfit = maxRevenue - totalExpenses;
+  const actualProfit = hasGroupScope ? 0 : actualRevenue - totalExpenses;
+  const forecastProfit = hasGroupScope ? 0 : forecastRevenue - totalExpenses;
+  const maxProfit = hasGroupScope ? 0 : maxRevenue - totalExpenses;
 
   const actualFill = capacity ? (actualClients.length / capacity) * 100 : 0;
   const forecastFill = capacity ? (rosterClients.length / capacity) * 100 : 0;

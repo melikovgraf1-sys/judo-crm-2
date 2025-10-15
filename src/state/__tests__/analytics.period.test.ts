@@ -287,4 +287,16 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.forecast).toBe(80);
     expect(snapshot.athleteStats.total).toBe(1);
   });
+
+  it("omits rent, coach salary and profit when filtering by group", () => {
+    const db = buildDB();
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.rent).toBe(0);
+    expect(snapshot.coachSalary).toBe(0);
+    expect(snapshot.metrics.profit.values.actual).toBe(0);
+    expect(snapshot.metrics.profit.values.forecast).toBe(0);
+    expect(snapshot.metrics.profit.values.target).toBe(0);
+  });
 });
