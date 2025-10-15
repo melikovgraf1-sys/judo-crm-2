@@ -16,6 +16,7 @@ import {
 } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
 import { isReserveArea } from "../state/areas";
+import { getClientPlacements } from "../state/clients";
 import type {
   Area,
   AttendanceEntry,
@@ -157,7 +158,12 @@ export default function AttendanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(client => client.area === area && client.group === group && !isReserveArea(client.area));
+    return db.clients.filter(client =>
+      getClientPlacements(client).some(
+        placement =>
+          placement.area === area && placement.group === group && !isReserveArea(placement.area),
+      ),
+    );
   }, [area, group, db.clients]);
 
 
