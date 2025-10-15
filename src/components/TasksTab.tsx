@@ -253,8 +253,16 @@ export default function TasksTab({
       const taskGroupKey = normalizeKey(task.group);
 
       if (normalizedArea) {
-        if (taskAreaKey !== normalizedArea) {
+        if (taskAreaKey === normalizedArea) {
+          // Task belongs to the selected area – no further checks required.
+        } else {
           const areaGroups = areaEntries.get(normalizedArea)?.groups ?? null;
+
+          // Tasks explicitly assigned to another area should never match a different area filter.
+          if (taskAreaKey) {
+            return false;
+          }
+
           if (!areaGroups || !taskGroupKey || !areaGroups.has(taskGroupKey)) {
             return false;
           }
