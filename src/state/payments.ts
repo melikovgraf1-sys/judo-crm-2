@@ -34,6 +34,35 @@ const ADULT_GROUP_NAMES = ["взрослое", "взрослые", "взросл
 
 const normalize = (value: string | undefined | null) => value?.trim().toLowerCase() ?? "";
 
+const AREA_GROUP_PRICE_OVERRIDES: Record<string, number> = {
+  "джикджилли|фокус": 25,
+};
+
+const getOverrideKey = (area?: string | null, group?: string | null): string | null => {
+  const normalizedArea = normalize(area);
+  const normalizedGroup = normalize(group);
+  if (!normalizedArea || !normalizedGroup) {
+    return null;
+  }
+  return `${normalizedArea}|${normalizedGroup}`;
+};
+
+const resolveAreaGroupOverride = (area?: string | null, group?: string | null): number | null => {
+  const key = getOverrideKey(area, group);
+  if (!key) {
+    return null;
+  }
+  const override = AREA_GROUP_PRICE_OVERRIDES[key];
+  return override == null ? null : override;
+};
+
+export const getAreaGroupOverride = (
+  area?: string | null,
+  group?: string | null,
+): number | null => {
+  return resolveAreaGroupOverride(area, group);
+};
+
 export function isIndividualGroup(group: string): boolean {
   const normalized = normalize(group);
   return INDIVIDUAL_GROUP_NAMES.some(name => normalized === name);
@@ -48,7 +77,11 @@ export function shouldAllowCustomPayAmount(group: string): boolean {
   return isIndividualGroup(group) || isAdultGroup(group);
 }
 
-export function getDefaultPayAmount(group: string): number | null {
+export function getDefaultPayAmount(group: string, area?: string | null): number | null {
+  const override = resolveAreaGroupOverride(area, group);
+  if (override != null) {
+    return override;
+  }
   if (isIndividualGroup(group)) {
     return 130;
   }

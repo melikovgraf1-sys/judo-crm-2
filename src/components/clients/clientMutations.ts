@@ -1,4 +1,5 @@
 import {
+  getAreaGroupOverride,
   getDefaultPayAmount,
   getSubscriptionPlanAmount,
   shouldAllowCustomPayAmount,
@@ -39,6 +40,7 @@ const normalizePlacement = (
     placement.group,
     placement.subscriptionPlan,
     previous?.payAmount,
+    placement.area,
   );
 
   const isDiscountPlan = placement.subscriptionPlan === "discount";
@@ -92,11 +94,17 @@ export function resolvePayAmount(
   group: Group,
   subscriptionPlan: SubscriptionPlan,
   previous?: number,
+  area?: string,
 ): number | undefined {
   const planAmount = getSubscriptionPlanAmount(subscriptionPlan);
-  const defaultAmount = getDefaultPayAmount(group);
+  const defaultAmount = getDefaultPayAmount(group, area);
   const groupAllowsCustom = shouldAllowCustomPayAmount(group);
   const planAllowsCustom = subscriptionPlanAllowsCustomAmount(subscriptionPlan);
+  const overrideAmount = getAreaGroupOverride(area, group);
+
+  if (overrideAmount != null) {
+    return overrideAmount;
+  }
 
   if (planAmount != null && !groupAllowsCustom) {
     return planAmount;

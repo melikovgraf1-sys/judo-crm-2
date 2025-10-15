@@ -1,5 +1,5 @@
 import { getClientPlacements } from "./clients";
-import { getDefaultPayAmount } from "./payments";
+import { getAreaGroupOverride, getDefaultPayAmount } from "./payments";
 import { normalizePaymentFacts } from "./paymentFacts";
 import { convertMoney } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
@@ -300,21 +300,69 @@ function groupLimit(db: DB, area: Area, group: string): number {
   return db.settings.limits?.[`${area}|${group}`] ?? 0;
 }
 
-function deriveGroupPrice(db: DB, group: string): number {
-  const cached = getDefaultPayAmount(group);
+function deriveGroupPrice(db: DB, group: string, area?: Area | null): number {
+  const cached = getDefaultPayAmount(group, area);
   if (cached != null) {
     return cached;
   }
-  const relevant = db.clients.filter(client => client.group === group && client.payAmount != null);
-  if (!relevant.length) {
+
+  const amounts: number[] = [];
+
+  for (const client of db.clients) {
+    const placements = getClientPlacements(client);
+    for (const placement of placements) {
+      if (placement.group !== group) {
+        continue;
+      }
+      if (area && placement.area !== area) {
+        continue;
+      }
+      if (placement.payAmount != null) {
+        amounts.push(ensureNumber(placement.payAmount));
+      }
+    }
+  }
+
+  if (!amounts.length) {
     return 0;
   }
-  const total = relevant.reduce((sum, client) => sum + (client.payAmount ?? 0), 0);
-  return total / relevant.length;
+
+  const total = amounts.reduce((sum, amount) => sum + amount, 0);
+  return total / amounts.length;
 }
 
-function getClientForecastAmount(client: Client): number {
-  return ensureNumber(client.payAmount ?? getDefaultPayAmount(client.group) ?? 0);
+function getClientForecastAmount(
+  client: Client,
+  area?: Area | null,
+  group?: Group | null,
+): number {
+  const placements = getClientPlacements(client);
+
+  const matches =
+    placements.find(placement => {
+      if (group && placement.group !== group) {
+        return false;
+      }
+      if (area && placement.area !== area) {
+        return false;
+      }
+      return true;
+    }) ?? (area ? placements.find(placement => placement.area === area) : undefined) ?? placements[0];
+
+  const resolvedArea = matches?.area ?? area ?? client.area;
+  const resolvedGroup = matches?.group ?? group ?? client.group;
+
+  const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
+  if (overrideAmount != null) {
+    return ensureNumber(overrideAmount);
+  }
+
+  const resolvedPayAmount = matches?.payAmount ?? client.payAmount;
+  if (resolvedPayAmount != null) {
+    return ensureNumber(resolvedPayAmount);
+  }
+
+  return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
 }
 
 function getClientActualAmount(client: Client, period?: PeriodFilter): number {
@@ -339,7 +387,7 @@ function maxRevenueForArea(db: DB, area: Area): number {
     if (!limit) {
       return sum;
     }
-    const price = deriveGroupPrice(db, group);
+    const price = deriveGroupPrice(db, group, area);
     return sum + price * limit;
   }, 0);
 }
@@ -349,7 +397,7 @@ function maxRevenueForGroup(db: DB, area: Area, group: string): number {
   if (!limit) {
     return 0;
   }
-  const price = deriveGroupPrice(db, group);
+  const price = deriveGroupPrice(db, group, area);
   return price * limit;
 }
 
@@ -412,26 +460,32 @@ export function computeAnalyticsSnapshot(
   const rosterClients = periodClients.filter(client => !isCanceledStatus(client.status));
   const actualClients = rosterClients.filter(client => client.payStatus === "действует");
 
+  const targetArea = area === "all" ? undefined : (area as Area);
+  const targetGroup = hasGroupScope ? (scopedGroup as string) : undefined;
+
   const capacity = hasGroupScope
     ? groupLimit(db, area as Area, scopedGroup as string)
     : relevantAreas.reduce((sum, item) => sum + capacityForArea(db, item), 0);
-  const rent = rentForAreas(db, relevantAreas);
-  const coachSalary = coachSalaryForAreas(db, relevantAreas);
+  const rent = hasGroupScope ? 0 : rentForAreas(db, relevantAreas);
+  const coachSalary = hasGroupScope ? 0 : coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce(
     (sum, client) => sum + getClientActualAmount(client, period),
     0,
   );
-  const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientForecastAmount(client), 0);
+  const forecastRevenue = rosterClients.reduce(
+    (sum, client) => sum + getClientForecastAmount(client, targetArea, targetGroup),
+    0,
+  );
   const maxRevenue = hasGroupScope
     ? maxRevenueForGroup(db, area as Area, scopedGroup as string)
     : relevantAreas.reduce((sum, item) => sum + maxRevenueForArea(db, item), 0);
 
-  const totalExpenses = rent + coachSalary;
+  const totalExpenses = hasGroupScope ? 0 : rent + coachSalary;
 
-  const actualProfit = actualRevenue - totalExpenses;
-  const forecastProfit = forecastRevenue - totalExpenses;
-  const maxProfit = maxRevenue - totalExpenses;
+  const actualProfit = hasGroupScope ? 0 : actualRevenue - totalExpenses;
+  const forecastProfit = hasGroupScope ? 0 : forecastRevenue - totalExpenses;
+  const maxProfit = hasGroupScope ? 0 : maxRevenue - totalExpenses;
 
   const actualFill = capacity ? (actualClients.length / capacity) * 100 : 0;
   const forecastFill = capacity ? (rosterClients.length / capacity) * 100 : 0;
