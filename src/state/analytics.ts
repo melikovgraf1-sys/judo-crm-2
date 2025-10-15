@@ -365,10 +365,66 @@ function getClientForecastAmount(
   return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
 }
 
-function getClientActualAmount(client: Client, period?: PeriodFilter): number {
+type AnalyticsScope = {
+  area: AreaScope;
+  group: Group | null;
+};
+
+function factMatchesScope(
+  factArea: Area | undefined,
+  factGroup: Group | undefined,
+  scope: AnalyticsScope,
+  placements: ReturnType<typeof getClientPlacements>,
+): boolean {
+  if (scope.area !== "all") {
+    if (factArea) {
+      if (factArea !== scope.area) {
+        return false;
+      }
+    } else {
+      const hasAreaPlacement = placements.some(placement => placement.area === scope.area);
+      if (!hasAreaPlacement) {
+        return false;
+      }
+    }
+  }
+
+  if (scope.group) {
+    if (factGroup) {
+      if (factGroup !== scope.group) {
+        return false;
+      }
+    } else {
+      const hasGroupPlacement = placements.some(placement => {
+        if (scope.area !== "all" && placement.area !== scope.area) {
+          return false;
+        }
+        return placement.group === scope.group;
+      });
+      if (!hasGroupPlacement) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function getClientActualAmount(
+  client: Client,
+  period?: PeriodFilter,
+  scope: AnalyticsScope = { area: "all", group: null },
+): number {
   if (period) {
     const history = normalizePaymentFacts(client.payHistory);
-    const matchingFacts = history.filter(fact => matchesPeriod(fact, period));
+    const placements = getClientPlacements(client);
+    const matchingFacts = history.filter(fact => {
+      if (!matchesPeriod(fact, period)) {
+        return false;
+      }
+
+      return factMatchesScope(fact.area, fact.group, scope, placements);
+    });
     if (!matchingFacts.length) {
       return 0;
     }
@@ -409,8 +465,54 @@ function coachSalaryForAreas(db: DB, areas: Area[]): number {
   return areas.reduce((sum, area) => sum + ensureNumber(db.settings.coachSalaryByAreaEUR?.[area] ?? 0), 0);
 }
 
+type EarliestSlot = { time: string; weekday: number };
+
 export function getAnalyticsGroups(db: DB, area: Area): Group[] {
-  return groupsForArea(db, area).sort((a, b) => a.localeCompare(b));
+  const groups = groupsForArea(db, area);
+  if (groups.length <= 1) {
+    return groups;
+  }
+
+  const earliestByGroup = new Map<Group, EarliestSlot>();
+  for (const slot of db.schedule) {
+    if (slot.area !== area) {
+      continue;
+    }
+
+    const candidate: EarliestSlot = { time: slot.time, weekday: slot.weekday };
+    const current = earliestByGroup.get(slot.group);
+    if (!current) {
+      earliestByGroup.set(slot.group, candidate);
+      continue;
+    }
+
+    const timeCompare = candidate.time.localeCompare(current.time);
+    if (timeCompare < 0 || (timeCompare === 0 && candidate.weekday < current.weekday)) {
+      earliestByGroup.set(slot.group, candidate);
+    }
+  }
+
+  return groups.sort((groupA, groupB) => {
+    const earliestA = earliestByGroup.get(groupA);
+    const earliestB = earliestByGroup.get(groupB);
+
+    if (earliestA && earliestB) {
+      const timeCompare = earliestA.time.localeCompare(earliestB.time);
+      if (timeCompare !== 0) {
+        return timeCompare;
+      }
+      const weekdayCompare = earliestA.weekday - earliestB.weekday;
+      if (weekdayCompare !== 0) {
+        return weekdayCompare;
+      }
+    } else if (earliestA) {
+      return -1;
+    } else if (earliestB) {
+      return 1;
+    }
+
+    return groupA.localeCompare(groupB);
+  });
 }
 
 export function getAnalyticsAreas(db: DB): AreaScope[] {
@@ -435,6 +537,10 @@ export function computeAnalyticsSnapshot(
   const relevantAreaSet = new Set(relevantAreas);
   const scopedGroup = area === "all" ? null : group ?? null;
   const hasGroupScope = area !== "all" && typeof scopedGroup === "string" && scopedGroup.length > 0;
+  const scope: AnalyticsScope = {
+    area,
+    group: hasGroupScope ? (scopedGroup as Group) : null,
+  };
   const periodClients = db.clients.filter(client => {
     const placements = getClientPlacements(client);
     const matchesArea =
@@ -470,7 +576,7 @@ export function computeAnalyticsSnapshot(
   const coachSalary = hasGroupScope ? 0 : coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce(
-    (sum, client) => sum + getClientActualAmount(client, period),
+    (sum, client) => sum + getClientActualAmount(client, period, scope),
     0,
   );
   const forecastRevenue = rosterClients.reduce(
@@ -545,7 +651,7 @@ export function computeAnalyticsSnapshot(
 
   const athleteStats: AthleteStats = {
     total: rosterClients.length,
-    payments: rosterClients.filter(client => getClientActualAmount(client, period) > 0).length,
+    payments: rosterClients.filter(client => getClientActualAmount(client, period, scope) > 0).length,
     new: rosterClients.filter(client => client.status === "новый").length,
     firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
     canceled: periodClients.filter(client => isCanceledStatus(client.status)).length,
