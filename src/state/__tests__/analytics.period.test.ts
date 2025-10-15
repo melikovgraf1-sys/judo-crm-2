@@ -136,6 +136,16 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.athleteStats.attendanceRate).toBe(100);
   });
 
+  it("counts actual revenue even if the pay status is not active", () => {
+    const db = buildDB();
+    db.clients[1].payStatus = "ожидает оплаты";
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "all", period);
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(130);
+  });
+
   it("excludes clients whose start date is after the period", () => {
     const db = buildDB();
     db.clients.push({
