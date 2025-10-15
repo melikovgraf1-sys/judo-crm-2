@@ -317,10 +317,66 @@ function getClientForecastAmount(client: Client): number {
   return ensureNumber(client.payAmount ?? getDefaultPayAmount(client.group) ?? 0);
 }
 
-function getClientActualAmount(client: Client, period?: PeriodFilter): number {
+type AnalyticsScope = {
+  area: AreaScope;
+  group: Group | null;
+};
+
+function factMatchesScope(
+  factArea: Area | undefined,
+  factGroup: Group | undefined,
+  scope: AnalyticsScope,
+  placements: ReturnType<typeof getClientPlacements>,
+): boolean {
+  if (scope.area !== "all") {
+    if (factArea) {
+      if (factArea !== scope.area) {
+        return false;
+      }
+    } else {
+      const hasAreaPlacement = placements.some(placement => placement.area === scope.area);
+      if (!hasAreaPlacement) {
+        return false;
+      }
+    }
+  }
+
+  if (scope.group) {
+    if (factGroup) {
+      if (factGroup !== scope.group) {
+        return false;
+      }
+    } else {
+      const hasGroupPlacement = placements.some(placement => {
+        if (scope.area !== "all" && placement.area !== scope.area) {
+          return false;
+        }
+        return placement.group === scope.group;
+      });
+      if (!hasGroupPlacement) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function getClientActualAmount(
+  client: Client,
+  period?: PeriodFilter,
+  scope: AnalyticsScope = { area: "all", group: null },
+): number {
   if (period) {
     const history = normalizePaymentFacts(client.payHistory);
-    const matchingFacts = history.filter(fact => matchesPeriod(fact, period));
+    const placements = getClientPlacements(client);
+    const matchingFacts = history.filter(fact => {
+      if (!matchesPeriod(fact, period)) {
+        return false;
+      }
+
+      return factMatchesScope(fact.area, fact.group, scope, placements);
+    });
     if (!matchingFacts.length) {
       return 0;
     }
@@ -387,6 +443,10 @@ export function computeAnalyticsSnapshot(
   const relevantAreaSet = new Set(relevantAreas);
   const scopedGroup = area === "all" ? null : group ?? null;
   const hasGroupScope = area !== "all" && typeof scopedGroup === "string" && scopedGroup.length > 0;
+  const scope: AnalyticsScope = {
+    area,
+    group: hasGroupScope ? (scopedGroup as Group) : null,
+  };
   const periodClients = db.clients.filter(client => {
     const placements = getClientPlacements(client);
     const matchesArea =
@@ -419,7 +479,7 @@ export function computeAnalyticsSnapshot(
   const coachSalary = hasGroupScope ? 0 : coachSalaryForAreas(db, relevantAreas);
 
   const actualRevenue = actualClients.reduce(
-    (sum, client) => sum + getClientActualAmount(client, period),
+    (sum, client) => sum + getClientActualAmount(client, period, scope),
     0,
   );
   const forecastRevenue = rosterClients.reduce((sum, client) => sum + getClientForecastAmount(client), 0);
@@ -491,7 +551,7 @@ export function computeAnalyticsSnapshot(
 
   const athleteStats: AthleteStats = {
     total: rosterClients.length,
-    payments: rosterClients.filter(client => getClientActualAmount(client, period) > 0).length,
+    payments: rosterClients.filter(client => getClientActualAmount(client, period, scope) > 0).length,
     new: rosterClients.filter(client => client.status === "новый").length,
     firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
     canceled: periodClients.filter(client => isCanceledStatus(client.status)).length,
