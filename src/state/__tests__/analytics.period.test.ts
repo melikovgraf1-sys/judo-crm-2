@@ -299,4 +299,139 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.profit.values.forecast).toBe(0);
     expect(snapshot.metrics.profit.values.target).toBe(0);
   });
+
+  it("uses Джикджилли фокус override for forecast revenue", () => {
+    const db = buildDB();
+    db.settings.areas = ["джикджилли"];
+    db.settings.groups = ["фокус"];
+    db.settings.limits = { "джикджилли|фокус": 10 };
+    db.settings.rentByAreaEUR = { джикджилли: 0 };
+    db.settings.coachSalaryByAreaEUR = { джикджилли: 0 };
+    db.schedule = [
+      {
+        id: "s-focus",
+        area: "джикджилли",
+        group: "фокус",
+        coachId: "coach-1",
+        weekday: 1,
+        time: "10:00",
+        location: "",
+      },
+    ];
+    db.clients = [
+      {
+        id: "focus-athlete",
+        firstName: "Игорь",
+        lastName: "Фокусов",
+        phone: "",
+        channel: "Telegram",
+        birthDate: "2014-01-01T00:00:00.000Z",
+        gender: "м",
+        area: "джикджилли",
+        group: "фокус",
+        startDate: "2023-09-01T00:00:00.000Z",
+        payMethod: "перевод",
+        payStatus: "действует",
+        status: "действующий",
+        payDate: "2024-01-05T00:00:00.000Z",
+        payActual: 25,
+        remainingLessons: 0,
+        placements: [
+          {
+            id: "pl-focus-athlete",
+            area: "джикджилли",
+            group: "фокус",
+            payStatus: "действует",
+            status: "действующий",
+            payDate: "2024-01-05T00:00:00.000Z",
+            payActual: 25,
+            remainingLessons: 0,
+          },
+        ],
+        payHistory: [
+          {
+            id: "fact-focus-2024-01",
+            paidAt: "2024-01-05T00:00:00.000Z",
+            amount: 25,
+          },
+        ],
+      },
+    ];
+    db.attendance = [];
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "джикджилли", period, "фокус");
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(25);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(25);
+    expect(snapshot.metrics.revenue.values.target).toBe(250);
+  });
+
+  it("ignores stored pay amount when override enforces a lower price", () => {
+    const db = buildDB();
+    db.settings.areas = ["джикджилли"];
+    db.settings.groups = ["фокус"];
+    db.settings.limits = { "джикджилли|фокус": 10 };
+    db.schedule = [
+      {
+        id: "s-focus",
+        area: "джикджилли",
+        group: "фокус",
+        coachId: "coach-1",
+        weekday: 1,
+        time: "10:00",
+        location: "",
+      },
+    ];
+    db.clients = [
+      {
+        id: "focus-athlete",
+        firstName: "Игорь",
+        lastName: "Фокусов",
+        phone: "",
+        channel: "Telegram",
+        birthDate: "2014-01-01T00:00:00.000Z",
+        gender: "м",
+        area: "джикджилли",
+        group: "фокус",
+        startDate: "2023-09-01T00:00:00.000Z",
+        payMethod: "перевод",
+        payStatus: "действует",
+        status: "действующий",
+        subscriptionPlan: "monthly",
+        payDate: "2024-01-05T00:00:00.000Z",
+        payAmount: 55,
+        payActual: 25,
+        remainingLessons: 0,
+        placements: [
+          {
+            id: "pl-focus-athlete",
+            area: "джикджилли",
+            group: "фокус",
+            payStatus: "действует",
+            status: "действующий",
+            subscriptionPlan: "monthly",
+            payDate: "2024-01-05T00:00:00.000Z",
+            payAmount: 55,
+            payActual: 25,
+            remainingLessons: 0,
+          },
+        ],
+        payHistory: [
+          {
+            id: "fact-focus-2024-01",
+            paidAt: "2024-01-05T00:00:00.000Z",
+            amount: 25,
+          },
+        ],
+      },
+    ];
+    db.attendance = [];
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "джикджилли", period, "фокус");
+
+    expect(snapshot.metrics.revenue.values.forecast).toBe(25);
+    expect(snapshot.metrics.revenue.values.target).toBe(250);
+  });
 });
