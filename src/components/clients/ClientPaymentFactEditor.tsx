@@ -121,9 +121,7 @@ export default function ClientPaymentFactEditor({
       options.add("1 день");
     } else if (plan === "half-month") {
       options.add("14 дней");
-    } else if (plan === "discount") {
-      options.add("Произвольно");
-    } else if (plan === "monthly" || plan === "weekly") {
+    } else if (plan === "monthly" || plan === "weekly" || plan === "discount") {
       monthOptions.forEach(label => options.add(label));
     }
 

@@ -34,7 +34,11 @@ export function formatPaymentPeriod(
   }
 
   if (plan === "discount") {
-    return "Произвольно";
+    if (normalizedReference) {
+      return monthFormatter.format(new Date(normalizedReference));
+    }
+
+    return undefined;
   }
 
   if (normalizedReference) {
