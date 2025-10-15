@@ -1,6 +1,26 @@
 import type { Area, Group, PaymentFact, SubscriptionPlan } from "../types";
 import { getSubscriptionPlanMeta } from "./payments";
 
+const parseAmountValue = (value: unknown): number | undefined => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const normalized = trimmed.replace(/\s+/g, "");
+    const withDecimal =
+      normalized.includes(",") && !normalized.includes(".")
+        ? normalized.replace(",", ".")
+        : normalized.replace(/,/g, "");
+    const parsed = Number.parseFloat(withDecimal);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
 const monthFormatter = new Intl.DateTimeFormat("ru-RU", {
   month: "long",
   year: "numeric",
@@ -107,7 +127,7 @@ export function normalizePaymentFacts(source: unknown): PaymentFact[] {
           : `legacy-${index}-${normalizeISO(fact.paidAt ?? fact.recordedAt) ?? "unknown"}`;
         const normalizedPaidAt = normalizeISO(fact.paidAt);
         const normalizedRecordedAt = normalizeISO(fact.recordedAt);
-        const amount = typeof fact.amount === "number" ? fact.amount : undefined;
+        const amount = parseAmountValue(fact.amount);
         const plan = fact.subscriptionPlan;
         const periodLabel = fact.periodLabel
           ?? formatPaymentPeriod(plan, normalizedPaidAt ?? normalizedRecordedAt);

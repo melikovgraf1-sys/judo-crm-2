@@ -221,4 +221,70 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.actual).toBeCloseTo(85.5, 5);
     expect(snapshot.athleteStats.payments).toBe(1);
   });
+
+  it("counts placements that differ from the client's primary group", () => {
+    const db = buildDB();
+    db.settings.groups.push("Group2");
+    db.settings.limits["Area1|Group2"] = 5;
+
+    db.clients.push({
+      id: "c3",
+      firstName: "Григорий",
+      lastName: "Смирнов",
+      phone: "",
+      channel: "Telegram",
+      birthDate: "2013-05-01T00:00:00.000Z",
+      gender: "м",
+      area: "Area1",
+      group: "Group1",
+      startDate: "2023-09-01T00:00:00.000Z",
+      payMethod: "перевод",
+      payStatus: "действует",
+      status: "действующий",
+      payDate: "2024-01-05T00:00:00.000Z",
+      payAmount: 80,
+      payActual: 80,
+      remainingLessons: 0,
+      placements: [
+        {
+          id: "pl-c3-primary",
+          area: "Area1",
+          group: "Group1",
+          payStatus: "действует",
+          status: "действующий",
+          payDate: "2023-12-05T00:00:00.000Z",
+          payAmount: 80,
+          payActual: 80,
+          remainingLessons: 0,
+        },
+        {
+          id: "pl-c3-secondary",
+          area: "Area1",
+          group: "Group2",
+          payStatus: "действует",
+          status: "действующий",
+          payDate: "2024-01-05T00:00:00.000Z",
+          payAmount: 80,
+          payActual: 80,
+          remainingLessons: 0,
+        },
+      ],
+      payHistory: [
+        {
+          id: "fact-c3-2024-01",
+          paidAt: "2024-01-05T00:00:00.000Z",
+          amount: 80,
+        },
+      ],
+    });
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group2");
+
+    expect(snapshot.metrics.athletes.values.actual).toBe(1);
+    expect(snapshot.metrics.athletes.values.forecast).toBe(1);
+    expect(snapshot.metrics.revenue.values.actual).toBe(80);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(80);
+    expect(snapshot.athleteStats.total).toBe(1);
+  });
 });
