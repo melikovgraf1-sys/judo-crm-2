@@ -74,6 +74,7 @@ export function resolvePaymentCompletion({
 }: PaymentCompletionParams): Partial<Client> {
   const placements = getClientPlacements(client);
   const targetPlacement = findTargetPlacement(placements, task);
+  const isPrimaryPlacement = targetPlacement?.id === placements[0]?.id;
 
   const payAmount = targetPlacement?.payAmount ?? client.payAmount;
   const plan = targetPlacement?.subscriptionPlan ?? client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
@@ -140,7 +141,7 @@ export function resolvePaymentCompletion({
     }
   }
 
-  if (nextPayDate) {
+  if (nextPayDate && (isPrimaryPlacement || placements.length <= 1)) {
     updates.payDate = nextPayDate.toISOString();
   }
 
