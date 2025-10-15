@@ -73,6 +73,60 @@ const createUI = (): UIState => ({
   pendingClientId: null,
 });
 
+const createClient = (overrides: Partial<DB["clients"][number]> = {}) => {
+  const base = {
+    id: "client-id",
+    firstName: "Имя",
+    lastName: "",
+    parentName: "",
+    phone: "",
+    whatsApp: "",
+    telegram: "",
+    instagram: "",
+    comment: "",
+    channel: "Telegram",
+    birthDate: "2010-01-01T00:00:00.000Z",
+    gender: "м",
+    area: "Area1",
+    group: "Group1",
+    coachId: "coach",
+    startDate: "2024-01-01T00:00:00.000Z",
+    payMethod: "перевод",
+    payStatus: "ожидание",
+    status: "действующий",
+    subscriptionPlan: "monthly",
+    payDate: "2024-01-10T00:00:00.000Z",
+    payAmount: 55,
+    payActual: 55,
+    remainingLessons: 5,
+    frozenLessons: 0,
+    placements: [],
+    payHistory: [],
+  };
+
+  const client = { ...base, ...overrides };
+
+  if (!overrides.placements || !overrides.placements.length) {
+    client.placements = [
+      {
+        id: `pl-${client.id}`,
+        area: client.area,
+        group: client.group,
+        payStatus: client.payStatus,
+        status: client.status,
+        subscriptionPlan: client.subscriptionPlan,
+        payDate: client.payDate,
+        payAmount: client.payAmount,
+        payActual: client.payActual,
+        remainingLessons: client.remainingLessons,
+        frozenLessons: client.frozenLessons,
+      },
+    ];
+  }
+
+  return client;
+};
+
 beforeEach(() => {
   window.localStorage.clear();
 });
@@ -155,4 +209,56 @@ test("PerformanceTab respects persisted group selections", async () => {
 
   await userEvent.selectOptions(areaSelect, "Area1");
   await waitFor(() => expect(groupSelect).toHaveValue("Group2"));
+});
+
+test("AttendanceTab shows clients from additional placements", async () => {
+  const db = createDB();
+  db.clients = [
+    createClient({
+      id: "client-extra",
+      firstName: "Дополнительный",
+      placements: [
+        {
+          id: "pl-primary",
+          area: "Area1",
+          group: "Group1",
+          payStatus: "ожидание",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+          payDate: "2024-01-10T00:00:00.000Z",
+          payAmount: 55,
+          payActual: 55,
+          remainingLessons: 5,
+          frozenLessons: 0,
+        },
+        {
+          id: "pl-extra",
+          area: "Area2",
+          group: "Group3",
+          payStatus: "ожидание",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+          payDate: "2024-01-10T00:00:00.000Z",
+          payAmount: 55,
+          payActual: 55,
+          remainingLessons: 5,
+          frozenLessons: 0,
+        },
+      ],
+    }),
+  ];
+
+  const Wrapper = () => {
+    const [state, setState] = React.useState(db);
+    return <AttendanceTab db={state} setDB={setState} currency="EUR" />;
+  };
+
+  render(<Wrapper />);
+
+  const [areaSelect, groupSelect] = screen.getAllByRole("combobox");
+  await userEvent.selectOptions(areaSelect, "Area2");
+
+  await waitFor(() => expect(groupSelect).toHaveValue("Group3"));
+  await waitFor(() => expect(screen.getByText("Найдено: 1")).toBeInTheDocument());
+  expect(screen.getByText("Дополнительный")).toBeInTheDocument();
 });
