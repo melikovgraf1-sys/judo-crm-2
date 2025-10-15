@@ -575,7 +575,7 @@ export function computeAnalyticsSnapshot(
   const rent = hasGroupScope ? 0 : rentForAreas(db, relevantAreas);
   const coachSalary = hasGroupScope ? 0 : coachSalaryForAreas(db, relevantAreas);
 
-  const actualRevenue = actualClients.reduce(
+  const actualRevenue = rosterClients.reduce(
     (sum, client) => sum + getClientActualAmount(client, period, scope),
     0,
   );
