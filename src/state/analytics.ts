@@ -1,3 +1,4 @@
+import { getClientPlacements } from "./clients";
 import { getDefaultPayAmount } from "./payments";
 import { normalizePaymentFacts } from "./paymentFacts";
 import { convertMoney } from "./utils";
@@ -230,7 +231,22 @@ export function decodeFavorite(id: string): AnalyticsFavorite | null {
   return null;
 }
 
-const ensureNumber = (value: number) => (Number.isFinite(value) ? value : 0);
+const ensureNumber = (value: number | string): number => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return 0;
+    }
+    const normalized = trimmed.replace(/\s+/g, "");
+    const withDecimal =
+      normalized.includes(",") && !normalized.includes(".")
+        ? normalized.replace(",", ".")
+        : normalized.replace(/,/g, "");
+    const parsed = Number.parseFloat(withDecimal);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return Number.isFinite(value) ? value : 0;
+};
 
 function ensureLeadHistoryEntries(entries?: LeadLifecycleEvent[]): LeadLifecycleEvent[] {
   if (!Array.isArray(entries)) {
@@ -247,7 +263,11 @@ function collectActiveAreas(db: DB): Area[] {
 
   const clientAreas = new Set<Area>();
   for (const client of db.clients) {
-    clientAreas.add(client.area);
+    for (const placement of getClientPlacements(client)) {
+      if (placement.area) {
+        clientAreas.add(placement.area);
+      }
+    }
   }
 
   const result: Area[] = [];
@@ -266,10 +286,10 @@ function groupsForArea(db: DB, area: Area): string[] {
       groups.add(slot.group);
     }
   }
-  if (!groups.size) {
-    for (const client of db.clients) {
-      if (client.area === area) {
-        groups.add(client.group);
+  for (const client of db.clients) {
+    for (const placement of getClientPlacements(client)) {
+      if (placement.area === area && placement.group) {
+        groups.add(placement.group);
       }
     }
   }
@@ -368,12 +388,21 @@ export function computeAnalyticsSnapshot(
   const scopedGroup = area === "all" ? null : group ?? null;
   const hasGroupScope = area !== "all" && typeof scopedGroup === "string" && scopedGroup.length > 0;
   const periodClients = db.clients.filter(client => {
-    const inScope = area === "all" ? relevantAreaSet.has(client.area) : client.area === area;
-    if (!inScope) {
+    const placements = getClientPlacements(client);
+    const matchesArea =
+      area === "all"
+        ? placements.some(placement => relevantAreaSet.has(placement.area))
+        : placements.some(placement => placement.area === area);
+    if (!matchesArea) {
       return false;
     }
-    if (hasGroupScope && client.group !== scopedGroup) {
-      return false;
+    if (hasGroupScope) {
+      const matchesGroup = placements.some(
+        placement => placement.area === area && placement.group === scopedGroup,
+      );
+      if (!matchesGroup) {
+        return false;
+      }
     }
     if (!period) {
       return true;
