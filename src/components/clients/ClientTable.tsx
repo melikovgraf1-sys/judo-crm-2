@@ -435,7 +435,9 @@ export default function ClientTable({
         if (billingPeriod?.month != null && !paid) {
           return "—";
         }
-        return client.payActual != null ? fmtMoney(client.payActual, currency, currencyRates) : "—";
+        const placement = getActivePlacement(client);
+        const payActual = placement?.payActual ?? client.payActual;
+        return payActual != null ? fmtMoney(payActual, currency, currencyRates) : "—";
       },
       sortValue: client => {
         const placementStatus = getClientPlacementDisplayStatus(client);
@@ -446,7 +448,9 @@ export default function ClientTable({
         if (billingPeriod?.month != null && !paid) {
           return 0;
         }
-        return client.payActual ?? 0;
+        const placement = getActivePlacement(client);
+        const payActual = placement?.payActual ?? client.payActual;
+        return payActual ?? 0;
       },
     },
     {
@@ -554,6 +558,7 @@ export default function ClientTable({
     billingPeriod,
     currency,
     currencyRates,
+    getActivePlacement,
     getDisplayPayStatus,
     getPayStatusTone,
     isPaidInSelectedPeriod,
