@@ -338,28 +338,71 @@ function getClientForecastAmount(
 ): number {
   const placements = getClientPlacements(client);
 
-  const matches =
-    placements.find(placement => {
-      if (group && placement.group !== group) {
+  const matchesScope = (placement: (typeof placements)[number]): boolean => {
+    if (group) {
+      if (placement.group !== group) {
         return false;
       }
-      if (area && placement.area !== area) {
+    }
+    if (area) {
+      if (placement.area !== area) {
         return false;
       }
-      return true;
-    }) ?? (area ? placements.find(placement => placement.area === area) : undefined) ?? placements[0];
+    }
+    return true;
+  };
 
-  const resolvedArea = matches?.area ?? area ?? client.area;
-  const resolvedGroup = matches?.group ?? group ?? client.group;
+  const getAmountForPlacement = (placement: (typeof placements)[number]): number => {
+    const resolvedArea = placement.area ?? area ?? client.area;
+    const resolvedGroup = placement.group ?? group ?? client.group;
 
+    const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
+    if (overrideAmount != null) {
+      return ensureNumber(overrideAmount);
+    }
+
+    const resolvedPayAmount = placement.payAmount ?? client.payAmount;
+    if (resolvedPayAmount != null) {
+      return ensureNumber(resolvedPayAmount);
+    }
+
+    return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
+  };
+
+  const matchingPlacements = placements.filter(matchesScope);
+
+  if (matchingPlacements.length > 0) {
+    return matchingPlacements.reduce((sum, placement) => sum + getAmountForPlacement(placement), 0);
+  }
+
+  const fallbackPlacement =
+    (group
+      ? placements.find(placement => {
+          if (placement.group !== group) {
+            return false;
+          }
+          if (area && placement.area !== area) {
+            return false;
+          }
+          return true;
+        })
+      : undefined) ??
+    (area ? placements.find(placement => placement.area === area) : undefined) ??
+    placements[0];
+
+  if (fallbackPlacement) {
+    return getAmountForPlacement(fallbackPlacement);
+  }
+
+  const resolvedArea = area ?? client.area;
+  const resolvedGroup = group ?? client.group;
   const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
   if (overrideAmount != null) {
     return ensureNumber(overrideAmount);
   }
 
-  const resolvedPayAmount = matches?.payAmount ?? client.payAmount;
-  if (resolvedPayAmount != null) {
-    return ensureNumber(resolvedPayAmount);
+  if (client.payAmount != null) {
+    return ensureNumber(client.payAmount);
   }
 
   return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
