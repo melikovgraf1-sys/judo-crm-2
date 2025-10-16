@@ -335,6 +335,8 @@ function getClientForecastAmount(
   client: Client,
   area?: Area | null,
   group?: Group | null,
+  period?: PeriodFilter,
+  scope?: AnalyticsScope,
 ): number {
   const placements = getClientPlacements(client);
 
@@ -623,7 +625,7 @@ export function computeAnalyticsSnapshot(
     0,
   );
   const forecastRevenue = rosterClients.reduce(
-    (sum, client) => sum + getClientForecastAmount(client, targetArea, targetGroup),
+    (sum, client) => sum + getClientForecastAmount(client, targetArea, targetGroup, period, scope),
     0,
   );
   const maxRevenue = hasGroupScope

@@ -136,6 +136,28 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.athleteStats.attendanceRate).toBe(100);
   });
 
+  it("prefers payment facts for forecast when they exist in the period", () => {
+    const db = buildDB();
+    db.clients[1].status = "отмена";
+    db.clients[0].payAmount = 55;
+    db.clients[0].placements[0].payAmount = 55;
+    db.clients[0].payHistory = [
+      {
+        id: "fact-c1-2024-01",
+        area: "Area1",
+        group: "Group1",
+        paidAt: "2024-01-03T00:00:00.000Z",
+        amount: 130,
+      },
+    ];
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.metrics.revenue.values.forecast).toBe(130);
+    expect(snapshot.metrics.revenue.values.remaining).toBe(0);
+  });
+
   it("counts actual revenue even if the pay status is not active", () => {
     const db = buildDB();
     db.clients[1].payStatus = "ожидает оплаты";
