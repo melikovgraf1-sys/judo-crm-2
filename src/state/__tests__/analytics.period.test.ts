@@ -200,6 +200,21 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.forecast).toBe(60);
   });
 
+  it("does not forecast revenue for placements due after the period", () => {
+    const db = buildDB();
+    const client = db.clients[1];
+    client.payHistory = [];
+    client.payDate = "2023-11-05T00:00:00.000Z";
+    client.placements[0].payDate = "2023-11-05T00:00:00.000Z";
+    db.clients = [client];
+
+    const period: PeriodFilter = { year: 2023, month: 10 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(0);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(0);
+  });
+
   it("ignores canceled placements when computing group forecast", () => {
     const db = buildDB();
     const client = db.clients[0];
