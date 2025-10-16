@@ -264,6 +264,9 @@ function collectActiveAreas(db: DB): Area[] {
   const clientAreas = new Set<Area>();
   for (const client of db.clients) {
     for (const placement of getClientPlacements(client)) {
+      if (isCanceledStatus(placement.status)) {
+        continue;
+      }
       if (placement.area) {
         clientAreas.add(placement.area);
       }
@@ -288,6 +291,9 @@ function groupsForArea(db: DB, area: Area): string[] {
   }
   for (const client of db.clients) {
     for (const placement of getClientPlacements(client)) {
+      if (isCanceledStatus(placement.status)) {
+        continue;
+      }
       if (placement.area === area && placement.group) {
         groups.add(placement.group);
       }
@@ -311,6 +317,9 @@ function deriveGroupPrice(db: DB, group: string, area?: Area | null): number {
   for (const client of db.clients) {
     const placements = getClientPlacements(client);
     for (const placement of placements) {
+      if (isCanceledStatus(placement.status)) {
+        continue;
+      }
       if (placement.group !== group) {
         continue;
       }
@@ -339,6 +348,22 @@ function getClientForecastAmount(
   scope?: AnalyticsScope,
 ): number {
   const placements = getClientPlacements(client);
+  const effectiveScope = scope ?? { area: "all" as AreaScope, group: null };
+
+  if (period) {
+    const history = normalizePaymentFacts(client.payHistory);
+    const matchingFacts = history.filter(fact => {
+      if (!matchesPeriod(fact, period)) {
+        return false;
+      }
+      return factMatchesScope(fact.area, fact.group, effectiveScope, placements);
+    });
+    if (matchingFacts.length > 0) {
+      return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
+    }
+  }
+
+  const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
 
   const matchesScope = (placement: (typeof placements)[number]): boolean => {
     if (group) {
@@ -371,7 +396,7 @@ function getClientForecastAmount(
     return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
   };
 
-  const matchingPlacements = placements.filter(matchesScope);
+  const matchingPlacements = activePlacements.filter(matchesScope);
 
   if (matchingPlacements.length > 0) {
     return matchingPlacements.reduce((sum, placement) => sum + getAmountForPlacement(placement), 0);
@@ -379,7 +404,7 @@ function getClientForecastAmount(
 
   const fallbackPlacement =
     (group
-      ? placements.find(placement => {
+      ? activePlacements.find(placement => {
           if (placement.group !== group) {
             return false;
           }
@@ -389,8 +414,8 @@ function getClientForecastAmount(
           return true;
         })
       : undefined) ??
-    (area ? placements.find(placement => placement.area === area) : undefined) ??
-    placements[0];
+    (area ? activePlacements.find(placement => placement.area === area) : undefined) ??
+    activePlacements[0];
 
   if (fallbackPlacement) {
     return getAmountForPlacement(fallbackPlacement);
@@ -421,13 +446,15 @@ function factMatchesScope(
   scope: AnalyticsScope,
   placements: ReturnType<typeof getClientPlacements>,
 ): boolean {
+  const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
+
   if (scope.area !== "all") {
     if (factArea) {
       if (factArea !== scope.area) {
         return false;
       }
     } else {
-      const hasAreaPlacement = placements.some(placement => placement.area === scope.area);
+      const hasAreaPlacement = activePlacements.some(placement => placement.area === scope.area);
       if (!hasAreaPlacement) {
         return false;
       }
@@ -440,7 +467,7 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const hasGroupPlacement = placements.some(placement => {
+      const hasGroupPlacement = activePlacements.some(placement => {
         if (scope.area !== "all" && placement.area !== scope.area) {
           return false;
         }
@@ -588,15 +615,16 @@ export function computeAnalyticsSnapshot(
   };
   const periodClients = db.clients.filter(client => {
     const placements = getClientPlacements(client);
+    const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
     const matchesArea =
       area === "all"
-        ? placements.some(placement => relevantAreaSet.has(placement.area))
-        : placements.some(placement => placement.area === area);
+        ? activePlacements.some(placement => relevantAreaSet.has(placement.area))
+        : activePlacements.some(placement => placement.area === area);
     if (!matchesArea) {
       return false;
     }
     if (hasGroupScope) {
-      const matchesGroup = placements.some(
+      const matchesGroup = activePlacements.some(
         placement => placement.area === area && placement.group === scopedGroup,
       );
       if (!matchesGroup) {
