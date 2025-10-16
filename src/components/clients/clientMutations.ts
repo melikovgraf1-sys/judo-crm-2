@@ -176,8 +176,26 @@ export function transformClientFormValues(
   const primaryFormPlacement = placements[0];
   const payActualProvided = Boolean(primaryFormPlacement?.payActual?.trim().length);
   const payDateProvided = Boolean(primaryFormPlacement?.payDate?.trim().length);
+  const previousPrimaryPlacement = previousPlacements.find(prev => prev.id === primary.id);
+  const normalizePayDateForComparison = (value?: string) => {
+    if (!value) {
+      return null;
+    }
+    const normalized = parseDateInput(value);
+    return normalized || value;
+  };
+  const previousPayDate = normalizePayDateForComparison(previousPrimaryPlacement?.payDate);
+  const previousPayAmount =
+    previousPrimaryPlacement?.payActual ?? previousPrimaryPlacement?.payAmount ?? null;
+  const nextPayDate = normalizePayDateForComparison(primary.payDate);
+  const nextPayAmount = primary.payActual ?? primary.payAmount ?? null;
+  const paymentFieldsChanged =
+    !previousPrimaryPlacement || previousPayDate !== nextPayDate || previousPayAmount !== nextPayAmount;
 
-  if (primary.payStatus === "действует" && (payActualProvided || payDateProvided)) {
+  const shouldRecordPayment =
+    primary.payStatus === "действует" && (payActualProvided || payDateProvided) && paymentFieldsChanged;
+
+  if (shouldRecordPayment) {
     const parsedPayDate = parseDateInput(primaryFormPlacement?.payDate ?? "");
     const now = todayISO();
     const fallbackDate = primary.payDate ?? now;
