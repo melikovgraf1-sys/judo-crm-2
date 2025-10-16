@@ -712,6 +712,7 @@ export default function TasksTab({
           client={clientToView}
           currency={currency}
           currencyRates={db.settings.currencyRates}
+          schedule={db.schedule}
           attendance={attendance}
           performance={performance}
           billingPeriod={undefined}
