@@ -158,6 +158,30 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.remaining).toBe(0);
   });
 
+  it("ignores canceled placements when computing group forecast", () => {
+    const db = buildDB();
+    const client = db.clients[0];
+    client.placements.push({
+      id: "pl-c1-canceled",
+      area: "Area1",
+      group: "Group1",
+      payStatus: "архив",
+      status: "отмена",
+      payDate: "2024-01-10T00:00:00.000Z",
+      payAmount: 150,
+      payActual: 0,
+      remainingLessons: 0,
+    });
+    db.clients[1].status = "отмена";
+    db.clients[1].placements[0].status = "отмена";
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.metrics.revenue.values.forecast).toBe(60);
+    expect(snapshot.metrics.athletes.values.forecast).toBe(1);
+  });
+
   it("counts actual revenue even if the pay status is not active", () => {
     const db = buildDB();
     db.clients[1].payStatus = "ожидает оплаты";
