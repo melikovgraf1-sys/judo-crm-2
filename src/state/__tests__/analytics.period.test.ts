@@ -143,6 +143,13 @@ describe("computeAnalyticsSnapshot with period", () => {
     db.clients[0].placements[0].payAmount = 55;
     db.clients[0].payHistory = [
       {
+        id: "fact-c1-2024-01-other-scope",
+        area: "Area2",
+        group: "GroupX",
+        paidAt: "2024-01-02T00:00:00.000Z",
+        amount: 999,
+      },
+      {
         id: "fact-c1-2024-01",
         area: "Area1",
         group: "Group1",

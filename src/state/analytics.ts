@@ -345,7 +345,7 @@ function getClientForecastAmount(
   area?: Area | null,
   group?: Group | null,
   period?: PeriodFilter,
-  scope?: AnalyticsScope,
+  scope: AnalyticsScope = { area: "all", group: null },
 ): number {
   const placements = getClientPlacements(client);
   const effectiveScope = scope ?? { area: "all" as AreaScope, group: null };
@@ -364,6 +364,19 @@ function getClientForecastAmount(
   }
 
   const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
+
+  if (period) {
+    const history = normalizePaymentFacts(client.payHistory);
+    const matchingFacts = history.filter(fact => {
+      if (!matchesPeriod(fact, period)) {
+        return false;
+      }
+      return factMatchesScope(fact.area, fact.group, scope, placements);
+    });
+    if (matchingFacts.length > 0) {
+      return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
+    }
+  }
 
   const matchesScope = (placement: (typeof placements)[number]): boolean => {
     if (group) {
