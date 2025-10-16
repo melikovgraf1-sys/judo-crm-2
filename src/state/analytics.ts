@@ -335,8 +335,27 @@ function getClientForecastAmount(
   client: Client,
   area?: Area | null,
   group?: Group | null,
+  period?: PeriodFilter,
+  scope?: AnalyticsScope,
 ): number {
   const placements = getClientPlacements(client);
+
+  const effectiveScope = scope ?? { area: "all" as AreaScope, group: null };
+
+  if (period) {
+    const history = normalizePaymentFacts(client.payHistory);
+    const matchingFacts = history.filter(fact => {
+      if (!matchesPeriod(fact, period)) {
+        return false;
+      }
+
+      return factMatchesScope(fact.area, fact.group, effectiveScope, placements);
+    });
+
+    if (matchingFacts.length) {
+      return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
+    }
+  }
 
   const matches =
     placements.find(placement => {
@@ -580,7 +599,7 @@ export function computeAnalyticsSnapshot(
     0,
   );
   const forecastRevenue = rosterClients.reduce(
-    (sum, client) => sum + getClientForecastAmount(client, targetArea, targetGroup),
+    (sum, client) => sum + getClientForecastAmount(client, targetArea, targetGroup, period, scope),
     0,
   );
   const maxRevenue = hasGroupScope
