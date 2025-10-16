@@ -340,45 +340,71 @@ function getClientForecastAmount(
 ): number {
   const placements = getClientPlacements(client);
 
-  const effectiveScope = scope ?? { area: "all" as AreaScope, group: null };
-
-  if (period) {
-    const history = normalizePaymentFacts(client.payHistory);
-    const matchingFacts = history.filter(fact => {
-      if (!matchesPeriod(fact, period)) {
+  const matchesScope = (placement: (typeof placements)[number]): boolean => {
+    if (group) {
+      if (placement.group !== group) {
         return false;
       }
-
-      return factMatchesScope(fact.area, fact.group, effectiveScope, placements);
-    });
-
-    if (matchingFacts.length) {
-      return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
     }
+    if (area) {
+      if (placement.area !== area) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const getAmountForPlacement = (placement: (typeof placements)[number]): number => {
+    const resolvedArea = placement.area ?? area ?? client.area;
+    const resolvedGroup = placement.group ?? group ?? client.group;
+
+    const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
+    if (overrideAmount != null) {
+      return ensureNumber(overrideAmount);
+    }
+
+    const resolvedPayAmount = placement.payAmount ?? client.payAmount;
+    if (resolvedPayAmount != null) {
+      return ensureNumber(resolvedPayAmount);
+    }
+
+    return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
+  };
+
+  const matchingPlacements = placements.filter(matchesScope);
+
+  if (matchingPlacements.length > 0) {
+    return matchingPlacements.reduce((sum, placement) => sum + getAmountForPlacement(placement), 0);
   }
 
-  const matches =
-    placements.find(placement => {
-      if (group && placement.group !== group) {
-        return false;
-      }
-      if (area && placement.area !== area) {
-        return false;
-      }
-      return true;
-    }) ?? (area ? placements.find(placement => placement.area === area) : undefined) ?? placements[0];
+  const fallbackPlacement =
+    (group
+      ? placements.find(placement => {
+          if (placement.group !== group) {
+            return false;
+          }
+          if (area && placement.area !== area) {
+            return false;
+          }
+          return true;
+        })
+      : undefined) ??
+    (area ? placements.find(placement => placement.area === area) : undefined) ??
+    placements[0];
 
-  const resolvedArea = matches?.area ?? area ?? client.area;
-  const resolvedGroup = matches?.group ?? group ?? client.group;
+  if (fallbackPlacement) {
+    return getAmountForPlacement(fallbackPlacement);
+  }
 
+  const resolvedArea = area ?? client.area;
+  const resolvedGroup = group ?? client.group;
   const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
   if (overrideAmount != null) {
     return ensureNumber(overrideAmount);
   }
 
-  const resolvedPayAmount = matches?.payAmount ?? client.payAmount;
-  if (resolvedPayAmount != null) {
-    return ensureNumber(resolvedPayAmount);
+  if (client.payAmount != null) {
+    return ensureNumber(client.payAmount);
   }
 
   return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);

@@ -221,6 +221,98 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.athletes.values.target).toBe(10);
   });
 
+  it("sums multiple Джикджилли placements for area forecasts", () => {
+    const db = buildDB();
+    db.settings.areas.push("Джикджилли");
+    db.settings.groups.push("Джикджилли-утро", "Джикджилли-вечер");
+    db.settings.limits = {
+      ...db.settings.limits,
+      "Джикджилли|Джикджилли-утро": 10,
+      "Джикджилли|Джикджилли-вечер": 10,
+    };
+    db.settings.rentByAreaEUR = {
+      ...db.settings.rentByAreaEUR,
+      Джикджилли: 0,
+    };
+    db.settings.coachSalaryByAreaEUR = {
+      ...db.settings.coachSalaryByAreaEUR,
+      Джикджилли: 0,
+    };
+    db.schedule.push(
+      {
+        id: "sched-dzh-1",
+        area: "Джикджилли",
+        group: "Джикджилли-утро",
+        coachId: "coach-2",
+        weekday: 2,
+        time: "09:00",
+        location: "",
+      },
+      {
+        id: "sched-dzh-2",
+        area: "Джикджилли",
+        group: "Джикджилли-вечер",
+        coachId: "coach-3",
+        weekday: 4,
+        time: "18:00",
+        location: "",
+      },
+    );
+    db.clients.push({
+      id: "client-dzh",
+      firstName: "Данил",
+      lastName: "Смирнов",
+      phone: "",
+      channel: "Telegram",
+      birthDate: "2013-05-01T00:00:00.000Z",
+      gender: "м",
+      area: "Джикджилли",
+      group: "Джикджилли-утро",
+      startDate: "2023-11-01T00:00:00.000Z",
+      payMethod: "перевод",
+      payStatus: "действует",
+      status: "действующий",
+      payDate: "2024-01-10T00:00:00.000Z",
+      payActual: 0,
+      remainingLessons: 0,
+      placements: [
+        {
+          id: "pl-dzh-1",
+          area: "Джикджилли",
+          group: "Джикджилли-утро",
+          payStatus: "действует",
+          status: "действующий",
+          payDate: "2024-01-10T00:00:00.000Z",
+          payAmount: 80,
+          payActual: 0,
+          remainingLessons: 0,
+        },
+        {
+          id: "pl-dzh-2",
+          area: "Джикджилли",
+          group: "Джикджилли-вечер",
+          payStatus: "действует",
+          status: "действующий",
+          payDate: "2024-01-10T00:00:00.000Z",
+          payAmount: 90,
+          payActual: 0,
+          remainingLessons: 0,
+        },
+      ],
+      payHistory: [],
+    });
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const areaSnapshot = computeAnalyticsSnapshot(db, "Джикджилли", period);
+    const morningSnapshot = computeAnalyticsSnapshot(db, "Джикджилли", period, "Джикджилли-утро");
+    const eveningSnapshot = computeAnalyticsSnapshot(db, "Джикджилли", period, "Джикджилли-вечер");
+
+    expect(areaSnapshot.metrics.revenue.values.forecast).toBe(
+      morningSnapshot.metrics.revenue.values.forecast +
+        eveningSnapshot.metrics.revenue.values.forecast,
+    );
+  });
+
   it("uses payment history amounts for October period", () => {
     const db = buildDB();
     const period: PeriodFilter = { year: 2023, month: 10 };
