@@ -165,6 +165,56 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.remaining).toBe(0);
   });
 
+  it("ignores ambiguous payment facts without scope metadata when forecasting", () => {
+    const db = buildDB();
+    db.settings.areas.push("Area2");
+    db.settings.groups.push("Group2");
+    db.settings.limits = { ...db.settings.limits, "Area2|Group2": 10 };
+
+    db.clients = [db.clients[0]];
+    const client = db.clients[0];
+
+    client.placements.push({
+      id: "pl-c1-area2",
+      area: "Area2",
+      group: "Group2",
+      payStatus: "действует",
+      status: "действующий",
+      payDate: "2024-01-10T00:00:00.000Z",
+      payAmount: 150,
+      payActual: 0,
+      remainingLessons: 0,
+    });
+
+    client.payHistory = [
+      {
+        id: "fact-c1-2024-01-ambiguous",
+        paidAt: "2024-01-04T00:00:00.000Z",
+        amount: 300,
+      },
+    ];
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.metrics.revenue.values.forecast).toBe(60);
+  });
+
+  it("does not forecast revenue for placements due after the period", () => {
+    const db = buildDB();
+    const client = db.clients[1];
+    client.payHistory = [];
+    client.payDate = "2023-11-05T00:00:00.000Z";
+    client.placements[0].payDate = "2023-11-05T00:00:00.000Z";
+    db.clients = [client];
+
+    const period: PeriodFilter = { year: 2023, month: 10 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(0);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(0);
+  });
+
   it("ignores canceled placements when computing group forecast", () => {
     const db = buildDB();
     const client = db.clients[0];
@@ -428,6 +478,7 @@ describe("computeAnalyticsSnapshot with period", () => {
         {
           id: "fact-c3-2024-01",
           paidAt: "2024-01-05T00:00:00.000Z",
+          group: "Group2",
           amount: 80,
         },
       ],

@@ -365,6 +365,16 @@ function getClientForecastAmount(
 
   const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
 
+  const placementsMatchingPeriod = !period
+    ? activePlacements
+    : activePlacements.filter(placement => {
+        const referenceDate = placement.payDate ?? client.payDate ?? null;
+        if (!referenceDate) {
+          return true;
+        }
+        return matchesPeriod(referenceDate, period);
+      });
+
   if (period) {
     const history = normalizePaymentFacts(client.payHistory);
     const matchingFacts = history.filter(fact => {
@@ -409,7 +419,7 @@ function getClientForecastAmount(
     return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
   };
 
-  const matchingPlacements = activePlacements.filter(matchesScope);
+  const matchingPlacements = placementsMatchingPeriod.filter(matchesScope);
 
   if (matchingPlacements.length > 0) {
     return matchingPlacements.reduce((sum, placement) => sum + getAmountForPlacement(placement), 0);
@@ -417,7 +427,7 @@ function getClientForecastAmount(
 
   const fallbackPlacement =
     (group
-      ? activePlacements.find(placement => {
+      ? placementsMatchingPeriod.find(placement => {
           if (placement.group !== group) {
             return false;
           }
@@ -427,11 +437,15 @@ function getClientForecastAmount(
           return true;
         })
       : undefined) ??
-    (area ? activePlacements.find(placement => placement.area === area) : undefined) ??
-    activePlacements[0];
+    (area ? placementsMatchingPeriod.find(placement => placement.area === area) : undefined) ??
+    placementsMatchingPeriod[0];
 
   if (fallbackPlacement) {
     return getAmountForPlacement(fallbackPlacement);
+  }
+
+  if (period) {
+    return 0;
   }
 
   const resolvedArea = area ?? client.area;
@@ -467,8 +481,14 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const hasAreaPlacement = activePlacements.some(placement => placement.area === scope.area);
-      if (!hasAreaPlacement) {
+      const placementsInScopeArea = activePlacements.filter(
+        placement => placement.area === scope.area,
+      );
+      if (!placementsInScopeArea.length) {
+        return false;
+      }
+      const isAreaUnambiguous = activePlacements.every(placement => placement.area === scope.area);
+      if (!isAreaUnambiguous) {
         return false;
       }
     }
@@ -480,13 +500,28 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const hasGroupPlacement = activePlacements.some(placement => {
+      const placementsInScopedArea = activePlacements.filter(placement => {
         if (scope.area !== "all" && placement.area !== scope.area) {
           return false;
         }
-        return placement.group === scope.group;
+        return true;
       });
-      if (!hasGroupPlacement) {
+
+      if (!placementsInScopedArea.length) {
+        return false;
+      }
+
+      const matchingGroupPlacements = placementsInScopedArea.filter(
+        placement => placement.group === scope.group,
+      );
+      if (!matchingGroupPlacements.length) {
+        return false;
+      }
+
+      const isGroupUnambiguous = placementsInScopedArea.every(
+        placement => placement.group === scope.group,
+      );
+      if (!isGroupUnambiguous) {
         return false;
       }
     }
