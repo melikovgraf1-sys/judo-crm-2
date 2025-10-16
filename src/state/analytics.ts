@@ -467,8 +467,14 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const hasAreaPlacement = activePlacements.some(placement => placement.area === scope.area);
-      if (!hasAreaPlacement) {
+      const placementsInScopeArea = activePlacements.filter(
+        placement => placement.area === scope.area,
+      );
+      if (!placementsInScopeArea.length) {
+        return false;
+      }
+      const isAreaUnambiguous = activePlacements.every(placement => placement.area === scope.area);
+      if (!isAreaUnambiguous) {
         return false;
       }
     }
@@ -480,13 +486,28 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const hasGroupPlacement = activePlacements.some(placement => {
+      const placementsInScopedArea = activePlacements.filter(placement => {
         if (scope.area !== "all" && placement.area !== scope.area) {
           return false;
         }
-        return placement.group === scope.group;
+        return true;
       });
-      if (!hasGroupPlacement) {
+
+      if (!placementsInScopedArea.length) {
+        return false;
+      }
+
+      const matchingGroupPlacements = placementsInScopedArea.filter(
+        placement => placement.group === scope.group,
+      );
+      if (!matchingGroupPlacements.length) {
+        return false;
+      }
+
+      const isGroupUnambiguous = placementsInScopedArea.every(
+        placement => placement.group === scope.group,
+      );
+      if (!isGroupUnambiguous) {
         return false;
       }
     }
