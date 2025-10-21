@@ -904,13 +904,18 @@ export function formatMetricValue(
   }
   switch (unit) {
     case "money":
-      return formatNumber("ru-RU", { style: "currency", currency, maximumFractionDigits: 0 }).format(
+      return formatNumber("ru-RU", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      }).format(
         convertMoney(value, currency, rates),
       );
     case "percent":
-      return `${formatNumber("ru-RU", { maximumFractionDigits: 1 }).format(value)}%`;
+      return `${formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}%`;
     default:
-      return formatNumber("ru-RU", { maximumFractionDigits: 0 }).format(value);
+      return formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
   }
 }
 
@@ -920,9 +925,9 @@ export function formatAthleteMetricValue(key: AthleteMetricKey, stats: AthleteSt
     return "—";
   }
   if (key === "attendanceRate") {
-    return `${formatNumber("ru-RU", { maximumFractionDigits: 1 }).format(value)}%`;
+    return `${formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}%`;
   }
-  return formatNumber("ru-RU", { maximumFractionDigits: 0 }).format(value);
+  return formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
 }
 
 export function formatLeadMetricValue(key: LeadMetricKey, stats: LeadStats): string {
@@ -930,7 +935,7 @@ export function formatLeadMetricValue(key: LeadMetricKey, stats: LeadStats): str
   if (!Number.isFinite(value)) {
     return "—";
   }
-  return formatNumber("ru-RU", { maximumFractionDigits: 0 }).format(value);
+  return formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
 }
 
 const METRIC_ACCENTS: Record<MetricKey, FavoriteSummary["accent"]> = {
