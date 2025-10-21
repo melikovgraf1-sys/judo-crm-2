@@ -1,13 +1,28 @@
 import React from "react";
 import Modal from "../Modal";
 import { getPaymentFactPlanLabel } from "../../state/paymentFacts";
+import { matchesPlacement } from "./paymentStatus";
 import * as utils from "../../state/utils";
-import type { Currency, PaymentFact, Settings } from "../../types";
+import type {
+  ClientPlacement,
+  Currency,
+  PaymentFact,
+  Settings,
+  SubscriptionPlan,
+} from "../../types";
+
+type PlacementSummary =
+  Pick<ClientPlacement, "area" | "group" | "remainingLessons" | "frozenLessons"> & {
+    effectiveRemainingLessons?: number | null;
+  };
 
 interface Props {
   fact: PaymentFact;
   currency: Currency;
   currencyRates: Settings["currencyRates"];
+  placements: PlacementSummary[];
+  defaultRemainingLessons: number | null;
+  defaultFrozenLessons: number | null;
   onClose: () => void;
   onEdit?: () => void;
   onDelete?: () => Promise<void> | void;
@@ -16,20 +31,51 @@ interface Props {
 
 const { fmtDate, fmtMoney } = utils;
 
+const EXPECTED_AMOUNT_BY_PLAN: Record<SubscriptionPlan, number> = {
+  monthly: 55,
+  weekly: 27.5,
+  "half-month": 27.5,
+  single: 13,
+  discount: 55,
+};
+
 export default function ClientPaymentFactViewer({
   fact,
   currency,
   currencyRates,
+  placements,
+  defaultRemainingLessons,
+  defaultFrozenLessons,
   onClose,
   onEdit,
   onDelete,
   deleting,
 }: Props) {
   const paidAt = fact.paidAt ? fmtDate(fact.paidAt) : "—";
-  const amount =
+  const actualAmount =
     typeof fact.amount === "number" ? fmtMoney(fact.amount, currency, currencyRates) : "—";
   const plan = getPaymentFactPlanLabel(fact.subscriptionPlan) ?? "—";
   const period = fact.periodLabel ?? "—";
+  const expectedAmountValue = fact.subscriptionPlan
+    ? EXPECTED_AMOUNT_BY_PLAN[fact.subscriptionPlan] ?? null
+    : null;
+  const expectedAmount =
+    expectedAmountValue != null ? fmtMoney(expectedAmountValue, currency, currencyRates) : "—";
+
+  const getFiniteNumber = (value: number | null | undefined): number | null => {
+    if (typeof value !== "number") {
+      return null;
+    }
+    return Number.isFinite(value) ? value : null;
+  };
+
+  const matchingPlacement = placements.find(place => matchesPlacement(place, fact)) ?? null;
+  const remainingLessons =
+    getFiniteNumber(matchingPlacement?.effectiveRemainingLessons) ??
+    getFiniteNumber(matchingPlacement?.remainingLessons) ??
+    getFiniteNumber(defaultRemainingLessons);
+  const frozenLessons =
+    getFiniteNumber(matchingPlacement?.frozenLessons) ?? getFiniteNumber(defaultFrozenLessons);
 
   return (
     <Modal size="sm" onClose={onClose}>
@@ -40,10 +86,19 @@ export default function ClientPaymentFactViewer({
         <div className="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
           <FactRow label="Район" value={fact.area ?? "—"} />
           <FactRow label="Группа" value={fact.group ?? "—"} />
-          <FactRow label="Дата оплаты" value={paidAt} />
-          <FactRow label="Сумма" value={amount} />
           <FactRow label="Форма абонемента" value={plan} />
+          <FactRow label="Дата оплаты" value={paidAt} />
+          <FactRow label="Сумма (ожидаемая), €" value={expectedAmount} />
+          <FactRow label="Факт оплаты, €" value={actualAmount} />
           <FactRow label="Период" value={period} />
+          <FactRow
+            label="Остаток занятий"
+            value={remainingLessons != null ? String(remainingLessons) : "—"}
+          />
+          <FactRow
+            label="Заморозка"
+            value={frozenLessons != null ? String(frozenLessons) : "—"}
+          />
         </div>
         <div className="flex justify-end gap-2">
           <button

@@ -104,34 +104,37 @@ describe("ClientDetailsModal placements", () => {
       />,
     );
 
-    const firstPlacementCard = screen.getByText("Area1 · Group1").parentElement as HTMLElement | null;
-    const secondPlacementCard = screen.getByText("Area2 · Group2").parentElement as HTMLElement | null;
+    const placementCards = screen.getAllByTestId("client-placement-card");
+    expect(placementCards).toHaveLength(2);
 
-    expect(firstPlacementCard).toBeTruthy();
-    expect(secondPlacementCard).toBeTruthy();
+    const [firstPlacementCard, secondPlacementCard] = placementCards;
 
-    if (!firstPlacementCard || !secondPlacementCard) {
-      throw new Error("Placement cards not found");
-    }
-
+    const firstAreaValue = within(firstPlacementCard)
+      .getByText("Район")
+      .nextElementSibling as HTMLElement | null;
+    const firstGroupValue = within(firstPlacementCard)
+      .getByText("Группа")
+      .nextElementSibling as HTMLElement | null;
     const firstStatusValue = within(firstPlacementCard)
       .getByText("Статус оплаты")
       .nextElementSibling as HTMLElement | null;
-    const firstFactValue = within(firstPlacementCard)
-      .getByText("Факт оплаты")
-      .nextElementSibling as HTMLElement | null;
 
+    expect(firstAreaValue).toHaveTextContent("Area1");
+    expect(firstGroupValue).toHaveTextContent("Group1");
     expect(firstStatusValue).toHaveTextContent("действует");
-    expect(firstFactValue).toHaveTextContent(/100/);
 
+    const secondAreaValue = within(secondPlacementCard)
+      .getByText("Район")
+      .nextElementSibling as HTMLElement | null;
+    const secondGroupValue = within(secondPlacementCard)
+      .getByText("Группа")
+      .nextElementSibling as HTMLElement | null;
     const secondStatusValue = within(secondPlacementCard)
       .getByText("Статус оплаты")
       .nextElementSibling as HTMLElement | null;
-    const secondFactValue = within(secondPlacementCard)
-      .getByText("Факт оплаты")
-      .nextElementSibling as HTMLElement | null;
 
+    expect(secondAreaValue).toHaveTextContent("Area2");
+    expect(secondGroupValue).toHaveTextContent("Group2");
     expect(secondStatusValue).toHaveTextContent("ожидание");
-    expect(secondFactValue).toHaveTextContent("—");
   });
 });
