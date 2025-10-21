@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import * as utils from "../../state/utils";
-import { getSubscriptionPlanMeta } from "../../state/payments";
 import { matchesPeriod, type PeriodFilter } from "../../state/period";
 import {
   estimateGroupRemainingLessonsByParams,
@@ -477,60 +476,22 @@ export default function ClientDetailsModal({
                 Тренировочные места
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {placementsWithDetails.map(place => {
-                  const planLabel = place.subscriptionPlan
-                    ? getSubscriptionPlanMeta(place.subscriptionPlan)?.label ?? "—"
-                    : "—";
-                  const frozenLessons = place.frozenLessons ?? client.frozenLessons ?? 0;
-                  const hidePaymentFact =
-                    place.displayPayStatus === "ожидание" ||
-                    (billingPeriod?.month != null && !place.paidInSelectedPeriod);
-                  return (
-                    <div
-                      key={`${place.id}-${place.area}-${place.group}`}
-                      className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
-                    >
-                      <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
-                        {place.area} · {place.group}
-                      </div>
-                      <dl className="mt-3 grid gap-1 text-slate-600 dark:text-slate-300">
-                        <ClientPlacementInfoCell
-                          label="Статус оплаты"
-                          value={place.displayPayStatus || "—"}
-                        />
-                        <ClientPlacementInfoCell label="Форма абонемента" value={planLabel} />
-                        <ClientPlacementInfoCell label="Дата оплаты" value={place.payDate?.slice(0, 10) || "—"} />
-                        <ClientPlacementInfoCell
-                          label="Сумма оплаты"
-                          value={
-                            place.payAmount != null
-                              ? fmtMoney(place.payAmount, currency, currencyRates)
-                              : "—"
-                          }
-                        />
-                        <ClientPlacementInfoCell
-                          label="Факт оплаты"
-                          value={
-                            hidePaymentFact
-                              ? "—"
-                              : place.payActual != null
-                              ? fmtMoney(place.payActual, currency, currencyRates)
-                              : "—"
-                          }
-                        />
-                        <ClientPlacementInfoCell
-                          label="Остаток занятий"
-                          value={
-                            place.effectiveRemainingLessons != null
-                              ? String(place.effectiveRemainingLessons)
-                              : "—"
-                          }
-                        />
-                        <ClientPlacementInfoCell label="Заморозка" value={String(frozenLessons)} />
-                      </dl>
-                    </div>
-                  );
-                })}
+                {placementsWithDetails.map(place => (
+                  <div
+                    key={`${place.id}-${place.area}-${place.group}`}
+                    data-testid="client-placement-card"
+                    className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                  >
+                    <dl className="grid gap-1 text-slate-600 dark:text-slate-300">
+                      <ClientPlacementInfoCell label="Район" value={place.area || "—"} />
+                      <ClientPlacementInfoCell label="Группа" value={place.group || "—"} />
+                      <ClientPlacementInfoCell
+                        label="Статус оплаты"
+                        value={place.displayPayStatus || "—"}
+                      />
+                    </dl>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -662,6 +623,9 @@ export default function ClientDetailsModal({
           fact={previewingFact}
           currency={currency}
           currencyRates={currencyRates}
+          placements={placementsWithDetails}
+          defaultRemainingLessons={derivedRemainingLessons}
+          defaultFrozenLessons={displayedFrozenLessons}
           onClose={() => setPreviewingFactId(null)}
           onEdit={canManagePaymentFacts ? () => handleEditPaymentFact(previewingFact.id) : undefined}
           onDelete={
