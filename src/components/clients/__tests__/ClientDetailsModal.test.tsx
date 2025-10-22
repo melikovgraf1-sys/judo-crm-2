@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 
 import ClientDetailsModal from "../ClientDetailsModal";
@@ -76,6 +77,8 @@ describe("ClientDetailsModal placements", () => {
         amount: 100,
         subscriptionPlan: "monthly",
         periodLabel: "Март",
+        remainingLessons: 7,
+        frozenLessons: 2,
       },
       {
         id: "fact-2",
@@ -136,5 +139,44 @@ describe("ClientDetailsModal placements", () => {
     expect(secondAreaValue).toHaveTextContent("Area2");
     expect(secondGroupValue).toHaveTextContent("Group2");
     expect(secondStatusValue).toHaveTextContent("ожидание");
+  });
+
+  it("shows payment fact details for editing", async () => {
+    render(
+      <ClientDetailsModal
+        client={baseClient}
+        currency="EUR"
+        currencyRates={currencyRates}
+        schedule={schedule}
+        attendance={attendance}
+        performance={performance}
+        billingPeriod={{ year: 2024, month: 3 }}
+        onClose={() => {}}
+        onPaymentFactsChange={jest.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Факты оплат" }));
+
+    await userEvent.click(screen.getByText("Area1 · Group1"));
+
+    const viewerHeading = await screen.findByText("Факт оплаты");
+    const viewerDialog = viewerHeading.closest('[role="dialog"]');
+    expect(viewerDialog).not.toBeNull();
+
+    await userEvent.click(
+      within(viewerDialog as HTMLElement).getByRole("button", { name: "Редактировать" }),
+    );
+
+    const editorHeading = await screen.findByText("Редактирование факта оплаты");
+    const editorDialog = editorHeading.closest('[role="dialog"]');
+    expect(editorDialog).not.toBeNull();
+
+    const editor = within(editorDialog as HTMLElement);
+
+    expect(editor.getByLabelText("Факт оплаты, €")).toHaveDisplayValue("100");
+    expect(editor.getByLabelText("Сумма (ожидаемая), €")).toHaveDisplayValue("100");
+    expect(editor.getByLabelText(/Остаток занятий/)).toHaveDisplayValue("7");
+    expect(editor.getByLabelText(/Заморозка занятий/)).toHaveDisplayValue("2");
   });
 });

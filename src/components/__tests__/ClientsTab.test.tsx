@@ -339,10 +339,15 @@ test('client details hide fact payment when overall status is ожидание',
 
   await userEvent.click(screen.getByText('Олег Иванов'));
 
-  const factLabels = await screen.findAllByText('Факт оплаты');
-  const firstFactRow = factLabels[0]?.closest('div');
-  expect(firstFactRow).toBeTruthy();
-  if (firstFactRow) {
-    expect(within(firstFactRow).getByText('—')).toBeInTheDocument();
-  }
+  const modal = await screen.findByRole('dialog');
+  const forbiddenLabels = [
+    'Форма абонемента',
+    'Дата оплаты',
+    'Сумма оплаты, €',
+    'Факт оплаты, €',
+    'Остаток занятий',
+  ];
+  forbiddenLabels.forEach(label => {
+    expect(within(modal).queryByText(label)).not.toBeInTheDocument();
+  });
 });
