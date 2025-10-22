@@ -809,6 +809,71 @@ test('weekly subscription advances payDate by one calendar month on payment comp
   });
 });
 
+test('standard group exposes all plans and default expected amount', async () => {
+  const db = makeDB();
+  renderGroups(db);
+
+  await userEvent.click(screen.getByText('+ Добавить клиента'));
+  const modal = screen.getByText('Новый клиент').parentElement;
+  expect(modal).not.toBeNull();
+
+  const planSelect = within(modal!).getByText('Форма абонемента').parentElement!.querySelector('select') as HTMLSelectElement;
+  const planValues = Array.from(planSelect.options).map(option => option.value);
+  expect(planValues).toEqual(['monthly', 'weekly', 'half-month', 'discount', 'single']);
+
+  const payAmountInput = within(modal!)
+    .getByText('Сумма оплаты, €')
+    .parentElement!.querySelector('input') as HTMLInputElement;
+  expect(payAmountInput.value).toBe('55');
+});
+
+test('adult group restricts plans and seeds expected amount', async () => {
+  const db = makeDB();
+  db.settings.groups = ['Group1', 'взрослые'];
+  db.schedule.push({ id: 'slot-adult', area: 'Area1', group: 'взрослые', coachId: 's1', weekday: 5, time: '19:00', location: '' });
+  renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'взрослые' });
+
+  await userEvent.click(screen.getByText('+ Добавить клиента'));
+  const modal = screen.getByText('Новый клиент').parentElement;
+  expect(modal).not.toBeNull();
+
+  const groupSelect = within(modal!).getByText('Группа').parentElement!.querySelector('select');
+  await userEvent.selectOptions(groupSelect as HTMLSelectElement, 'взрослые');
+
+  const planSelect = within(modal!).getByText('Форма абонемента').parentElement!.querySelector('select') as HTMLSelectElement;
+  await waitFor(() => expect(planSelect.value).toBe('monthly'));
+  const planValues = Array.from(planSelect.options).map(option => option.value);
+  expect(planValues).toEqual(['monthly', 'discount', 'single']);
+
+  const payAmountInput = within(modal!)
+    .getByText('Сумма оплаты, €')
+    .parentElement!.querySelector('input') as HTMLInputElement;
+  expect(payAmountInput.value).toBe('55');
+});
+
+test('focus group applies override and allowed plans', async () => {
+  const db = makeDB();
+  db.settings.areas = ['джикджилли'];
+  db.settings.groups = ['фокус'];
+  db.schedule = [
+    { id: 'slot-focus', area: 'джикджилли', group: 'фокус', coachId: 's1', weekday: 2, time: '10:30', location: '' },
+  ];
+  renderGroups(db, makeUI(), { initialArea: 'джикджилли', initialGroup: 'фокус' });
+
+  await userEvent.click(screen.getByText('+ Добавить клиента'));
+  const modal = screen.getByText('Новый клиент').parentElement;
+  expect(modal).not.toBeNull();
+
+  const planSelect = within(modal!).getByText('Форма абонемента').parentElement!.querySelector('select') as HTMLSelectElement;
+  const planValues = Array.from(planSelect.options).map(option => option.value);
+  expect(planValues).toEqual(['weekly', 'single']);
+
+  const payAmountInput = within(modal!)
+    .getByText('Сумма оплаты, €')
+    .parentElement!.querySelector('input') as HTMLInputElement;
+  await waitFor(() => expect(payAmountInput.value).toBe('25'));
+});
+
 test('individual group allows custom payment amount', async () => {
   const db = makeDB();
   db.settings.groups = ['Group1', 'индивидуальные'];
@@ -820,6 +885,15 @@ test('individual group allows custom payment amount', async () => {
 
   const groupSelect = within(modal).getByText('Группа').parentElement.querySelector('select');
   await userEvent.selectOptions(groupSelect, 'индивидуальные');
+
+  const planSelect = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
+  const planValues = Array.from(planSelect.options).map(option => option.value);
+  expect(planValues).toEqual(['monthly', 'single']);
+
+  const payAmountInput = within(modal)
+    .getByText('Сумма оплаты, €')
+    .parentElement.querySelector('input') as HTMLInputElement;
+  expect(payAmountInput.value).toBe('130');
 
   const firstName = within(modal).getByText('Имя').parentElement.querySelector('input');
   const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');

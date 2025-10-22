@@ -2,7 +2,8 @@ import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import {
   getAreaGroupOverride,
-  getDefaultPayAmount,
+  getGroupDefaultExpectedAmount,
+  getSubscriptionPlanAmountForGroup,
   getSubscriptionPlanMeta,
 } from "../../state/payments";
 import { formatPaymentPeriod } from "../../state/paymentFacts";
@@ -121,6 +122,15 @@ export default function ClientPaymentFactEditor({
     }
 
     if (currentPlan) {
+      const expected = getSubscriptionPlanAmountForGroup(
+        currentArea || undefined,
+        currentGroup || undefined,
+        currentPlan,
+      );
+      if (expected != null) {
+        return expected;
+      }
+
       const metaAmount = getSubscriptionPlanMeta(currentPlan)?.amount;
       if (typeof metaAmount === "number") {
         return metaAmount;
@@ -131,14 +141,7 @@ export default function ClientPaymentFactEditor({
       return defaultExpectedAmount;
     }
 
-    if (currentGroup) {
-      const defaultAmount = getDefaultPayAmount(currentGroup, currentArea || undefined);
-      if (defaultAmount != null) {
-        return defaultAmount;
-      }
-    }
-
-    return null;
+    return getGroupDefaultExpectedAmount(currentArea || undefined, currentGroup || undefined);
   }, [
     defaultExpectedAmount,
     fact.area,

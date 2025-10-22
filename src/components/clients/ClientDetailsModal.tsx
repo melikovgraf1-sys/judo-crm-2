@@ -8,8 +8,8 @@ import {
 } from "../../state/lessons";
 import {
   getAreaGroupOverride,
-  getDefaultPayAmount,
-  getSubscriptionPlanAmount,
+  getGroupDefaultExpectedAmount,
+  getSubscriptionPlanAmountForGroup,
 } from "../../state/payments";
 import type {
   AttendanceEntry,
@@ -311,19 +311,12 @@ export default function ClientDetailsModal({
       client.subscriptionPlan ??
       null;
 
-    const planAmount = getSubscriptionPlanAmount(plan);
-    if (planAmount != null) {
-      return planAmount;
+    const expectedAmount = getSubscriptionPlanAmountForGroup(area || undefined, group || undefined, plan);
+    if (expectedAmount != null) {
+      return expectedAmount;
     }
 
-    if (group) {
-      const defaultAmount = getDefaultPayAmount(group, area || undefined);
-      if (defaultAmount != null) {
-        return defaultAmount;
-      }
-    }
-
-    return null;
+    return getGroupDefaultExpectedAmount(area || undefined, group || undefined);
   }, [
     client.area,
     client.group,

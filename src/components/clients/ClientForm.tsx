@@ -14,8 +14,11 @@ import { todayISO, uid } from "../../state/utils";
 import {
   DEFAULT_SUBSCRIPTION_PLAN,
   SUBSCRIPTION_PLANS,
-  getDefaultPayAmount,
+  getAllowedSubscriptionPlansForGroup,
+  getDefaultSubscriptionPlanForGroup,
+  getGroupDefaultExpectedAmount,
   getSubscriptionPlanAmount,
+  getSubscriptionPlanAmountForGroup,
   shouldAllowCustomPayAmount,
   subscriptionPlanAllowsCustomAmount,
   subscriptionPlanRequiresManualRemainingLessons,
@@ -78,6 +81,12 @@ const makePlacement = (
   const resolvedArea = area ?? groupsByArea.keys().next().value ?? availableAreas[0];
   const groups = groupsByArea.get(resolvedArea) ?? groupsByArea.values().next().value ?? db.settings.groups;
   const resolvedGroup = groups?.[0] ?? db.settings.groups[0];
+  const allowedPlans = getAllowedSubscriptionPlansForGroup(resolvedGroup);
+  const groupDefaultPlan = getDefaultSubscriptionPlanForGroup(resolvedGroup);
+  const resolvedPlan = allowedPlans.includes(groupDefaultPlan)
+    ? groupDefaultPlan
+    : allowedPlans[0] ?? DEFAULT_SUBSCRIPTION_PLAN;
+  const expectedAmount = getSubscriptionPlanAmountForGroup(resolvedArea, resolvedGroup, resolvedPlan);
 
   return {
     id: `placement-${uid()}`,
@@ -85,9 +94,9 @@ const makePlacement = (
     group: resolvedGroup,
     payStatus: "ожидание",
     status: "новый",
-    subscriptionPlan: DEFAULT_SUBSCRIPTION_PLAN,
+    subscriptionPlan: resolvedPlan,
     payDate: todayISO().slice(0, 10),
-    payAmount: String(getDefaultPayAmount(resolvedGroup) ?? ""),
+    payAmount: expectedAmount != null ? String(expectedAmount) : "",
     payActual: "",
     remainingLessons: "",
     frozenLessons: "",
@@ -550,17 +559,61 @@ function PrimaryPaymentFields({
   const payAmount = useWatch({ control, name: `placements.${index}.payAmount` });
   const payDate = useWatch({ control, name: `placements.${index}.payDate` });
 
-  const defaultPayAmount = useMemo(
-    () => (group ? getDefaultPayAmount(group, area) ?? undefined : undefined),
-    [group, area],
+  const allowedPlans = useMemo(
+    () => (group ? getAllowedSubscriptionPlansForGroup(group) : []),
+    [group],
   );
-  const subscriptionPlanAmount = useMemo(
+  const allowedPlanSet = useMemo(() => new Set(allowedPlans), [allowedPlans]);
+  const fallbackPlan = useMemo(() => {
+    const preferred = getDefaultSubscriptionPlanForGroup(group ?? undefined);
+    if (allowedPlanSet.size === 0) {
+      return preferred;
+    }
+    if (allowedPlanSet.has(preferred)) {
+      return preferred;
+    }
+    return allowedPlans[0];
+  }, [allowedPlanSet, allowedPlans, group]);
+  const planOptions = useMemo(() => {
+    if (allowedPlans.length === 0) {
+      return SUBSCRIPTION_PLANS;
+    }
+    return SUBSCRIPTION_PLANS.filter(option => allowedPlanSet.has(option.value));
+  }, [allowedPlanSet, allowedPlans]);
+
+  useEffect(() => {
+    if (!group) {
+      return;
+    }
+    if (allowedPlans.length === 0) {
+      return;
+    }
+    if (!subscriptionPlan || !allowedPlanSet.has(subscriptionPlan)) {
+      const nextPlan = fallbackPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+      if (nextPlan !== subscriptionPlan) {
+        setValue(`placements.${index}.subscriptionPlan` as const, nextPlan, {
+          shouldDirty: Boolean(subscriptionPlan),
+          shouldValidate: true,
+        });
+      }
+    }
+  }, [allowedPlanSet, allowedPlans, fallbackPlan, group, index, setValue, subscriptionPlan]);
+
+  const defaultPayAmount = useMemo(
+    () => (group ? getGroupDefaultExpectedAmount(area, group) ?? undefined : undefined),
+    [area, group],
+  );
+  const subscriptionPlanMetaAmount = useMemo(
     () => (subscriptionPlan ? getSubscriptionPlanAmount(subscriptionPlan) ?? undefined : undefined),
     [subscriptionPlan],
   );
+  const expectedPlanAmount = useMemo(
+    () => (subscriptionPlan ? getSubscriptionPlanAmountForGroup(area, group, subscriptionPlan) ?? undefined : undefined),
+    [area, group, subscriptionPlan],
+  );
   const groupAllowsCustom = group ? shouldAllowCustomPayAmount(group) : false;
   const planAllowsCustom = subscriptionPlan ? subscriptionPlanAllowsCustomAmount(subscriptionPlan) : false;
-  const payAmountLockedByPlan = subscriptionPlanAmount != null && !groupAllowsCustom;
+  const payAmountLockedByPlan = subscriptionPlanMetaAmount != null && !groupAllowsCustom;
   const canEditPayAmount = groupAllowsCustom || planAllowsCustom;
 
   const previousGroupRef = useRef<Group | null>(null);
@@ -574,8 +627,9 @@ function PrimaryPaymentFields({
     const planChanged = previousPlan !== null && previousPlan !== subscriptionPlan;
     const currentPayAmount = payAmount;
 
-    if (subscriptionPlanAmount != null && !groupAllowsCustom) {
-      const target = String(subscriptionPlanAmount);
+    if (payAmountLockedByPlan) {
+      const targetAmount = expectedPlanAmount ?? subscriptionPlanMetaAmount;
+      const target = targetAmount != null ? String(targetAmount) : "";
       if (currentPayAmount !== target) {
         setValue(name, target, {
           shouldDirty: groupChanged || planChanged,
@@ -628,7 +682,8 @@ function PrimaryPaymentFields({
     payAmountLockedByPlan,
     setValue,
     subscriptionPlan,
-    subscriptionPlanAmount,
+    subscriptionPlanMetaAmount,
+    expectedPlanAmount,
   ]);
 
   const manualRemainingRequired = useMemo(
@@ -677,7 +732,7 @@ function PrimaryPaymentFields({
             {...register(`placements.${index}.subscriptionPlan` as const)}
             disabled={isWaiting}
           >
-            {SUBSCRIPTION_PLANS.map(option => (
+            {planOptions.map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
