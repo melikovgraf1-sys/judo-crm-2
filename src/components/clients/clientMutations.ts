@@ -1,7 +1,8 @@
 import {
   getAreaGroupOverride,
-  getDefaultPayAmount,
+  getGroupDefaultExpectedAmount,
   getSubscriptionPlanAmount,
+  getSubscriptionPlanAmountForGroup,
   shouldAllowCustomPayAmount,
   subscriptionPlanAllowsCustomAmount,
   subscriptionPlanRequiresManualRemainingLessons,
@@ -109,7 +110,8 @@ export function resolvePayAmount(
   area?: string,
 ): number | undefined {
   const planAmount = getSubscriptionPlanAmount(subscriptionPlan);
-  const defaultAmount = getDefaultPayAmount(group, area);
+  const groupPlanAmount = getSubscriptionPlanAmountForGroup(area, group, subscriptionPlan);
+  const defaultAmount = getGroupDefaultExpectedAmount(area, group);
   const groupAllowsCustom = shouldAllowCustomPayAmount(group);
   const planAllowsCustom = subscriptionPlanAllowsCustomAmount(subscriptionPlan);
   const overrideAmount = getAreaGroupOverride(area, group);
@@ -119,7 +121,7 @@ export function resolvePayAmount(
   }
 
   if (planAmount != null && !groupAllowsCustom) {
-    return planAmount;
+    return groupPlanAmount ?? planAmount;
   }
 
   if (!groupAllowsCustom && !planAllowsCustom && defaultAmount != null) {

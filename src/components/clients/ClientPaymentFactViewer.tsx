@@ -2,13 +2,16 @@ import React from "react";
 import Modal from "../Modal";
 import { getPaymentFactPlanLabel } from "../../state/paymentFacts";
 import { matchesPlacement } from "./paymentStatus";
+import {
+  getGroupDefaultExpectedAmount,
+  getSubscriptionPlanAmountForGroup,
+} from "../../state/payments";
 import * as utils from "../../state/utils";
 import type {
   ClientPlacement,
   Currency,
   PaymentFact,
   Settings,
-  SubscriptionPlan,
 } from "../../types";
 
 type PlacementSummary =
@@ -31,14 +34,6 @@ interface Props {
 
 const { fmtDate, fmtMoney } = utils;
 
-const EXPECTED_AMOUNT_BY_PLAN: Record<SubscriptionPlan, number> = {
-  monthly: 55,
-  weekly: 27.5,
-  "half-month": 27.5,
-  single: 13,
-  discount: 55,
-};
-
 export default function ClientPaymentFactViewer({
   fact,
   currency,
@@ -56,9 +51,24 @@ export default function ClientPaymentFactViewer({
     typeof fact.amount === "number" ? fmtMoney(fact.amount, currency, currencyRates) : "—";
   const plan = getPaymentFactPlanLabel(fact.subscriptionPlan) ?? "—";
   const period = fact.periodLabel ?? "—";
-  const expectedAmountValue = fact.subscriptionPlan
-    ? EXPECTED_AMOUNT_BY_PLAN[fact.subscriptionPlan] ?? null
-    : null;
+  const matchingPlacement = placements.find(place => matchesPlacement(place, fact)) ?? null;
+  const expectedAmountValue = (() => {
+    const area = fact.area ?? matchingPlacement?.area ?? null;
+    const group = fact.group ?? matchingPlacement?.group ?? null;
+
+    if (fact.subscriptionPlan) {
+      const amount = getSubscriptionPlanAmountForGroup(
+        area ?? undefined,
+        group ?? undefined,
+        fact.subscriptionPlan,
+      );
+      if (amount != null) {
+        return amount;
+      }
+    }
+
+    return getGroupDefaultExpectedAmount(area ?? undefined, group ?? undefined);
+  })();
   const expectedAmount =
     expectedAmountValue != null ? fmtMoney(expectedAmountValue, currency, currencyRates) : "—";
 
@@ -69,7 +79,6 @@ export default function ClientPaymentFactViewer({
     return Number.isFinite(value) ? value : null;
   };
 
-  const matchingPlacement = placements.find(place => matchesPlacement(place, fact)) ?? null;
   const factRemainingLessons = getFiniteNumber(fact.remainingLessons);
   const remainingLessons =
     factRemainingLessons ??

@@ -12,6 +12,10 @@ import { commitDBUpdate } from "../state/appState";
 import {
   DEFAULT_SUBSCRIPTION_PLAN,
   SUBSCRIPTION_PLANS,
+  getAllowedSubscriptionPlansForGroup,
+  getDefaultSubscriptionPlanForGroup,
+  getGroupDefaultExpectedAmount,
+  getSubscriptionPlanAmountForGroup,
   getSubscriptionPlanMeta,
 } from "../state/payments";
 import type {
@@ -272,8 +276,15 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
   const coach =
     db.staff.find(member => member.role === "Тренер" && member.areas.includes(area) && member.groups.includes(group)) ??
     db.staff.find(member => member.role === "Тренер");
-  const subscriptionPlan = lead.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
-  const subscriptionPlanMeta = getSubscriptionPlanMeta(subscriptionPlan);
+  const rawPlan = lead.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+  const allowedPlans = getAllowedSubscriptionPlansForGroup(group);
+  const defaultPlan = getDefaultSubscriptionPlanForGroup(group);
+  const subscriptionPlan = allowedPlans.includes(rawPlan)
+    ? rawPlan
+    : allowedPlans[0] ?? defaultPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+  const expectedAmount = getSubscriptionPlanAmountForGroup(area, group, subscriptionPlan);
+  const resolvedExpectedAmount =
+    expectedAmount != null ? expectedAmount : getGroupDefaultExpectedAmount(area, group);
 
   const rawName = (lead.firstName ?? lead.name ?? "Новый клиент").trim();
   const nameParts = rawName.split(/\s+/).filter(Boolean);
@@ -289,7 +300,9 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     status: "новый",
     subscriptionPlan,
     payDate: fallbackDate,
-    ...(subscriptionPlanMeta?.amount != null ? { payAmount: subscriptionPlanMeta.amount } : {}),
+    ...(resolvedExpectedAmount != null
+      ? { payAmount: resolvedExpectedAmount, payActual: resolvedExpectedAmount }
+      : {}),
   };
 
   const client: Client = {
@@ -313,7 +326,9 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     status: "новый",
     subscriptionPlan,
     payDate: fallbackDate,
-    ...(subscriptionPlanMeta?.amount != null ? { payAmount: subscriptionPlanMeta.amount } : {}),
+    ...(resolvedExpectedAmount != null
+      ? { payAmount: resolvedExpectedAmount, payActual: resolvedExpectedAmount }
+      : {}),
     placements: [primaryPlacement],
   };
 
@@ -344,6 +359,13 @@ const toLeadFormValues = (
   defaults: { area: string; group: string },
 ): LeadFormValues => {
   const [firstName = "", ...restName] = (current.firstName ?? current.name ?? "").split(/\s+/).filter(Boolean);
+  const resolvedGroup = current.group ?? defaults.group;
+  const allowedPlans = getAllowedSubscriptionPlansForGroup(resolvedGroup);
+  const defaultPlan = getDefaultSubscriptionPlanForGroup(resolvedGroup);
+  const rawPlan = current.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+  const subscriptionPlan = allowedPlans.includes(rawPlan)
+    ? rawPlan
+    : allowedPlans[0] ?? defaultPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
   return {
     name: current.name,
     firstName: current.firstName ?? firstName ?? "",
@@ -355,9 +377,9 @@ const toLeadFormValues = (
     instagram: current.instagram ?? "",
     source: current.source,
     area: current.area ?? defaults.area,
-    group: current.group ?? defaults.group,
+    group: resolvedGroup,
     stage: current.stage,
-    subscriptionPlan: current.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
+    subscriptionPlan,
     birthDate: current.birthDate ? current.birthDate.slice(0, 10) : "",
     startDate: current.startDate ? current.startDate.slice(0, 10) : "",
     notes: current.notes ?? "",
@@ -511,6 +533,8 @@ function LeadFormModal({
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isValid },
   } = useForm<LeadFormValues>({
     resolver,
@@ -530,6 +554,44 @@ function LeadFormModal({
     });
     onClose();
   };
+
+  const currentGroup = watch("group");
+  const currentPlan = watch("subscriptionPlan");
+  const allowedPlans = useMemo(
+    () => getAllowedSubscriptionPlansForGroup(currentGroup || undefined),
+    [currentGroup],
+  );
+  const allowedPlanSet = useMemo(() => new Set(allowedPlans), [allowedPlans]);
+  const fallbackPlan = useMemo(() => {
+    const preferred = getDefaultSubscriptionPlanForGroup(currentGroup || undefined);
+    if (allowedPlanSet.size === 0) {
+      return preferred;
+    }
+    if (preferred && allowedPlanSet.has(preferred)) {
+      return preferred;
+    }
+    return allowedPlans[0] ?? preferred;
+  }, [allowedPlanSet, allowedPlans, currentGroup]);
+
+  useEffect(() => {
+    if (allowedPlans.length === 0) {
+      return;
+    }
+    const normalizedPlan = (currentPlan || "") as SubscriptionPlan | "";
+    if (!normalizedPlan || !allowedPlanSet.has(normalizedPlan as SubscriptionPlan)) {
+      const nextPlan = fallbackPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+      if (nextPlan && nextPlan !== normalizedPlan) {
+        setValue("subscriptionPlan", nextPlan, { shouldDirty: Boolean(normalizedPlan), shouldValidate: true });
+      }
+    }
+  }, [allowedPlanSet, allowedPlans, currentPlan, fallbackPlan, setValue]);
+
+  const planOptions = useMemo(() => {
+    if (allowedPlans.length === 0) {
+      return SUBSCRIPTION_PLANS;
+    }
+    return SUBSCRIPTION_PLANS.filter(option => allowedPlanSet.has(option.value));
+  }, [allowedPlanSet, allowedPlans]);
 
   const labelClass = "text-xs text-slate-500 dark:text-slate-400";
   const fieldClass =
@@ -606,7 +668,7 @@ function LeadFormModal({
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Форма абонемента</label>
             <select className={selectClass} {...register("subscriptionPlan")}>
-              {SUBSCRIPTION_PLANS.map(option => (
+              {planOptions.map(option => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
