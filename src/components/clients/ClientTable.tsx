@@ -149,24 +149,62 @@ export default function ClientTable({
     [activeArea, activeGroup],
   );
 
+  const collectPlacementPaymentFacts = useCallback(
+    (client: Client) => {
+      const placement = getActivePlacement(client);
+      const facts = normalizePaymentFacts(client.payHistory);
+      const filteredFacts = facts.filter(fact => {
+        const inSelectedPeriod = billingPeriod ? matchesPeriod(fact, billingPeriod) : true;
+        if (!inSelectedPeriod) {
+          return false;
+        }
+        return matchesPlacement(placement, fact);
+      });
+      const amount = filteredFacts.reduce((sum, fact) => {
+        const value = typeof fact.amount === "number" && Number.isFinite(fact.amount) ? fact.amount : 0;
+        return sum + value;
+      }, 0);
+
+      return {
+        placement,
+        amount,
+        hasFacts: filteredFacts.length > 0,
+      };
+    },
+    [billingPeriod, getActivePlacement],
+  );
+
+  const getPayActualAmount = useCallback(
+    (client: Client) => {
+      const { placement, amount, hasFacts } = collectPlacementPaymentFacts(client);
+      if (hasFacts) {
+        return amount;
+      }
+
+      const fallbackPlacement =
+        placement ??
+        (activeArea == null && activeGroup == null
+          ? client.placements?.find(item => typeof item.payActual === "number" && Number.isFinite(item.payActual)) ??
+            null
+          : null);
+
+      const fallbackAmount = fallbackPlacement?.payActual;
+      return typeof fallbackAmount === "number" && Number.isFinite(fallbackAmount) ? fallbackAmount : null;
+    },
+    [activeArea, activeGroup, collectPlacementPaymentFacts],
+  );
+
   const paidInPeriodMap = useMemo(() => {
     if (!billingPeriod || billingPeriod.month == null) {
       return null;
     }
     const map = new Map<string, boolean>();
     list.forEach(client => {
-      const history = normalizePaymentFacts(client.payHistory);
-      const placement = getActivePlacement(client);
-      const paid = history.some(entry => {
-        if (!matchesPeriod(entry, billingPeriod)) {
-          return false;
-        }
-        return matchesPlacement(placement, entry);
-      });
-      map.set(client.id, paid);
+      const { hasFacts } = collectPlacementPaymentFacts(client);
+      map.set(client.id, hasFacts);
     });
     return map;
-  }, [billingPeriod, getActivePlacement, list]);
+  }, [billingPeriod, collectPlacementPaymentFacts, list]);
 
   const isPaidInSelectedPeriod = useCallback((client: Client): boolean => {
     const placement = getActivePlacement(client);
@@ -395,9 +433,8 @@ export default function ClientTable({
         if (billingPeriod?.month != null && !paid) {
           return "—";
         }
-        const placement = getActivePlacement(client);
-        const payActual = placement?.payActual ?? client.payActual;
-        return payActual != null ? fmtMoney(payActual, currency, currencyRates) : "—";
+        const amount = getPayActualAmount(client);
+        return amount != null ? fmtMoney(amount, currency, currencyRates) : "—";
       },
       sortValue: client => {
         const placementStatus = getClientPlacementDisplayStatus(client);
@@ -408,9 +445,8 @@ export default function ClientTable({
         if (billingPeriod?.month != null && !paid) {
           return 0;
         }
-        const placement = getActivePlacement(client);
-        const payActual = placement?.payActual ?? client.payActual;
-        return payActual ?? 0;
+        const amount = getPayActualAmount(client);
+        return amount ?? 0;
       },
     },
     {
@@ -518,8 +554,8 @@ export default function ClientTable({
     billingPeriod,
     currency,
     currencyRates,
-    getActivePlacement,
     getDisplayPayStatus,
+    getPayActualAmount,
     getPayStatusTone,
     isPaidInSelectedPeriod,
     onCompletePaymentTask,
