@@ -169,7 +169,6 @@ export function buildGroupsByArea(schedule: ScheduleSlot[]): Map<Area, Group[]> 
   const earliestByAreaGroup = new Map<Area, Map<Group, EarliestSlot>>();
 
   for (const slot of schedule) {
-    const groups = map.get(slot.area);
     const candidate: EarliestSlot = { time: slot.time, weekday: slot.weekday };
     const current = earliestByArea.get(slot.area);
     if (!current) {

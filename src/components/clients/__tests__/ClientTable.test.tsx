@@ -180,8 +180,6 @@ describe("ClientTable active placement matching", () => {
       placements: [canonical.placements[0]],
     };
 
-    const user = userEvent.setup();
-
     render(
       <ClientTable
         list={[listClient]}
@@ -196,8 +194,9 @@ describe("ClientTable active placement matching", () => {
       />,
     );
 
-    await user.click(screen.getByText("Иван Иванов"));
+    await userEvent.click(screen.getByText("Иван Иванов"));
 
-    expect(await screen.findByText("Area2 · Group2")).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Area1 · Group1, Area2 · Group2")).toBeInTheDocument();
   });
 });

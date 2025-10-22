@@ -441,8 +441,6 @@ function PlacementFields({
   const groupAllowsCustom = group ? shouldAllowCustomPayAmount(group) : false;
   const planAllowsCustom = subscriptionPlan ? subscriptionPlanAllowsCustomAmount(subscriptionPlan) : false;
   const payAmountLockedByPlan = subscriptionPlanAmount != null && !groupAllowsCustom;
-  const canEditPayAmount = groupAllowsCustom || planAllowsCustom;
-
   useEffect(() => {
     const name = `placements.${index}.payAmount` as const;
     const previousGroup = previousGroupRef.current;
@@ -540,8 +538,6 @@ function PlacementFields({
     "px-3 py-2 rounded-md border border-slate-300 bg-white placeholder:text-slate-400 " +
     "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
   const selectClass = `${fieldClass} appearance-none`;
-  const subtleTextClass = "text-xs text-slate-500 dark:text-slate-400";
-
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <div className="flex items-center justify-between">
@@ -611,72 +607,11 @@ function PlacementFields({
             )}
           </div>
         )}
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Форма абонемента</label>
-          <select className={selectClass} {...register(`placements.${index}.subscriptionPlan` as const)}>
-            {SUBSCRIPTION_PLANS.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {placementErrors?.subscriptionPlan && (
-            <span className="text-xs text-rose-600">{placementErrors.subscriptionPlan.message}</span>
-          )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Дата оплаты</label>
-          <input type="date" className={fieldClass} {...register(`placements.${index}.payDate` as const)} />
-          {placementErrors?.payDate && (
-            <span className="text-xs text-rose-600">{placementErrors.payDate.message}</span>
-          )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Сумма оплаты, €</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            step={0.5}
-            className={fieldClass}
-            {...register(`placements.${index}.payAmount` as const)}
-            disabled={!canEditPayAmount}
-            placeholder="Укажите сумму"
-          />
-          {!canEditPayAmount && defaultPayAmount != null && (
-            <span className={subtleTextClass}>
-              {payAmountLockedByPlan
-                ? "Сумма выбрана формой абонемента"
-                : "Сумма фиксирована для этой группы"}
-            </span>
-          )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Факт оплаты, €</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            step={0.5}
-            className={fieldClass}
-            {...register(`placements.${index}.payActual` as const)}
-            placeholder="Оплата по факту"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={labelClass}>Остаток занятий</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            className={fieldClass}
-            {...register(`placements.${index}.remainingLessons` as const)}
-            disabled={!manualRemainingRequired}
-            placeholder={manualRemainingRequired ? "Укажите вручную" : "Рассчитывается автоматически"}
-          />
-          {!manualRemainingRequired && recommendedRemaining != null && (
-            <span className={subtleTextClass}>
-              Рекомендуемое значение: {recommendedRemaining}
-            </span>
-          )}
-        </div>
+        <input type="hidden" {...register(`placements.${index}.subscriptionPlan` as const)} />
+        <input type="hidden" {...register(`placements.${index}.payDate` as const)} />
+        <input type="hidden" {...register(`placements.${index}.payAmount` as const)} />
+        <input type="hidden" {...register(`placements.${index}.payActual` as const)} />
+        <input type="hidden" {...register(`placements.${index}.remainingLessons` as const)} />
       </div>
     </div>
   );
