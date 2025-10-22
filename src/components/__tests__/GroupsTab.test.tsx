@@ -233,6 +233,39 @@ test('read: filters clients by area, group and pay status', () => {
   expect(screen.queryByText('C')).not.toBeInTheDocument();
 });
 
+test('read: skips placements with status отмена', () => {
+  const db = makeDB();
+  db.clients = [
+    makeClient({ id: 'active', firstName: 'Активный', area: 'Area1', group: 'Group1' }),
+    makeClient({
+      id: 'cancel-placement',
+      firstName: 'Отмененный',
+      area: 'Area1',
+      group: 'Group1',
+      placements: [
+        {
+          id: 'pl-cancel',
+          area: 'Area1',
+          group: 'Group1',
+          payStatus: 'ожидание',
+          status: 'отмена',
+          subscriptionPlan: 'monthly',
+          payDate: '2024-01-10T00:00:00.000Z',
+          payAmount: 55,
+          payActual: 55,
+          remainingLessons: 5,
+          frozenLessons: 0,
+        },
+      ],
+    }),
+  ];
+
+  renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
+
+  expect(screen.getByText('Активный')).toBeInTheDocument();
+  expect(screen.queryByText('Отмененный')).not.toBeInTheDocument();
+});
+
 test('filters clients by selected month', async () => {
   const db = makeDB();
   db.clients = [

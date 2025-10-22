@@ -11,6 +11,7 @@ import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
 import { isReserveArea } from "../state/areas";
+import { getClientPlacements } from "../state/clients";
 import type {
   Area,
   Client,
@@ -121,7 +122,18 @@ export default function PerformanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(client => client.area === area && client.group === group && !isReserveArea(client.area));
+    return db.clients.filter(client => {
+      if (client.status === "отмена") {
+        return false;
+      }
+      return getClientPlacements(client).some(
+        placement =>
+          placement.area === area &&
+          placement.group === group &&
+          placement.status !== "отмена" &&
+          !isReserveArea(placement.area),
+      );
+    });
   }, [area, group, db.clients]);
 
 
