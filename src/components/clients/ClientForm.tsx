@@ -35,6 +35,7 @@ import type {
   ClientFormValues,
   ClientPlacementFormValues,
   Group,
+  PaymentMethod,
   SubscriptionPlan,
 } from "../../types";
 import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS } from "../../types";
@@ -77,6 +78,7 @@ const makePlacement = (
   groupsByArea: Map<Area, Group[]>,
   db: DB,
   area?: Area,
+  payMethod: PaymentMethod = "перевод",
 ): ClientPlacementFormValues => {
   const availableAreas = db.settings.areas;
   const resolvedArea = area ?? groupsByArea.keys().next().value ?? availableAreas[0];
@@ -93,6 +95,7 @@ const makePlacement = (
     id: `placement-${uid()}`,
     area: resolvedArea,
     group: resolvedGroup,
+    payMethod,
     payStatus: "ожидание",
     status: "новый",
     subscriptionPlan: resolvedPlan,
@@ -108,6 +111,10 @@ const placementSchema: yup.ObjectSchema<ClientPlacementFormValues> = yup.object(
   id: yup.string().required(),
   area: yup.string().required("Укажите район"),
   group: yup.string().required("Укажите группу"),
+  payMethod: yup
+    .mixed<ClientPlacementFormValues["payMethod"]>()
+    .oneOf(["наличные", "перевод"], "Укажите способ оплаты")
+    .required("Укажите способ оплаты"),
   payStatus: yup
     .mixed<ClientPlacementFormValues["payStatus"]>()
     .oneOf(["ожидание", "действует", "задолженность"], "Укажите статус оплаты")
@@ -145,8 +152,8 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     birthDate: "2017-01-01",
     parentName: "",
     startDate: todayISO().slice(0, 10),
-    payMethod: DEFAULT_PAYMENT_METHOD,
-    placements: [makePlacement(groupsByArea, db)],
+    payMethod: "перевод",
+    placements: [makePlacement(groupsByArea, db, undefined, "перевод")],
   }), [db, groupsByArea]);
 
   const schema = yup
@@ -208,6 +215,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               id: editing.id,
               area: editing.area,
               group: editing.group,
+              payMethod: editing.payMethod,
               payStatus: editing.payStatus,
               status: editing.status,
               subscriptionPlan: editing.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN,
@@ -217,8 +225,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
               frozenLessons: editing.frozenLessons != null ? String(editing.frozenLessons) : "",
             },
-          ]).map(item => ({
+        ]).map(item => ({
         ...item,
+        payMethod: item.payMethod ?? editing.payMethod,
         payDate: item.payDate?.slice(0, 10) ?? "",
         frozenLessons: item.frozenLessons ?? "",
       }));
@@ -247,6 +256,32 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
   }, [blankForm, editing, reset]);
 
   const placementsWatch = useWatch({ control, name: "placements" });
+  const formPayMethod = useWatch({ control, name: "payMethod" }) as PaymentMethod | undefined;
+  const primaryPayMethod = useWatch({
+    control,
+    name: "placements.0.payMethod",
+  }) as PaymentMethod | undefined;
+
+  useEffect(() => {
+    if (!primaryPayMethod && formPayMethod) {
+      setValue("placements.0.payMethod", formPayMethod, {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: false,
+      });
+    }
+  }, [formPayMethod, primaryPayMethod, setValue]);
+
+  useEffect(() => {
+    if (primaryPayMethod && primaryPayMethod !== formPayMethod) {
+      setValue("payMethod", primaryPayMethod, {
+        shouldDirty: true,
+        shouldTouch: false,
+        shouldValidate: false,
+      });
+    }
+  }, [formPayMethod, primaryPayMethod, setValue]);
+
   const uniqueAreas = useMemo(() => new Set((placementsWatch ?? []).map(p => p?.area).filter(Boolean)), [
     placementsWatch,
   ]);
@@ -261,7 +296,8 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
   const onSubmit = handleSubmit(onSave);
 
   const addPlacement = () => {
-    append(makePlacement(groupsByArea, db));
+    const defaultPayMethod = primaryPayMethod ?? formPayMethod ?? "перевод";
+    append(makePlacement(groupsByArea, db, undefined, defaultPayMethod as PaymentMethod));
   };
 
   const disableAddPlacement = fields.length >= MAX_PLACEMENTS;
@@ -272,6 +308,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         {editing ? "Редактирование клиента" : "Новый клиент"}
       </div>
       <form onSubmit={onSubmit} className="space-y-4">
+        <input type="hidden" {...register("payMethod")} />
         <div className="grid sm:grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Имя</label>
@@ -340,29 +377,6 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             <input type="date" className={fieldClass} {...register("startDate")} />
             {errors.startDate && (
               <span className="text-xs text-rose-600">{errors.startDate.message}</span>
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Способ оплаты</label>
-            <select className={selectClass} {...register("payMethod")}>
-              {PAYMENT_METHODS.map(method => (
-                <option key={method} value={method}>
-                  {method}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Статус клиента</label>
-            <select className={selectClass} {...register("placements.0.status" as const)}>
-              <option value="действующий">действующий</option>
-              <option value="отмена">отмена</option>
-              <option value="новый">новый</option>
-              <option value="вернувшийся">вернувшийся</option>
-              <option value="продлившийся">продлившийся</option>
-            </select>
-            {errors.placements?.[0]?.status && (
-              <span className="text-xs text-rose-600">{errors.placements?.[0]?.status?.message}</span>
             )}
           </div>
         </div>
@@ -518,6 +532,16 @@ function PlacementFields({
           )}
         </div>
         <div className="flex flex-col gap-1">
+          <label className={labelClass}>Способ оплаты</label>
+          <select className={selectClass} {...register(`placements.${index}.payMethod` as const)}>
+            <option value="перевод">перевод</option>
+            <option value="наличные">наличные</option>
+          </select>
+          {placementErrors?.payMethod && (
+            <span className="text-xs text-rose-600">{placementErrors.payMethod.message}</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
           <label className={labelClass}>Статус оплаты</label>
           <select className={selectClass} {...register(`placements.${index}.payStatus` as const)}>
             <option value="ожидание">ожидание</option>
@@ -528,21 +552,19 @@ function PlacementFields({
             <span className="text-xs text-rose-600">{placementErrors.payStatus.message}</span>
           )}
         </div>
-        {!isPrimary && (
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Статус клиента</label>
-            <select className={selectClass} {...register(`placements.${index}.status` as const)}>
-              <option value="действующий">действующий</option>
-              <option value="отмена">отмена</option>
-              <option value="новый">новый</option>
-              <option value="вернувшийся">вернувшийся</option>
-              <option value="продлившийся">продлившийся</option>
-            </select>
-            {placementErrors?.status && (
-              <span className="text-xs text-rose-600">{placementErrors.status.message}</span>
-            )}
-          </div>
-        )}
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Статус клиента</label>
+          <select className={selectClass} {...register(`placements.${index}.status` as const)}>
+            <option value="действующий">действующий</option>
+            <option value="отмена">отмена</option>
+            <option value="новый">новый</option>
+            <option value="вернувшийся">вернувшийся</option>
+            <option value="продлившийся">продлившийся</option>
+          </select>
+          {placementErrors?.status && (
+            <span className="text-xs text-rose-600">{placementErrors.status.message}</span>
+          )}
+        </div>
       </div>
     </div>
   );

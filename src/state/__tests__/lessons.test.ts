@@ -19,6 +19,7 @@ const baseClient: Client = {
       id: "placement-1",
       area: "Area1",
       group: "индивидуальные",
+      payMethod: "перевод",
       payStatus: "действует",
       status: "действующий",
       subscriptionPlan: "monthly",

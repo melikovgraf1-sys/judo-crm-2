@@ -2,7 +2,20 @@ import type { Client, ClientPlacement, DB } from "../types";
 
 export function getClientPlacements(client: Client): ClientPlacement[] {
   if (Array.isArray(client.placements) && client.placements.length) {
-    return client.placements;
+    return client.placements.map((placement, index) => ({
+      id: placement.id ?? `${client.id}-${index}`,
+      area: placement.area ?? client.area,
+      group: placement.group ?? client.group,
+      payMethod: placement.payMethod ?? client.payMethod,
+      payStatus: placement.payStatus ?? client.payStatus,
+      status: placement.status ?? client.status,
+      subscriptionPlan: placement.subscriptionPlan ?? client.subscriptionPlan,
+      payDate: placement.payDate ?? client.payDate,
+      payAmount: placement.payAmount ?? client.payAmount,
+      payActual: placement.payActual ?? client.payActual,
+      remainingLessons: placement.remainingLessons ?? client.remainingLessons,
+      frozenLessons: placement.frozenLessons ?? client.frozenLessons,
+    }));
   }
 
   return [
@@ -10,6 +23,7 @@ export function getClientPlacements(client: Client): ClientPlacement[] {
       id: client.id,
       area: client.area,
       group: client.group,
+      payMethod: client.payMethod,
       payStatus: client.payStatus,
       status: client.status,
       subscriptionPlan: client.subscriptionPlan,

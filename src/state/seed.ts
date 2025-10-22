@@ -111,6 +111,7 @@ export function makeSeedDB(): DB {
       id: placementId,
       area,
       group,
+      payMethod: "перевод" as const,
       payStatus: "действует" as const,
       status: "действующий" as const,
       subscriptionPlan,
