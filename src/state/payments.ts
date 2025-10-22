@@ -1,4 +1,13 @@
-import type { Client, PaymentStatus, SubscriptionPlan, TaskItem } from "../types";
+import type {
+  Area,
+  Client,
+  ClientPlacement,
+  Group,
+  PaymentStatus,
+  SubscriptionPlan,
+  TaskItem,
+} from "../types";
+import type { PeriodFilter } from "./period";
 import { applyClientStatusAutoTransition } from "./clientLifecycle";
 
 export const SUBSCRIPTION_PLANS: { value: SubscriptionPlan; label: string; amount: number | null }[] = [
@@ -89,6 +98,54 @@ export function getDefaultPayAmount(group: string, area?: string | null): number
     return null;
   }
   return 55;
+}
+
+type PricingOverrides = {
+  area?: Area | null;
+  group?: Group | null;
+};
+
+export function getPlacementPricing(
+  client: Client,
+  placement?: ClientPlacement | null,
+  overrides: PricingOverrides = {},
+): { amount: number | null; plan: SubscriptionPlan } {
+  const resolvedArea = placement?.area ?? overrides.area ?? client.area;
+  const resolvedGroup = placement?.group ?? overrides.group ?? client.group;
+  const plan = placement?.subscriptionPlan ?? client.subscriptionPlan ?? DEFAULT_SUBSCRIPTION_PLAN;
+
+  const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
+  if (overrideAmount != null) {
+    return { amount: overrideAmount, plan };
+  }
+
+  const resolvedPayAmount = placement?.payAmount ?? client.payAmount ?? null;
+  if (resolvedPayAmount != null) {
+    return { amount: resolvedPayAmount, plan };
+  }
+
+  return { amount: getDefaultPayAmount(resolvedGroup, resolvedArea), plan };
+}
+
+const getDaysInMonth = (year: number, month: number): number => {
+  const date = new Date(Date.UTC(year, month, 0));
+  return date.getUTCDate();
+};
+
+export function getSubscriptionPlanCadenceMultiplier(
+  plan: SubscriptionPlan | undefined | null,
+  period?: PeriodFilter,
+): number {
+  if (!period || period.month == null) {
+    return 1;
+  }
+
+  if (plan === "half-month") {
+    const daysInMonth = getDaysInMonth(period.year, period.month);
+    return Math.max(1, Math.floor(daysInMonth / 14));
+  }
+
+  return 1;
 }
 
 export function derivePaymentStatus(

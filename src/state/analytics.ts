@@ -1,5 +1,10 @@
 import { getClientPlacements } from "./clients";
-import { getAreaGroupOverride, getDefaultPayAmount } from "./payments";
+import {
+  getAreaGroupOverride,
+  getDefaultPayAmount,
+  getPlacementPricing,
+  getSubscriptionPlanCadenceMultiplier,
+} from "./payments";
 import { normalizePaymentFacts } from "./paymentFacts";
 import { convertMoney } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
@@ -350,6 +355,7 @@ function getClientForecastAmount(
   const placements = getClientPlacements(client);
   const effectiveScope = scope ?? { area: "all" as AreaScope, group: null };
 
+  let actualFactsTotal = 0;
   if (period) {
     const history = normalizePaymentFacts(client.payHistory);
     const matchingFacts = history.filter(fact => {
@@ -358,9 +364,7 @@ function getClientForecastAmount(
       }
       return factMatchesScope(fact.area, fact.group, effectiveScope, placements);
     });
-    if (matchingFacts.length > 0) {
-      return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
-    }
+    actualFactsTotal = matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
   }
 
   const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
@@ -374,19 +378,6 @@ function getClientForecastAmount(
         }
         return matchesPeriod(referenceDate, period);
       });
-
-  if (period) {
-    const history = normalizePaymentFacts(client.payHistory);
-    const matchingFacts = history.filter(fact => {
-      if (!matchesPeriod(fact, period)) {
-        return false;
-      }
-      return factMatchesScope(fact.area, fact.group, scope, placements);
-    });
-    if (matchingFacts.length > 0) {
-      return matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
-    }
-  }
 
   const matchesScope = (placement: (typeof placements)[number]): boolean => {
     if (group) {
@@ -402,64 +393,54 @@ function getClientForecastAmount(
     return true;
   };
 
-  const getAmountForPlacement = (placement: (typeof placements)[number]): number => {
-    const resolvedArea = placement.area ?? area ?? client.area;
-    const resolvedGroup = placement.group ?? group ?? client.group;
-
-    const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
-    if (overrideAmount != null) {
-      return ensureNumber(overrideAmount);
+  const getExpectedRevenueForPlacement = (
+    placement?: (typeof placements)[number],
+  ): number => {
+    const { amount, plan } = getPlacementPricing(client, placement, { area, group });
+    const baseAmount = amount != null ? ensureNumber(amount) : 0;
+    if (!period) {
+      return baseAmount;
     }
-
-    const resolvedPayAmount = placement.payAmount ?? client.payAmount;
-    if (resolvedPayAmount != null) {
-      return ensureNumber(resolvedPayAmount);
-    }
-
-    return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
+    const cadenceMultiplier = getSubscriptionPlanCadenceMultiplier(plan, period);
+    return baseAmount * cadenceMultiplier;
   };
 
   const matchingPlacements = placementsMatchingPeriod.filter(matchesScope);
 
+  let expectedRevenue = 0;
   if (matchingPlacements.length > 0) {
-    return matchingPlacements.reduce((sum, placement) => sum + getAmountForPlacement(placement), 0);
+    expectedRevenue = matchingPlacements.reduce(
+      (sum, placement) => sum + getExpectedRevenueForPlacement(placement),
+      0,
+    );
+  } else {
+    const fallbackPlacement =
+      (group
+        ? placementsMatchingPeriod.find(placement => {
+            if (placement.group !== group) {
+              return false;
+            }
+            if (area && placement.area !== area) {
+              return false;
+            }
+            return true;
+          })
+        : undefined) ??
+      (area ? placementsMatchingPeriod.find(placement => placement.area === area) : undefined) ??
+      placementsMatchingPeriod[0];
+
+    if (fallbackPlacement) {
+      expectedRevenue = getExpectedRevenueForPlacement(fallbackPlacement);
+    } else if (!period) {
+      expectedRevenue = getExpectedRevenueForPlacement();
+    }
   }
 
-  const fallbackPlacement =
-    (group
-      ? placementsMatchingPeriod.find(placement => {
-          if (placement.group !== group) {
-            return false;
-          }
-          if (area && placement.area !== area) {
-            return false;
-          }
-          return true;
-        })
-      : undefined) ??
-    (area ? placementsMatchingPeriod.find(placement => placement.area === area) : undefined) ??
-    placementsMatchingPeriod[0];
-
-  if (fallbackPlacement) {
-    return getAmountForPlacement(fallbackPlacement);
+  if (period && actualFactsTotal > 0) {
+    return Math.max(expectedRevenue, actualFactsTotal);
   }
 
-  if (period) {
-    return 0;
-  }
-
-  const resolvedArea = area ?? client.area;
-  const resolvedGroup = group ?? client.group;
-  const overrideAmount = getAreaGroupOverride(resolvedArea, resolvedGroup);
-  if (overrideAmount != null) {
-    return ensureNumber(overrideAmount);
-  }
-
-  if (client.payAmount != null) {
-    return ensureNumber(client.payAmount);
-  }
-
-  return ensureNumber(getDefaultPayAmount(resolvedGroup, resolvedArea) ?? 0);
+  return expectedRevenue;
 }
 
 type AnalyticsScope = {

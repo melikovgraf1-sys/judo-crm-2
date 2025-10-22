@@ -640,4 +640,107 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.forecast).toBe(25);
     expect(snapshot.metrics.revenue.values.target).toBe(250);
   });
+
+  describe("half-month plan forecasting", () => {
+    const period: PeriodFilter = { year: 2023, month: 10 };
+
+    const buildHalfMonthDB = (paymentDates: string[] = []): DB => ({
+      revision: 0,
+      clients: [
+        {
+          id: "half-1",
+          firstName: "Полина",
+          lastName: "Лунина",
+          phone: "",
+          channel: "Telegram",
+          birthDate: "2015-03-10T00:00:00.000Z",
+          gender: "ж",
+          area: "Area1",
+          group: "Group1",
+          startDate: "2023-08-01T00:00:00.000Z",
+          payMethod: "перевод",
+          payStatus: "действует",
+          status: "действующий",
+          subscriptionPlan: "half-month",
+          payDate: "2023-10-01T00:00:00.000Z",
+          payAmount: 27.5,
+          payActual: 0,
+          remainingLessons: 0,
+          placements: [
+            {
+              id: "pl-half-1",
+              area: "Area1",
+              group: "Group1",
+              payStatus: "действует",
+              status: "действующий",
+              subscriptionPlan: "half-month",
+              payDate: "2023-10-01T00:00:00.000Z",
+              payAmount: 27.5,
+              payActual: 0,
+              remainingLessons: 0,
+            },
+          ],
+          payHistory: paymentDates.map((paidAt, index) => ({
+            id: `fact-half-${index}`,
+            paidAt,
+            amount: 27.5,
+            subscriptionPlan: "half-month",
+          })),
+        },
+      ],
+      attendance: [],
+      performance: [],
+      schedule: [],
+      leads: [],
+      leadsArchive: [],
+      leadHistory: [],
+      tasks: [],
+      tasksArchive: [],
+      staff: [],
+      settings: {
+        areas: ["Area1"],
+        groups: ["Group1"],
+        limits: { "Area1|Group1": 10 },
+        rentByAreaEUR: { Area1: 0 },
+        coachSalaryByAreaEUR: { Area1: 0 },
+        currencyRates: { EUR: 1, TRY: 1, RUB: 1 },
+        coachPayFormula: "",
+        analyticsFavorites: [],
+      },
+      changelog: [],
+    });
+
+    it("forecasts a full month with no October payments", () => {
+      const db = buildHalfMonthDB();
+
+      const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+      expect(snapshot.metrics.revenue.values.actual).toBe(0);
+      expect(snapshot.metrics.revenue.values.forecast).toBe(55);
+      expect(snapshot.metrics.revenue.values.remaining).toBe(55);
+    });
+
+    it("keeps forecast monthly when a single October fact exists", () => {
+      const db = buildHalfMonthDB(["2023-10-05T00:00:00.000Z"]);
+
+      const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+      expect(snapshot.metrics.revenue.values.actual).toBe(27.5);
+      expect(snapshot.metrics.revenue.values.forecast).toBe(55);
+      expect(snapshot.metrics.revenue.values.remaining).toBe(27.5);
+    });
+
+    it("tracks full payment when two October facts exist", () => {
+      const db = buildHalfMonthDB([
+        "2023-10-05T00:00:00.000Z",
+        "2023-10-20T00:00:00.000Z",
+      ]);
+
+      const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+      expect(snapshot.metrics.revenue.values.actual).toBe(55);
+      expect(snapshot.metrics.revenue.values.forecast).toBe(55);
+      expect(snapshot.metrics.revenue.values.remaining).toBe(0);
+    });
+  });
 });
