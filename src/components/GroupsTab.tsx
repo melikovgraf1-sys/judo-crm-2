@@ -50,7 +50,10 @@ export const clientMatchesGroup = (
 
   return getClientPlacements(client).some(
     placement =>
-      placement.area === area && placement.group === group && !isReserveArea(placement.area),
+      placement.area === area &&
+      placement.group === group &&
+      placement.status !== "отмена" &&
+      !isReserveArea(placement.area),
   );
 };
 

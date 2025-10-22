@@ -265,3 +265,89 @@ test("AttendanceTab shows clients from additional placements", async () => {
   await waitFor(() => expect(screen.getByText("Найдено: 1")).toBeInTheDocument());
   expect(screen.getByText("Дополнительный")).toBeInTheDocument();
 });
+
+test("AttendanceTab hides canceled placements and clients", async () => {
+  const db = createDB();
+  db.clients = [
+    createClient({ id: "active", firstName: "Активный" }),
+    createClient({
+      id: "placement-cancel",
+      firstName: "Отмененное размещение",
+      placements: [
+        {
+          id: "pl-cancel",
+          area: "Area1",
+          group: "Group1",
+          payStatus: "ожидание",
+          status: "отмена",
+          subscriptionPlan: "monthly",
+          payDate: "2024-01-10T00:00:00.000Z",
+          payAmount: 55,
+          payActual: 55,
+          remainingLessons: 5,
+          frozenLessons: 0,
+        },
+      ],
+    }),
+    createClient({ id: "client-cancel", firstName: "Отмененный клиент", status: "отмена" }),
+  ];
+
+  const Wrapper = () => {
+    const [state, setState] = React.useState(db);
+    return <AttendanceTab db={state} setDB={setState} currency="EUR" />;
+  };
+
+  render(<Wrapper />);
+
+  const [areaSelect, groupSelect] = screen.getAllByRole("combobox");
+  await userEvent.selectOptions(areaSelect, "Area1");
+  await waitFor(() => expect(groupSelect).toHaveValue("Group1"));
+
+  await waitFor(() => expect(screen.getByText("Найдено: 1")).toBeInTheDocument());
+  expect(screen.getByText("Активный")).toBeInTheDocument();
+  expect(screen.queryByText("Отмененное размещение")).not.toBeInTheDocument();
+  expect(screen.queryByText("Отмененный клиент")).not.toBeInTheDocument();
+});
+
+test("PerformanceTab hides canceled placements and clients", async () => {
+  const db = createDB();
+  db.clients = [
+    createClient({ id: "active", firstName: "Активный" }),
+    createClient({
+      id: "placement-cancel",
+      firstName: "Отмененное размещение",
+      placements: [
+        {
+          id: "pl-cancel",
+          area: "Area1",
+          group: "Group1",
+          payStatus: "ожидание",
+          status: "отмена",
+          subscriptionPlan: "monthly",
+          payDate: "2024-01-10T00:00:00.000Z",
+          payAmount: 55,
+          payActual: 55,
+          remainingLessons: 5,
+          frozenLessons: 0,
+        },
+      ],
+    }),
+    createClient({ id: "client-cancel", firstName: "Отмененный клиент", status: "отмена" }),
+  ];
+
+  const Wrapper = () => {
+    const [state, setState] = React.useState(db);
+    return <PerformanceTab db={state} setDB={setState} currency="EUR" />;
+  };
+
+  render(<Wrapper />);
+
+  const selects = screen.getAllByRole("combobox");
+  await userEvent.selectOptions(selects[0], "Area1");
+  await waitFor(() => expect(selects[1]).toHaveValue("Group1"));
+
+  await waitFor(() => expect(screen.getByText("Найдено: 1")).toBeInTheDocument());
+  expect(screen.getByText("Активный")).toBeInTheDocument();
+  expect(screen.queryByText("Отмененное размещение")).not.toBeInTheDocument();
+  expect(screen.queryByText("Отмененный клиент")).not.toBeInTheDocument();
+});

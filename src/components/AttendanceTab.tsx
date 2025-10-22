@@ -158,12 +158,18 @@ export default function AttendanceTab({
     if (!area || !group) {
       return [];
     }
-    return db.clients.filter(client =>
-      getClientPlacements(client).some(
+    return db.clients.filter(client => {
+      if (client.status === "отмена") {
+        return false;
+      }
+      return getClientPlacements(client).some(
         placement =>
-          placement.area === area && placement.group === group && !isReserveArea(placement.area),
-      ),
-    );
+          placement.area === area &&
+          placement.group === group &&
+          placement.status !== "отмена" &&
+          !isReserveArea(placement.area),
+      );
+    });
   }, [area, group, db.clients]);
 
 
