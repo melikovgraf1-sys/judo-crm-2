@@ -44,6 +44,7 @@ export const CLIENT_CSV_HEADERS = [
   "payAmount",
   "payActual",
   "remainingLessons",
+  "frozenLessons",
   "statusUpdatedAt",
   "payHistory",
 ] as const;
@@ -105,6 +106,8 @@ const HEADER_ALIASES: HeaderAliasMap = {
   "факт_оплаты": "payActual",
   remaininglessons: "remainingLessons",
   "оставшиеся_занятия": "remainingLessons",
+  frozenlessons: "frozenLessons",
+  "заморозка": "frozenLessons",
   statusupdatedat: "statusUpdatedAt",
   "status_updated_at": "statusUpdatedAt",
   "обновление_статуса": "statusUpdatedAt",
@@ -333,6 +336,7 @@ function clientToRow(client: Client): (string | number | null | undefined)[] {
     client.payAmount != null ? client.payAmount : "",
     client.payActual != null ? client.payActual : "",
     client.remainingLessons != null ? client.remainingLessons : "",
+    client.frozenLessons != null ? client.frozenLessons : "",
     client.statusUpdatedAt ? client.statusUpdatedAt.slice(0, 10) : "",
     serializedPayHistory,
   ];
@@ -369,6 +373,7 @@ export function buildClientCsvTemplate(): string {
     "monthly",
     "2024-09-10",
     "12000",
+    "",
     "",
     "",
     "2024-10-10",
@@ -565,6 +570,17 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       }
     }
 
+    const frozenRaw = normalizeIntString(record.frozenLessons);
+    if (frozenRaw) {
+      const parsedFrozen = Number.parseInt(frozenRaw, 10);
+      if (Number.isNaN(parsedFrozen)) {
+        errors.push(
+          `Строка ${lineNumber}: неверное значение frozenLessons "${record.frozenLessons}"`,
+        );
+        hasError = true;
+      }
+    }
+
     const contacts = [record.phone, record.whatsApp, record.telegram, record.instagram]
       .map(contact => contact.trim())
       .filter(Boolean);
@@ -620,6 +636,7 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       payAmount: payAmountRaw,
       payActual: payActualRaw,
       remainingLessons: remainingRaw,
+      frozenLessons: frozenRaw,
     };
 
     const formValues: ClientFormValues = {
@@ -718,6 +735,7 @@ function mergeClientData(target: Client, source: Omit<Client, "id">) {
       if (primary.payAmount != null) target.payAmount = primary.payAmount;
       if (primary.payActual != null) target.payActual = primary.payActual;
       if (primary.remainingLessons != null) target.remainingLessons = primary.remainingLessons;
+      if (primary.frozenLessons != null) target.frozenLessons = primary.frozenLessons;
     }
   }
 
