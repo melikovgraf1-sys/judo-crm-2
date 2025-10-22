@@ -30,6 +30,7 @@ import type {
   LeadLifecycleOutcome,
   SubscriptionPlan,
 } from "../types";
+import { DEFAULT_PAYMENT_METHOD } from "../types";
 
 export default function LeadsTab({
   db,

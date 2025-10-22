@@ -13,6 +13,7 @@ import type {
   AttendanceEntry,
   PerformanceEntry,
 } from "../types";
+import { DEFAULT_PAYMENT_METHOD } from "../types";
 import { clientRequiresManualRemainingLessons } from "./lessons";
 import { SUBSCRIPTION_PLANS } from "./payments";
 import { RESERVE_AREA_NAME } from "./areas";
@@ -132,7 +133,7 @@ export function makeSeedDB(): DB {
       area,
       group,
       startDate: start.toISOString(),
-      payMethod: "перевод",
+      payMethod: DEFAULT_PAYMENT_METHOD,
       payStatus: placement.payStatus,
       status: placement.status,
       statusUpdatedAt: start.toISOString(),

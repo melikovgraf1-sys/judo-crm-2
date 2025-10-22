@@ -8,7 +8,9 @@ export type Gender = "м" | "ж";
 
 export type ContactChannel = "Telegram" | "WhatsApp" | "Instagram";
 
-export type PaymentMethod = "наличные" | "перевод";
+export const PAYMENT_METHODS = ["перевод", "наличные", "доллар", "евро"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export const DEFAULT_PAYMENT_METHOD: PaymentMethod = "перевод";
 
 export type PaymentStatus = "ожидание" | "действует" | "задолженность";
 

@@ -30,6 +30,7 @@ import type {
   Toast,
   UIState,
 } from "../types";
+import { DEFAULT_PAYMENT_METHOD } from "../types";
 
 
 export const LS_KEYS = {

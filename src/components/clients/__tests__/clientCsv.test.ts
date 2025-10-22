@@ -4,10 +4,12 @@ jest.mock('../../../state/utils', () => ({
   __esModule: true,
   uid: jest.fn(),
   todayISO: jest.fn(),
+  parseDateInput: jest.fn(),
 }));
 
-import { appendImportedClients } from '../clientCsv';
-import { uid, todayISO } from '../../../state/utils';
+import { appendImportedClients, parseClientsCsv } from '../clientCsv';
+import { uid, todayISO, parseDateInput } from '../../../state/utils';
+import { stringifyCsv } from '../../../utils/csv';
 
 const asMock = <T extends (...args: any[]) => any>(fn: T) => fn as unknown as jest.MockedFunction<T>;
 
@@ -82,6 +84,9 @@ beforeEach(() => {
   let counter = 0;
   asMock(uid).mockImplementation(() => `uid-${++counter}`);
   asMock(todayISO).mockReturnValue('2024-01-01T00:00:00.000Z');
+  asMock(parseDateInput).mockImplementation((value: string) =>
+    value ? `${value}T00:00:00.000Z` : '',
+  );
 });
 
 describe('appendImportedClients', () => {
@@ -177,5 +182,100 @@ describe('appendImportedClients', () => {
     expect(result.changelogMessage).toBe('Добавлено клиентов: 1');
     expect(result.next.changelog).toHaveLength(1);
     expect(result.next.changelog[0]).toMatchObject({ what: 'Импортировано клиентов из CSV: 1' });
+  });
+});
+
+describe('parseClientsCsv', () => {
+  test('recognizes доллар and евро payment methods', () => {
+    const db = makeDB();
+    const csv = stringifyCsv([
+      [
+        'firstName',
+        'lastName',
+        'parentName',
+        'phone',
+        'whatsApp',
+        'telegram',
+        'instagram',
+        'comment',
+        'channel',
+        'birthDate',
+        'gender',
+        'area',
+        'group',
+        'startDate',
+        'payMethod',
+        'payStatus',
+        'status',
+        'subscriptionPlan',
+        'payDate',
+        'payAmount',
+        'payActual',
+        'remainingLessons',
+        'frozenLessons',
+        'statusUpdatedAt',
+        'payHistory',
+      ],
+      [
+        'Иван',
+        '',
+        '',
+        '+79991234567',
+        '',
+        '',
+        '',
+        '',
+        'Telegram',
+        '2010-01-01',
+        'м',
+        'Area1',
+        'Group1',
+        '2024-01-01',
+        'доллар',
+        'ожидание',
+        'новый',
+        'monthly',
+        '2024-01-10',
+        '100',
+        '100',
+        '5',
+        '0',
+        '2024-01-10',
+        '[]',
+      ],
+      [
+        'Мария',
+        '',
+        '',
+        '+79998887766',
+        '',
+        '',
+        '',
+        '',
+        'Telegram',
+        '2011-02-02',
+        'ж',
+        'Area1',
+        'Group1',
+        '2024-02-01',
+        'евро',
+        'ожидание',
+        'новый',
+        'monthly',
+        '2024-02-10',
+        '120',
+        '120',
+        '4',
+        '0',
+        '2024-02-10',
+        '[]',
+      ],
+    ]);
+
+    const result = parseClientsCsv(csv, db);
+
+    expect(result.errors).toEqual([]);
+    expect(result.clients).toHaveLength(2);
+    expect(result.clients.map(client => client.payMethod)).toEqual(['доллар', 'евро']);
   });
 });

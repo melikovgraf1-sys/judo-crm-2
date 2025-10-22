@@ -38,6 +38,7 @@ import type {
   PaymentMethod,
   SubscriptionPlan,
 } from "../../types";
+import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS } from "../../types";
 
 type Props = {
   db: DB;
