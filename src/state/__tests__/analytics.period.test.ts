@@ -1,6 +1,51 @@
-import { computeAnalyticsSnapshot } from "../analytics";
+import {
+  computeAnalyticsSnapshot,
+  formatAthleteMetricValue,
+  formatLeadMetricValue,
+  type AthleteStats,
+  type LeadStats,
+} from "../analytics";
 import type { DB } from "../../types";
 import type { PeriodFilter } from "../period";
+
+describe("analytics metric formatting", () => {
+  const athleteStats: AthleteStats = {
+    total: 10.4,
+    payments: 2.6,
+    new: 1.2,
+    firstRenewals: 0.7,
+    canceled: 0.2,
+    returned: 1,
+    dropIns: 3.9,
+    attendanceRate: 87.3,
+  };
+
+  const leadStats: LeadStats = {
+    created: 12.2,
+    converted: 3.5,
+    canceled: 0.6,
+  };
+
+  it("keeps a single decimal for attendance rate", () => {
+    expect(formatAthleteMetricValue("attendanceRate", athleteStats)).toBe("87,3%");
+  });
+
+  it("formats other athlete metrics without fractional digits", () => {
+    expect(formatAthleteMetricValue("total", athleteStats)).toBe("10");
+    expect(formatAthleteMetricValue("payments", athleteStats)).toBe("3");
+    expect(formatAthleteMetricValue("new", athleteStats)).toBe("1");
+    expect(formatAthleteMetricValue("firstRenewals", athleteStats)).toBe("1");
+    expect(formatAthleteMetricValue("canceled", athleteStats)).toBe("0");
+    expect(formatAthleteMetricValue("returned", athleteStats)).toBe("1");
+    expect(formatAthleteMetricValue("dropIns", athleteStats)).toBe("4");
+  });
+
+  it("formats lead metrics without fractional digits", () => {
+    expect(formatLeadMetricValue("created", leadStats)).toBe("12");
+    expect(formatLeadMetricValue("converted", leadStats)).toBe("4");
+    expect(formatLeadMetricValue("canceled", leadStats)).toBe("1");
+  });
+});
 
 describe("computeAnalyticsSnapshot with period", () => {
   const buildDB = (): DB => ({
