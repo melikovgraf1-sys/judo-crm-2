@@ -15,6 +15,7 @@ describe("transformClientFormValues", () => {
     payAmount: "",
     payActual: "",
     remainingLessons: "",
+    frozenLessons: "",
   });
 
   const baseFormValues: ClientFormValues = {
@@ -34,7 +35,7 @@ describe("transformClientFormValues", () => {
     placements: [basePlacement()],
   };
 
-  it("omits payAmount, payActual and remainingLessons when not provided", () => {
+  it("omits payAmount, payActual, remainingLessons and frozenLessons when not provided", () => {
     const data: ClientFormValues = {
       ...baseFormValues,
       placements: [
@@ -45,6 +46,7 @@ describe("transformClientFormValues", () => {
           payAmount: "",
           payActual: "",
           remainingLessons: "",
+          frozenLessons: "",
         },
       ],
       whatsApp: "",
@@ -55,6 +57,7 @@ describe("transformClientFormValues", () => {
     expect(result.placements[0]).not.toHaveProperty("payAmount");
     expect(result.placements[0]).not.toHaveProperty("payActual");
     expect(result.placements[0]).not.toHaveProperty("remainingLessons");
+    expect(result.placements[0]).not.toHaveProperty("frozenLessons");
   });
 
   it("keeps numeric fields when provided", () => {
@@ -68,6 +71,7 @@ describe("transformClientFormValues", () => {
           payAmount: "150",
           payActual: "120",
           remainingLessons: "8",
+          frozenLessons: "3",
         },
       ],
       telegram: "@client",
@@ -79,11 +83,13 @@ describe("transformClientFormValues", () => {
       payAmount: 150,
       payActual: 120,
       remainingLessons: 8,
+      frozenLessons: 3,
       placements: [
         expect.objectContaining({
           payAmount: 150,
           payActual: 120,
           remainingLessons: 8,
+          frozenLessons: 3,
         }),
       ],
       telegram: "@client",
@@ -199,6 +205,46 @@ describe("transformClientFormValues", () => {
 
     expect(result).not.toHaveProperty("payActual");
     expect(result.placements[0]).not.toHaveProperty("payActual");
+  });
+
+  it("allows editing frozenLessons", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      placements: [
+        { ...basePlacement(), id: "pl-freeze", frozenLessons: "5" },
+      ],
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result).toMatchObject({
+      frozenLessons: 5,
+      placements: [expect.objectContaining({ frozenLessons: 5 })],
+    });
+  });
+
+  it("allows clearing frozenLessons when editing", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      placements: [
+        { ...basePlacement(), id: "pl-freeze", frozenLessons: "" },
+      ],
+    };
+
+    const editing: Client = {
+      id: "client-freeze",
+      ...transformClientFormValues({
+        ...baseFormValues,
+        placements: [
+          { ...basePlacement(), id: "pl-freeze", frozenLessons: "4" },
+        ],
+      }),
+    };
+
+    const result = transformClientFormValues(data, editing);
+
+    expect(result).not.toHaveProperty("frozenLessons");
+    expect(result.placements[0]).not.toHaveProperty("frozenLessons");
   });
 
   it("forces active status and syncs amounts for discount plan", () => {

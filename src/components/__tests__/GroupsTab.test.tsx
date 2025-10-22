@@ -440,13 +440,33 @@ test('update: editing payment status hides payment fact fields', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
 
   const modal = screen.getByText('Редактирование клиента').parentElement;
-  expect(within(modal).queryByText('Дата оплаты')).not.toBeInTheDocument();
-  expect(within(modal).queryByText('Факт оплаты, €')).not.toBeInTheDocument();
-  expect(within(modal).queryByText('Сумма оплаты, €')).not.toBeInTheDocument();
+  const planSelect = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
+  const payDateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement;
+  const factInput = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
+  const payAmountInput = within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
 
-  const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select');
+  expect(planSelect).toBeDisabled();
+  expect(payDateInput).toBeDisabled();
+  expect(factInput).toBeDisabled();
+  expect(payAmountInput).toBeDisabled();
+  expect(within(modal).getByText(/Укажите статус оплаты «действует»/)).toBeInTheDocument();
+
+  const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select') as HTMLSelectElement;
 
   await userEvent.selectOptions(payStatusSelect, 'действует');
+  await waitFor(() => expect(within(modal).queryByText(/Укажите статус оплаты «действует»/)).not.toBeInTheDocument());
+  await waitFor(() => {
+    const select = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
+    expect(select).not.toBeDisabled();
+  });
+  await waitFor(() => {
+    const dateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement;
+    expect(dateInput).not.toBeDisabled();
+  });
+  await waitFor(() => {
+    const factField = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
+    expect(factField).not.toBeDisabled();
+  });
 
   const save = within(modal).getByRole('button', { name: 'Сохранить' });
   await waitFor(() => expect(save).toBeEnabled());
@@ -805,9 +825,18 @@ test('individual group allows custom payment amount', async () => {
   const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');
   const birthDate = within(modal).getByText('Дата рождения').parentElement.querySelector('input');
   const startDate = within(modal).getByText('Дата начала').parentElement.querySelector('input');
-  expect(within(modal).queryByText('Сумма оплаты, €')).not.toBeInTheDocument();
-  expect(within(modal).queryByText('Факт оплаты, €')).not.toBeInTheDocument();
-  expect(within(modal).queryByText('Дата оплаты')).not.toBeInTheDocument();
+  expect(
+    within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement,
+  ).toBeDisabled();
+  expect(
+    within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input') as HTMLInputElement,
+  ).toBeDisabled();
+  expect(
+    within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement,
+  ).toBeDisabled();
+  expect(
+    within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement,
+  ).toBeDisabled();
 
   await userEvent.type(firstName, 'Люба');
   await userEvent.type(phone, '999');

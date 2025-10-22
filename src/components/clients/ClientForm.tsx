@@ -60,6 +60,15 @@ type PlacementFieldProps = {
   isPrimary: boolean;
 };
 
+type PlacementPaymentFieldProps = {
+  index: number;
+  db: DB;
+  control: Control<ClientFormValues>;
+  register: UseFormRegister<ClientFormValues>;
+  setValue: UseFormSetValue<ClientFormValues>;
+  errors: PlacementFieldErrors;
+};
+
 const makePlacement = (
   groupsByArea: Map<Area, Group[]>,
   db: DB,
@@ -81,6 +90,7 @@ const makePlacement = (
     payAmount: String(getDefaultPayAmount(resolvedGroup) ?? ""),
     payActual: "",
     remainingLessons: "",
+    frozenLessons: "",
   };
 };
 
@@ -107,6 +117,7 @@ const placementSchema: yup.ObjectSchema<ClientPlacementFormValues> = yup.object(
   payAmount: yup.string().default(""),
   payActual: yup.string().default(""),
   remainingLessons: yup.string().default(""),
+  frozenLessons: yup.string().default(""),
 });
 
 export default function ClientForm({ db, editing, onSave, onClose }: Props) {
@@ -194,10 +205,12 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               payAmount: editing.payAmount != null ? String(editing.payAmount) : "",
               payActual: editing.payActual != null ? String(editing.payActual) : "",
               remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
+              frozenLessons: editing.frozenLessons != null ? String(editing.frozenLessons) : "",
             },
           ]).map(item => ({
         ...item,
         payDate: item.payDate?.slice(0, 10) ?? "",
+        frozenLessons: item.frozenLessons ?? "",
       }));
 
       const values: ClientFormValues = {
@@ -382,6 +395,17 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
           )}
         </div>
 
+        {fields.length > 0 && (
+          <PrimaryPaymentFields
+            index={0}
+            db={db}
+            control={control}
+            register={register}
+            setValue={setValue}
+            errors={errors.placements}
+          />
+        )}
+
         <div className="flex justify-end gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
           <button
             type="button"
@@ -417,12 +441,9 @@ function PlacementFields({
 }: PlacementFieldProps) {
   const area = useWatch({ control, name: `placements.${index}.area` });
   const group = useWatch({ control, name: `placements.${index}.group` });
-  const subscriptionPlan = useWatch({ control, name: `placements.${index}.subscriptionPlan` });
-  const payAmount = useWatch({ control, name: `placements.${index}.payAmount` });
-  const payDate = useWatch({ control, name: `placements.${index}.payDate` });
-  const groupList = area ? groupsByArea.get(area) ?? groupsByArea.values().next().value ?? db.settings.groups : db.settings.groups;
-  const previousGroupRef = useRef<Group | null>(null);
-  const previousPlanRef = useRef<SubscriptionPlan | null>(null);
+  const groupList = area
+    ? groupsByArea.get(area) ?? groupsByArea.values().next().value ?? db.settings.groups
+    : db.settings.groups;
 
   useEffect(() => {
     if (!groupList?.length) {
@@ -433,7 +454,106 @@ function PlacementFields({
     }
   }, [groupList, group, index, setValue]);
 
-  const defaultPayAmount = useMemo(() => (group ? getDefaultPayAmount(group) ?? undefined : undefined), [group]);
+  const placementErrors = Array.isArray(errors) ? errors[index] : undefined;
+
+  const labelClass = "text-xs text-slate-500 dark:text-slate-400";
+  const fieldClass =
+    "px-3 py-2 rounded-md border border-slate-300 bg-white placeholder:text-slate-400 " +
+    "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
+  const selectClass = `${fieldClass} appearance-none`;
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
+          {isPrimary ? "Основное место" : "Дополнительное место"}
+        </div>
+        {onRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-rose-600 hover:text-rose-700"
+          >
+            Удалить
+          </button>
+        )}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Район</label>
+          <select className={selectClass} {...register(`placements.${index}.area` as const)}>
+            {areaOptions.map(option => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          {placementErrors?.area && (
+            <span className="text-xs text-rose-600">{placementErrors.area.message}</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Группа</label>
+          <select className={selectClass} {...register(`placements.${index}.group` as const)}>
+            {groupList?.map((option: Group) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          {placementErrors?.group && (
+            <span className="text-xs text-rose-600">{placementErrors.group.message}</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Статус оплаты</label>
+          <select className={selectClass} {...register(`placements.${index}.payStatus` as const)}>
+            <option value="ожидание">ожидание</option>
+            <option value="действует">действует</option>
+            <option value="задолженность">задолженность</option>
+          </select>
+          {placementErrors?.payStatus && (
+            <span className="text-xs text-rose-600">{placementErrors.payStatus.message}</span>
+          )}
+        </div>
+        {!isPrimary && (
+          <div className="flex flex-col gap-1">
+            <label className={labelClass}>Статус клиента</label>
+            <select className={selectClass} {...register(`placements.${index}.status` as const)}>
+              <option value="действующий">действующий</option>
+              <option value="отмена">отмена</option>
+              <option value="новый">новый</option>
+              <option value="вернувшийся">вернувшийся</option>
+              <option value="продлившийся">продлившийся</option>
+            </select>
+            {placementErrors?.status && (
+              <span className="text-xs text-rose-600">{placementErrors.status.message}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PrimaryPaymentFields({
+  index,
+  db,
+  control,
+  register,
+  setValue,
+  errors,
+}: PlacementPaymentFieldProps) {
+  const payStatus = useWatch({ control, name: `placements.${index}.payStatus` });
+  const area = useWatch({ control, name: `placements.${index}.area` });
+  const group = useWatch({ control, name: `placements.${index}.group` });
+  const subscriptionPlan = useWatch({ control, name: `placements.${index}.subscriptionPlan` });
+  const payAmount = useWatch({ control, name: `placements.${index}.payAmount` });
+  const payDate = useWatch({ control, name: `placements.${index}.payDate` });
+
+  const defaultPayAmount = useMemo(
+    () => (group ? getDefaultPayAmount(group, area) ?? undefined : undefined),
+    [group, area],
+  );
   const subscriptionPlanAmount = useMemo(
     () => (subscriptionPlan ? getSubscriptionPlanAmount(subscriptionPlan) ?? undefined : undefined),
     [subscriptionPlan],
@@ -441,6 +561,11 @@ function PlacementFields({
   const groupAllowsCustom = group ? shouldAllowCustomPayAmount(group) : false;
   const planAllowsCustom = subscriptionPlan ? subscriptionPlanAllowsCustomAmount(subscriptionPlan) : false;
   const payAmountLockedByPlan = subscriptionPlanAmount != null && !groupAllowsCustom;
+  const canEditPayAmount = groupAllowsCustom || planAllowsCustom;
+
+  const previousGroupRef = useRef<Group | null>(null);
+  const previousPlanRef = useRef<SubscriptionPlan | null>(null);
+
   useEffect(() => {
     const name = `placements.${index}.payAmount` as const;
     const previousGroup = previousGroupRef.current;
@@ -538,81 +663,113 @@ function PlacementFields({
     "px-3 py-2 rounded-md border border-slate-300 bg-white placeholder:text-slate-400 " +
     "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500";
   const selectClass = `${fieldClass} appearance-none`;
+  const subtleTextClass = "text-xs text-slate-500 dark:text-slate-400";
+  const isWaiting = payStatus === "ожидание";
+
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
-          {isPrimary ? "Основное место" : "Дополнительное место"}
-        </div>
-        {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-xs text-rose-600 hover:text-rose-700"
-          >
-            Удалить
-          </button>
-        )}
-      </div>
+      <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">Факт оплаты</div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Район</label>
-          <select className={selectClass} {...register(`placements.${index}.area` as const)}>
-            {areaOptions.map(option => (
-              <option key={option} value={option}>
-                {option}
+          <label className={labelClass}>Форма абонемента</label>
+          <select
+            className={selectClass}
+            {...register(`placements.${index}.subscriptionPlan` as const)}
+            disabled={isWaiting}
+          >
+            {SUBSCRIPTION_PLANS.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
-          {placementErrors?.area && (
-            <span className="text-xs text-rose-600">{placementErrors.area.message}</span>
+          {placementErrors?.subscriptionPlan && (
+            <span className="text-xs text-rose-600">{placementErrors.subscriptionPlan.message}</span>
           )}
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Группа</label>
-          <select className={selectClass} {...register(`placements.${index}.group` as const)}>
-            {groupList?.map((option: Group) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          {placementErrors?.group && (
-            <span className="text-xs text-rose-600">{placementErrors.group.message}</span>
+          <label className={labelClass}>Дата оплаты</label>
+          <input
+            type="date"
+            className={fieldClass}
+            {...register(`placements.${index}.payDate` as const)}
+            disabled={isWaiting}
+          />
+          {placementErrors?.payDate && (
+            <span className="text-xs text-rose-600">{placementErrors.payDate.message}</span>
           )}
         </div>
         <div className="flex flex-col gap-1">
-          <label className={labelClass}>Статус оплаты</label>
-          <select className={selectClass} {...register(`placements.${index}.payStatus` as const)}>
-            <option value="ожидание">ожидание</option>
-            <option value="действует">действует</option>
-            <option value="задолженность">задолженность</option>
-          </select>
-          {placementErrors?.payStatus && (
-            <span className="text-xs text-rose-600">{placementErrors.payStatus.message}</span>
+          <label className={labelClass}>Сумма оплаты, €</label>
+          <input
+            type="number"
+            inputMode="decimal"
+            step={0.5}
+            className={fieldClass}
+            {...register(`placements.${index}.payAmount` as const)}
+            disabled={isWaiting || !canEditPayAmount}
+            placeholder="Укажите сумму"
+          />
+          {!canEditPayAmount && defaultPayAmount != null && (
+            <span className={subtleTextClass}>
+              {payAmountLockedByPlan
+                ? "Сумма выбрана формой абонемента"
+                : "Сумма фиксирована для этой группы"}
+            </span>
+          )}
+          {placementErrors?.payAmount && (
+            <span className="text-xs text-rose-600">{placementErrors.payAmount.message}</span>
           )}
         </div>
-        {!isPrimary && (
-          <div className="flex flex-col gap-1">
-            <label className={labelClass}>Статус клиента</label>
-            <select className={selectClass} {...register(`placements.${index}.status` as const)}>
-              <option value="действующий">действующий</option>
-              <option value="отмена">отмена</option>
-              <option value="новый">новый</option>
-              <option value="вернувшийся">вернувшийся</option>
-              <option value="продлившийся">продлившийся</option>
-            </select>
-            {placementErrors?.status && (
-              <span className="text-xs text-rose-600">{placementErrors.status.message}</span>
-            )}
-          </div>
-        )}
-        <input type="hidden" {...register(`placements.${index}.subscriptionPlan` as const)} />
-        <input type="hidden" {...register(`placements.${index}.payDate` as const)} />
-        <input type="hidden" {...register(`placements.${index}.payAmount` as const)} />
-        <input type="hidden" {...register(`placements.${index}.payActual` as const)} />
-        <input type="hidden" {...register(`placements.${index}.remainingLessons` as const)} />
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Факт оплаты, €</label>
+          <input
+            type="number"
+            inputMode="decimal"
+            step={0.5}
+            className={fieldClass}
+            {...register(`placements.${index}.payActual` as const)}
+            placeholder="Оплата по факту"
+            disabled={isWaiting}
+          />
+          {placementErrors?.payActual && (
+            <span className="text-xs text-rose-600">{placementErrors.payActual.message}</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Остаток занятий</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            className={fieldClass}
+            {...register(`placements.${index}.remainingLessons` as const)}
+            disabled={isWaiting || !manualRemainingRequired}
+            placeholder={manualRemainingRequired ? "Укажите вручную" : "Рассчитывается автоматически"}
+          />
+          {!manualRemainingRequired && recommendedRemaining != null && (
+            <span className={subtleTextClass}>Рекомендуемое значение: {recommendedRemaining}</span>
+          )}
+          {placementErrors?.remainingLessons && (
+            <span className="text-xs text-rose-600">{placementErrors.remainingLessons.message}</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className={labelClass}>Заморозка</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            className={fieldClass}
+            {...register(`placements.${index}.frozenLessons` as const)}
+            placeholder="Количество занятий"
+            disabled={isWaiting}
+          />
+        </div>
       </div>
+      {isWaiting && (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-300">
+          Укажите статус оплаты «действует» или «задолженность», чтобы сохранить данные факта оплаты.
+        </div>
+      )}
     </div>
   );
 }
