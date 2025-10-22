@@ -70,12 +70,17 @@ export default function ClientPaymentFactViewer({
   };
 
   const matchingPlacement = placements.find(place => matchesPlacement(place, fact)) ?? null;
+  const factRemainingLessons = getFiniteNumber(fact.remainingLessons);
   const remainingLessons =
+    factRemainingLessons ??
     getFiniteNumber(matchingPlacement?.effectiveRemainingLessons) ??
     getFiniteNumber(matchingPlacement?.remainingLessons) ??
     getFiniteNumber(defaultRemainingLessons);
+  const factFrozenLessons = getFiniteNumber(fact.frozenLessons);
   const frozenLessons =
-    getFiniteNumber(matchingPlacement?.frozenLessons) ?? getFiniteNumber(defaultFrozenLessons);
+    factFrozenLessons ??
+    getFiniteNumber(matchingPlacement?.frozenLessons) ??
+    getFiniteNumber(defaultFrozenLessons);
 
   return (
     <Modal size="sm" onClose={onClose}>

@@ -21,6 +21,22 @@ const parseAmountValue = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const parseLessonsValue = (value: unknown): number | undefined => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? Math.trunc(value) : undefined;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    const normalized = trimmed.replace(/\s+/g, "");
+    const parsed = Number.parseInt(normalized, 10);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
 const monthFormatter = new Intl.DateTimeFormat("ru-RU", {
   month: "long",
   year: "numeric",
@@ -76,12 +92,16 @@ export function createPaymentFact(options: {
   recordedAt?: string | null;
   amount?: number | null;
   subscriptionPlan?: SubscriptionPlan | null;
+  remainingLessons?: number | null;
+  frozenLessons?: number | null;
 }): PaymentFact {
-  const { id, area, group, paidAt, recordedAt, amount, subscriptionPlan } = options;
+  const { id, area, group, paidAt, recordedAt, amount, subscriptionPlan, remainingLessons, frozenLessons } = options;
   const normalizedPaidAt = normalizeISO(paidAt);
   const normalizedRecordedAt = normalizeISO(recordedAt);
   const effectiveDate = normalizedPaidAt ?? normalizedRecordedAt;
   const periodLabel = formatPaymentPeriod(subscriptionPlan ?? undefined, effectiveDate);
+  const normalizedRemaining = parseLessonsValue(remainingLessons ?? undefined);
+  const normalizedFrozen = parseLessonsValue(frozenLessons ?? undefined);
 
   const fact: PaymentFact = {
     id: id ?? `payment-${normalizedPaidAt ?? normalizedRecordedAt ?? "pending"}`,
@@ -92,6 +112,8 @@ export function createPaymentFact(options: {
     ...(typeof amount === "number" ? { amount } : {}),
     ...(subscriptionPlan ? { subscriptionPlan } : {}),
     ...(periodLabel ? { periodLabel } : {}),
+    ...(normalizedRemaining != null ? { remainingLessons: normalizedRemaining } : {}),
+    ...(normalizedFrozen != null ? { frozenLessons: normalizedFrozen } : {}),
   };
 
   return fact;
@@ -131,6 +153,8 @@ export function normalizePaymentFacts(source: unknown): PaymentFact[] {
         const plan = fact.subscriptionPlan;
         const periodLabel = fact.periodLabel
           ?? formatPaymentPeriod(plan, normalizedPaidAt ?? normalizedRecordedAt);
+        const remainingLessons = parseLessonsValue(fact.remainingLessons);
+        const frozenLessons = parseLessonsValue(fact.frozenLessons);
 
         return {
           id,
@@ -141,6 +165,8 @@ export function normalizePaymentFacts(source: unknown): PaymentFact[] {
           ...(amount != null ? { amount } : {}),
           ...(plan ? { subscriptionPlan: plan } : {}),
           ...(periodLabel ? { periodLabel } : {}),
+          ...(remainingLessons != null ? { remainingLessons } : {}),
+          ...(frozenLessons != null ? { frozenLessons } : {}),
         };
       }
 

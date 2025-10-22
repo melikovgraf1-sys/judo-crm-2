@@ -11,6 +11,8 @@ export interface PaymentFactEditorValues {
   amount: string;
   subscriptionPlan: SubscriptionPlan | "";
   periodLabel: string;
+  remainingLessons: string;
+  frozenLessons: string;
 }
 
 interface Props {
@@ -18,6 +20,8 @@ interface Props {
   availableAreas: string[];
   availableGroups: string[];
   saving: boolean;
+  defaultRemainingLessons: number | null;
+  defaultFrozenLessons: number | null;
   onSubmit: (values: PaymentFactEditorValues) => Promise<void> | void;
   onClose: () => void;
 }
@@ -56,6 +60,8 @@ export default function ClientPaymentFactEditor({
   availableAreas,
   availableGroups,
   saving,
+  defaultRemainingLessons,
+  defaultFrozenLessons,
   onSubmit,
   onClose,
 }: Props) {
@@ -66,6 +72,18 @@ export default function ClientPaymentFactEditor({
     amount: fact.amount != null ? String(fact.amount) : "",
     subscriptionPlan: fact.subscriptionPlan ?? "",
     periodLabel: fact.periodLabel ?? "",
+    remainingLessons:
+      fact.remainingLessons != null
+        ? String(fact.remainingLessons)
+        : defaultRemainingLessons != null
+        ? String(defaultRemainingLessons)
+        : "",
+    frozenLessons:
+      fact.frozenLessons != null
+        ? String(fact.frozenLessons)
+        : defaultFrozenLessons != null
+        ? String(defaultFrozenLessons)
+        : "",
   }));
 
   const recommendedPeriod = useMemo(() => {
@@ -233,14 +251,14 @@ export default function ClientPaymentFactEditor({
             />
           </label>
           <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
-            <span className="font-medium text-slate-700 dark:text-slate-200">Сумма</span>
+            <span className="font-medium text-slate-700 dark:text-slate-200">Факт оплаты, €</span>
             <input
               type="number"
               name="amount"
               value={form.amount}
               onChange={handleChange}
               className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-              placeholder="Например, 4500"
+              placeholder="Укажите сумму"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
@@ -284,6 +302,40 @@ export default function ClientPaymentFactEditor({
             </span>
           ) : null}
         </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span className="font-medium text-slate-700 dark:text-slate-200">Остаток занятий</span>
+            <input
+              type="number"
+              name="remainingLessons"
+              value={form.remainingLessons}
+              onChange={handleChange}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              placeholder="Рассчитывается автоматически"
+            />
+            {defaultRemainingLessons != null ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Рекомендуемое значение: {defaultRemainingLessons}
+              </span>
+            ) : null}
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span className="font-medium text-slate-700 dark:text-slate-200">Заморозка занятий</span>
+            <input
+              type="number"
+              name="frozenLessons"
+              value={form.frozenLessons}
+              onChange={handleChange}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              placeholder="Количество замороженных занятий"
+            />
+            {defaultFrozenLessons != null ? (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                По данным посещаемости: {defaultFrozenLessons}
+              </span>
+            ) : null}
+          </label>
+        </div>
         <div className="flex justify-end gap-2">
           <button
             type="button"
