@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
-import { getSubscriptionPlanMeta } from "../../state/payments";
+import {
+  getAreaGroupOverride,
+  getDefaultPayAmount,
+  getSubscriptionPlanMeta,
+} from "../../state/payments";
 import { formatPaymentPeriod } from "../../state/paymentFacts";
 import type { PaymentFact, SubscriptionPlan } from "../../types";
 
@@ -22,6 +26,8 @@ interface Props {
   saving: boolean;
   defaultRemainingLessons: number | null;
   defaultFrozenLessons: number | null;
+  defaultExpectedAmount: number | null;
+  placementSubscriptionPlan: SubscriptionPlan | null;
   onSubmit: (values: PaymentFactEditorValues) => Promise<void> | void;
   onClose: () => void;
 }
@@ -62,6 +68,8 @@ export default function ClientPaymentFactEditor({
   saving,
   defaultRemainingLessons,
   defaultFrozenLessons,
+  defaultExpectedAmount,
+  placementSubscriptionPlan,
   onSubmit,
   onClose,
 }: Props) {
@@ -91,6 +99,56 @@ export default function ClientPaymentFactEditor({
     const reference = form.paidAt || undefined;
     return formatPaymentPeriod(plan, reference);
   }, [form.paidAt, form.subscriptionPlan]);
+
+  const expectedAmountValue = useMemo(() => {
+    const currentArea = form.area || fact.area || "";
+    const currentGroup = form.group || fact.group || "";
+    const areaOverride = getAreaGroupOverride(currentArea || undefined, currentGroup || undefined);
+    if (areaOverride != null) {
+      return areaOverride;
+    }
+
+    const basePlan = placementSubscriptionPlan ?? fact.subscriptionPlan ?? undefined;
+    const currentPlan = form.subscriptionPlan
+      ? (form.subscriptionPlan as SubscriptionPlan)
+      : basePlan;
+
+    if (
+      defaultExpectedAmount != null &&
+      (!currentPlan || !placementSubscriptionPlan || currentPlan === placementSubscriptionPlan)
+    ) {
+      return defaultExpectedAmount;
+    }
+
+    if (currentPlan) {
+      const metaAmount = getSubscriptionPlanMeta(currentPlan)?.amount;
+      if (typeof metaAmount === "number") {
+        return metaAmount;
+      }
+    }
+
+    if (defaultExpectedAmount != null) {
+      return defaultExpectedAmount;
+    }
+
+    if (currentGroup) {
+      const defaultAmount = getDefaultPayAmount(currentGroup, currentArea || undefined);
+      if (defaultAmount != null) {
+        return defaultAmount;
+      }
+    }
+
+    return null;
+  }, [
+    defaultExpectedAmount,
+    fact.area,
+    fact.group,
+    fact.subscriptionPlan,
+    form.area,
+    form.group,
+    form.subscriptionPlan,
+    placementSubscriptionPlan,
+  ]);
 
   const areaOptions = useMemo(() => {
     const unique = new Set<string>();
@@ -259,6 +317,21 @@ export default function ClientPaymentFactEditor({
               onChange={handleChange}
               className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
               placeholder="Укажите сумму"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span className="font-medium text-slate-700 dark:text-slate-200">Сумма (ожидаемая), €</span>
+            <input
+              type="number"
+              value={
+                typeof expectedAmountValue === "number" && Number.isFinite(expectedAmountValue)
+                  ? String(expectedAmountValue)
+                  : ""
+              }
+              readOnly
+              disabled
+              className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-80 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              placeholder="Рассчитывается автоматически"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm text-slate-600 dark:text-slate-300">

@@ -174,8 +174,9 @@ describe("ClientDetailsModal placements", () => {
 
     const editor = within(editorDialog as HTMLElement);
 
-    expect(editor.getByPlaceholderText("Укажите сумму")).toHaveDisplayValue("100");
-    expect(editor.getByPlaceholderText("Рассчитывается автоматически")).toHaveDisplayValue("7");
-    expect(editor.getByPlaceholderText("Количество замороженных занятий")).toHaveDisplayValue("2");
+    expect(editor.getByLabelText("Факт оплаты, €")).toHaveDisplayValue("100");
+    expect(editor.getByLabelText("Сумма (ожидаемая), €")).toHaveDisplayValue("100");
+    expect(editor.getByLabelText(/Остаток занятий/)).toHaveDisplayValue("7");
+    expect(editor.getByLabelText(/Заморозка занятий/)).toHaveDisplayValue("2");
   });
 });

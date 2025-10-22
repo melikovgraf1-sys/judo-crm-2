@@ -6,6 +6,11 @@ import {
   estimateGroupRemainingLessonsByParams,
   getEffectiveRemainingLessons,
 } from "../../state/lessons";
+import {
+  getAreaGroupOverride,
+  getDefaultPayAmount,
+  getSubscriptionPlanAmount,
+} from "../../state/payments";
 import type {
   AttendanceEntry,
   Client,
@@ -283,6 +288,49 @@ export default function ClientDetailsModal({
     }
     return displayedFrozenLessons;
   }, [displayedFrozenLessons, editingFact, editingFactPlacement]);
+  const editingFactExpectedAmount = useMemo(() => {
+    if (!editingFact) {
+      return null;
+    }
+
+    const area = editingFact.area ?? editingFactPlacement?.area ?? client.area ?? "";
+    const group = editingFact.group ?? editingFactPlacement?.group ?? client.group ?? "";
+
+    if (editingFactPlacement?.payAmount != null) {
+      return editingFactPlacement.payAmount;
+    }
+
+    const override = getAreaGroupOverride(area || undefined, group || undefined);
+    if (override != null) {
+      return override;
+    }
+
+    const plan =
+      editingFact.subscriptionPlan ??
+      editingFactPlacement?.subscriptionPlan ??
+      client.subscriptionPlan ??
+      null;
+
+    const planAmount = getSubscriptionPlanAmount(plan);
+    if (planAmount != null) {
+      return planAmount;
+    }
+
+    if (group) {
+      const defaultAmount = getDefaultPayAmount(group, area || undefined);
+      if (defaultAmount != null) {
+        return defaultAmount;
+      }
+    }
+
+    return null;
+  }, [
+    client.area,
+    client.group,
+    client.subscriptionPlan,
+    editingFact,
+    editingFactPlacement,
+  ]);
   const previewingFact = useMemo(
     () => (previewingFactId ? paymentFacts.find(fact => fact.id === previewingFactId) ?? null : null),
     [previewingFactId, paymentFacts],
@@ -669,6 +717,8 @@ export default function ClientDetailsModal({
           saving={savingFact}
           defaultRemainingLessons={editingFactDefaultRemainingLessons}
           defaultFrozenLessons={editingFactDefaultFrozenLessons}
+          defaultExpectedAmount={editingFactExpectedAmount}
+          placementSubscriptionPlan={editingFactPlacement?.subscriptionPlan ?? null}
           onSubmit={handleSubmitPaymentFact}
           onClose={() => {
             if (!savingFact) {
