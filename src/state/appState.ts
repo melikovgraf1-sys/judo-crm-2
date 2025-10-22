@@ -30,6 +30,7 @@ import type {
   Toast,
   UIState,
 } from "../types";
+import { DEFAULT_PAYMENT_METHOD } from "../types";
 
 
 export const LS_KEYS = {
@@ -1144,7 +1145,7 @@ export function useAppState(): AppState {
       area: primaryPlacement.area,
       group: primaryPlacement.group,
       startDate: todayISO(),
-      payMethod: "перевод",
+      payMethod: DEFAULT_PAYMENT_METHOD,
       payStatus: primaryPlacement.payStatus,
       status: primaryPlacement.status,
       subscriptionPlan: primaryPlacement.subscriptionPlan,

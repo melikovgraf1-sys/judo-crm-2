@@ -154,6 +154,13 @@ const PAYMENT_METHOD_ALIASES: Record<string, PaymentMethod> = {
   transfer: "перевод",
   "безнал": "перевод",
   "перевод на карту": "перевод",
+  "доллар": "доллар",
+  dollar: "доллар",
+  usd: "доллар",
+  "евро": "евро",
+  euro: "евро",
+  eur: "евро",
+  "€": "евро",
 };
 
 const PAYMENT_STATUS_ALIASES: Record<string, PaymentStatus> = {
