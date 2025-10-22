@@ -37,6 +37,7 @@ import type {
   Group,
   SubscriptionPlan,
 } from "../../types";
+import { DEFAULT_PAYMENT_METHOD, PAYMENT_METHODS } from "../../types";
 
 type Props = {
   db: DB;
@@ -144,7 +145,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
     birthDate: "2017-01-01",
     parentName: "",
     startDate: todayISO().slice(0, 10),
-    payMethod: "перевод",
+    payMethod: DEFAULT_PAYMENT_METHOD,
     placements: [makePlacement(groupsByArea, db)],
   }), [db, groupsByArea]);
 
@@ -344,8 +345,11 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
           <div className="flex flex-col gap-1">
             <label className={labelClass}>Способ оплаты</label>
             <select className={selectClass} {...register("payMethod")}>
-              <option>перевод</option>
-              <option>наличные</option>
+              {PAYMENT_METHODS.map(method => (
+                <option key={method} value={method}>
+                  {method}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex flex-col gap-1">

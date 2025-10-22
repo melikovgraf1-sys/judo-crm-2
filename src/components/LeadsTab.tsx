@@ -30,6 +30,7 @@ import type {
   LeadLifecycleOutcome,
   SubscriptionPlan,
 } from "../types";
+import { DEFAULT_PAYMENT_METHOD } from "../types";
 
 export default function LeadsTab({
   db,
@@ -321,7 +322,7 @@ function convertLeadToClient(lead: Lead, db: DB): Client {
     group,
     coachId: coach?.id,
     startDate: lead.startDate ?? fallbackDate,
-    payMethod: "перевод",
+    payMethod: DEFAULT_PAYMENT_METHOD,
     payStatus: "ожидание",
     status: "новый",
     subscriptionPlan,
