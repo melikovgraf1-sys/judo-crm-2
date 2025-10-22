@@ -178,6 +178,108 @@ const makeClient = (overrides = {}) => {
   };
 };
 
+test('shows placement payment facts for the selected group', async () => {
+  const multiClient = makeClient({
+    id: 'multi-client',
+    firstName: 'Мульти',
+    lastName: 'Клиент',
+    payStatus: 'действует',
+    payAmount: 200,
+    payActual: 0,
+    placements: [
+      {
+        id: 'pl-multi-1',
+        area: 'Area1',
+        group: 'Group1',
+        payStatus: 'действует',
+        status: 'действующий',
+        subscriptionPlan: 'monthly',
+        payDate: '2024-01-01T00:00:00.000Z',
+        payAmount: 200,
+        payActual: 50,
+        remainingLessons: 5,
+        frozenLessons: 0,
+      },
+      {
+        id: 'pl-multi-2',
+        area: 'Area2',
+        group: 'Group2',
+        payStatus: 'действует',
+        status: 'действующий',
+        subscriptionPlan: 'monthly',
+        payDate: '2024-01-01T00:00:00.000Z',
+        payAmount: 200,
+        payActual: 90,
+        remainingLessons: 5,
+        frozenLessons: 0,
+      },
+    ],
+    payHistory: [
+      {
+        id: 'fact-multi-1',
+        paidAt: '2024-01-05T00:00:00.000Z',
+        amount: 70,
+        area: 'Area2',
+        group: 'Group2',
+      },
+      {
+        id: 'fact-multi-2',
+        paidAt: '2024-01-09T00:00:00.000Z',
+        amount: 80,
+        area: 'Area2',
+        group: 'Group2',
+      },
+    ],
+  });
+
+  const db = makeDB();
+  db.schedule.push({
+    id: 'slot-4',
+    area: 'Area2',
+    group: 'Group2',
+    coachId: 's1',
+    weekday: 4,
+    time: '13:00',
+    location: '',
+  });
+  db.clients = [multiClient];
+
+  window.localStorage.setItem(
+    'judo_crm_table_clients_columns',
+    JSON.stringify([
+      'name',
+      'parent',
+      'phone',
+      'whatsApp',
+      'telegram',
+      'instagram',
+      'area',
+      'group',
+      'age',
+      'experience',
+      'status',
+      'payStatus',
+      'remainingLessons',
+      'payAmount',
+      'payActual',
+      'payDate',
+      'actions',
+    ]),
+  );
+
+  renderGroups(db, makeUI(), { initialArea: 'Area2', initialGroup: 'Group2' });
+
+  const rowLabel = await screen.findByText('Мульти Клиент');
+  const row = rowLabel.closest('tr');
+  expect(row).not.toBeNull();
+  if (!row) {
+    throw new Error('Client row not found');
+  }
+
+  expect(within(row).getByText('150 EUR')).toBeInTheDocument();
+  expect(within(row).getByText('действует')).toBeInTheDocument();
+});
+
 test('create: adds client through modal', async () => {
   const { getDB, unmount } = renderGroups();
 
