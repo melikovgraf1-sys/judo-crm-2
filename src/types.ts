@@ -33,6 +33,7 @@ export interface ClientPlacement {
   id: string;
   area: Area;
   group: Group;
+  payMethod: PaymentMethod;
   payStatus: PaymentStatus;
   status: ClientStatus;
   subscriptionPlan?: SubscriptionPlan;
@@ -113,6 +114,7 @@ export interface ClientPlacementFormValues {
   id: string;
   area: Area;
   group: Group;
+  payMethod: PaymentMethod;
   payStatus: PaymentStatus;
   status: ClientStatus;
   subscriptionPlan: SubscriptionPlan;

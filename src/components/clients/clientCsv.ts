@@ -629,6 +629,7 @@ export function parseClientsCsv(text: string, db: DB): ClientCsvImportResult {
       id: `placement-${uid()}`,
       area,
       group,
+      payMethod: payMethod!,
       payStatus: payStatus!,
       status: status!,
       subscriptionPlan,
@@ -707,7 +708,13 @@ function mergeClientData(target: Client, source: Omit<Client, "id">) {
   }
 
   if (Array.isArray(source.placements) && source.placements.length) {
-    const existing = Array.isArray(target.placements) ? [...target.placements] : [];
+    const existing = Array.isArray(target.placements)
+      ? target.placements.map((placement, index) => ({
+          ...placement,
+          id: placement.id ?? `placement-${index}`,
+          payMethod: placement.payMethod ?? target.payMethod,
+        }))
+      : [];
     const existingKeys = new Set(existing.map(placement => `${placement.area}|${placement.group}`));
     const additional = source.placements.filter(placement => {
       const key = `${placement.area}|${placement.group}`;
@@ -728,6 +735,7 @@ function mergeClientData(target: Client, source: Omit<Client, "id">) {
     if (primary) {
       target.area = primary.area;
       target.group = primary.group;
+      target.payMethod = primary.payMethod ?? target.payMethod;
       target.payStatus = primary.payStatus;
       target.status = primary.status;
       target.subscriptionPlan = primary.subscriptionPlan;

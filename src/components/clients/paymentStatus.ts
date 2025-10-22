@@ -10,6 +10,7 @@ export const getClientPlacementsWithFallback = (client: Client): ClientPlacement
       id: client.id,
       area: client.area,
       group: client.group,
+      payMethod: client.payMethod,
       payStatus: client.payStatus,
       status: client.status,
       subscriptionPlan: client.subscriptionPlan,

@@ -80,6 +80,7 @@ test('resolveClientsAfterTaskCompletion updates manual group with extra lessons 
         id: 'placement-1',
         area: 'A',
         group: 'Индивидуальные',
+        payMethod: 'наличные',
         payStatus: 'ожидание',
         status: 'новый',
         subscriptionPlan: 'monthly',

@@ -36,6 +36,7 @@ const normalizePlacement = (
   placement: ClientPlacementFormValues,
   previous?: ClientPlacement,
 ): ClientPlacement => {
+  const resolvedPayMethod = placement.payMethod ?? previous?.payMethod ?? "перевод";
   let resolvedPayAmount = resolvePayAmount(
     placement.payAmount,
     placement.group,
@@ -91,6 +92,7 @@ const normalizePlacement = (
     id: ensurePlacementId(placement, previous),
     area: placement.area,
     group: placement.group,
+    payMethod: resolvedPayMethod,
     payStatus: isDiscountPlan ? "действует" : placement.payStatus,
     status: placement.status,
     subscriptionPlan: placement.subscriptionPlan,
@@ -153,6 +155,7 @@ export function transformClientFormValues(
     telegram,
     instagram,
     comment,
+    payMethod,
     ...base
   } = data;
 
@@ -247,6 +250,7 @@ export function transformClientFormValues(
     ...base,
     area: primary.area,
     group: primary.group,
+    payMethod: primary.payMethod ?? payMethod,
     payStatus: primary.payStatus,
     status: primary.status,
     subscriptionPlan: primary.subscriptionPlan,

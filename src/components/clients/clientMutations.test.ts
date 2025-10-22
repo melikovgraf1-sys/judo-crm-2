@@ -8,6 +8,7 @@ describe("transformClientFormValues", () => {
     id: "pl-1",
     area: "Area1",
     group: "Group1",
+    payMethod: "перевод",
     payStatus: "ожидание",
     status: "действующий",
     subscriptionPlan: "monthly",
@@ -58,6 +59,8 @@ describe("transformClientFormValues", () => {
     expect(result.placements[0]).not.toHaveProperty("payActual");
     expect(result.placements[0]).not.toHaveProperty("remainingLessons");
     expect(result.placements[0]).not.toHaveProperty("frozenLessons");
+    expect(result.payMethod).toBe("перевод");
+    expect(result.placements[0].payMethod).toBe("перевод");
   });
 
   it("keeps numeric fields when provided", () => {
@@ -84,8 +87,10 @@ describe("transformClientFormValues", () => {
       payActual: 120,
       remainingLessons: 8,
       frozenLessons: 3,
+      payMethod: "перевод",
       placements: [
         expect.objectContaining({
+          payMethod: "перевод",
           payAmount: 150,
           payActual: 120,
           remainingLessons: 8,
@@ -356,6 +361,7 @@ describe("transformClientFormValues", () => {
           id: "pl-legacy",
           area: "Area1",
           group: "Group1",
+          payMethod: "перевод",
           payStatus: "действует",
           status: "действующий",
           subscriptionPlan: "monthly",
