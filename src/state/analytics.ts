@@ -6,7 +6,7 @@ import {
   getSubscriptionPlanCadenceMultiplier,
 } from "./payments";
 import { normalizePaymentFacts } from "./paymentFacts";
-import { convertMoney } from "./utils";
+import { convertMoney, isReserveArea } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
 import type { Area, Client, Currency, DB, Group, Lead, LeadLifecycleEvent } from "../types";
 
@@ -284,7 +284,8 @@ function collectActiveAreas(db: DB): Area[] {
       result.push(area);
     }
   }
-  return result.length ? result : [...db.settings.areas];
+  const areas = result.length ? result : [...db.settings.areas];
+  return areas.filter(area => !isReserveArea(area));
 }
 
 function groupsForArea(db: DB, area: Area): string[] {
@@ -630,8 +631,16 @@ export function computeAnalyticsSnapshot(
   group?: Group | null,
 ): AnalyticsSnapshot {
   const activeAreas = collectActiveAreas(db);
-  const relevantAreas = area === "all" ? activeAreas : activeAreas.includes(area) ? [area] : [];
-  if (!relevantAreas.length && area !== "all") {
+  const isReserveScope = area !== "all" && isReserveArea(area);
+  const relevantAreas =
+    area === "all"
+      ? activeAreas.filter(activeArea => !isReserveArea(activeArea))
+      : isReserveScope
+        ? []
+        : activeAreas.includes(area)
+          ? [area]
+          : [];
+  if (!relevantAreas.length && area !== "all" && !isReserveScope) {
     relevantAreas.push(area);
   }
 
@@ -648,7 +657,9 @@ export function computeAnalyticsSnapshot(
     const matchesArea =
       area === "all"
         ? activePlacements.some(placement => relevantAreaSet.has(placement.area))
-        : activePlacements.some(placement => placement.area === area);
+        : isReserveScope
+          ? false
+          : activePlacements.some(placement => placement.area === area);
     if (!matchesArea) {
       return false;
     }
