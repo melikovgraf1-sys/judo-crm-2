@@ -23,11 +23,9 @@ import {
   type DuplicateMatchDetail,
 } from "../state/clients";
 import type {
-  Area,
   Client,
   ClientFormValues,
   DB,
-  Group,
   PaymentFact,
   TaskItem,
   UIState,
