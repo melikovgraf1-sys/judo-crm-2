@@ -23,6 +23,8 @@ export interface PaymentFact {
   amount?: number;
   subscriptionPlan?: SubscriptionPlan;
   periodLabel?: string;
+  remainingLessons?: number;
+  frozenLessons?: number;
 }
 
 export type ClientStatus = "действующий" | "отмена" | "новый" | "вернувшийся" | "продлившийся";

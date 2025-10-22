@@ -250,6 +250,39 @@ export default function ClientDetailsModal({
     () => (editingFactId ? paymentFacts.find(fact => fact.id === editingFactId) ?? null : null),
     [editingFactId, paymentFacts],
   );
+  const editingFactPlacement = useMemo(() => {
+    if (!editingFact) {
+      return null;
+    }
+    return placementsWithDetails.find(place => matchesPlacement(place, editingFact)) ?? null;
+  }, [editingFact, placementsWithDetails]);
+  const editingFactDefaultRemainingLessons = useMemo(() => {
+    if (!editingFact) {
+      return derivedRemainingLessons ?? null;
+    }
+    if (typeof editingFact.remainingLessons === "number") {
+      return editingFact.remainingLessons;
+    }
+    if (editingFactPlacement?.remainingLessons != null) {
+      return editingFactPlacement.remainingLessons;
+    }
+    if (editingFactPlacement?.effectiveRemainingLessons != null) {
+      return editingFactPlacement.effectiveRemainingLessons;
+    }
+    return derivedRemainingLessons ?? null;
+  }, [derivedRemainingLessons, editingFact, editingFactPlacement]);
+  const editingFactDefaultFrozenLessons = useMemo(() => {
+    if (!editingFact) {
+      return displayedFrozenLessons;
+    }
+    if (typeof editingFact.frozenLessons === "number") {
+      return editingFact.frozenLessons;
+    }
+    if (editingFactPlacement?.frozenLessons != null) {
+      return editingFactPlacement.frozenLessons;
+    }
+    return displayedFrozenLessons;
+  }, [displayedFrozenLessons, editingFact, editingFactPlacement]);
   const previewingFact = useMemo(
     () => (previewingFactId ? paymentFacts.find(fact => fact.id === previewingFactId) ?? null : null),
     [previewingFactId, paymentFacts],
@@ -327,6 +360,28 @@ export default function ClientDetailsModal({
       const amountValue = values.amount.trim();
       const parsedAmount = amountValue.length ? Number.parseFloat(amountValue) : Number.NaN;
       const amount = Number.isFinite(parsedAmount) ? parsedAmount : undefined;
+      const remainingLessonsValue = values.remainingLessons.trim();
+      const nextRemainingLessons = (() => {
+        if (!remainingLessonsValue.length) {
+          return null;
+        }
+        const parsed = Number.parseInt(remainingLessonsValue, 10);
+        if (Number.isNaN(parsed)) {
+          return editingFact.remainingLessons ?? null;
+        }
+        return parsed;
+      })();
+      const frozenLessonsValue = values.frozenLessons.trim();
+      const nextFrozenLessons = (() => {
+        if (!frozenLessonsValue.length) {
+          return null;
+        }
+        const parsed = Number.parseInt(frozenLessonsValue, 10);
+        if (Number.isNaN(parsed)) {
+          return editingFact.frozenLessons ?? null;
+        }
+        return parsed;
+      })();
 
       const nextFactBase = createPaymentFact({
         id: editingFact.id,
@@ -336,6 +391,8 @@ export default function ClientDetailsModal({
         recordedAt: editingFact.recordedAt || undefined,
         amount,
         subscriptionPlan: values.subscriptionPlan || undefined,
+        remainingLessons: nextRemainingLessons,
+        frozenLessons: nextFrozenLessons,
       });
 
       const trimmedPeriod = values.periodLabel.trim();
@@ -547,7 +604,7 @@ export default function ClientDetailsModal({
             emptyText="Пока нет фактов оплат"
             entries={paymentFactEntries}
             onOpen={handleOpenPaymentFact}
-            onEdit={canManagePaymentFacts ? setEditingFactId : undefined}
+            onEdit={canManagePaymentFacts ? handleEditPaymentFact : undefined}
             onDelete={canManagePaymentFacts ? handleDeletePaymentFact : undefined}
             pendingId={pendingFactId}
           />
@@ -610,6 +667,8 @@ export default function ClientDetailsModal({
           availableAreas={paymentFactAreas}
           availableGroups={paymentFactGroups}
           saving={savingFact}
+          defaultRemainingLessons={editingFactDefaultRemainingLessons}
+          defaultFrozenLessons={editingFactDefaultFrozenLessons}
           onSubmit={handleSubmitPaymentFact}
           onClose={() => {
             if (!savingFact) {
