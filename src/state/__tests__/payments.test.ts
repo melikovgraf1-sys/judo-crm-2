@@ -28,22 +28,32 @@ describe("derivePaymentStatus", () => {
   };
 
   it("returns the current client pay status when there are no related tasks", () => {
-    const client: Client = { ...baseClient, payStatus: "действует" };
+    const client: Client = { ...baseClient, payStatus: "действует", payActual: 55 };
 
     expect(derivePaymentStatus(client, [], [])).toBe("действует");
   });
 
   it("returns debt status when there is an open related task", () => {
-    const client: Client = { ...baseClient, payStatus: "ожидание" };
+    const client: Client = { ...baseClient, payStatus: "ожидание", payActual: 55 };
     const tasks: TaskItem[] = [{ ...baseTask, status: "open" }];
 
     expect(derivePaymentStatus(client, tasks, [])).toBe("задолженность");
   });
 
   it("returns active status when all related tasks are done", () => {
-    const client: Client = { ...baseClient, payStatus: "ожидание" };
+    const client: Client = { ...baseClient, payStatus: "ожидание", payActual: 55 };
     const tasks: TaskItem[] = [{ ...baseTask, status: "done" }];
 
     expect(derivePaymentStatus(client, tasks, [])).toBe("действует");
+  });
+
+  it("marks active clients with insufficient payments as debt", () => {
+    const client: Client = {
+      ...baseClient,
+      payStatus: "действует",
+      payActual: 20,
+    };
+
+    expect(derivePaymentStatus(client, [], [])).toBe("задолженность");
   });
 });

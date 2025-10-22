@@ -790,7 +790,7 @@ test('half-month subscription advances payDate by 14 days on payment completion'
     expect(getDB().tasks).toHaveLength(0);
     expect(getDB().tasksArchive).toHaveLength(1);
     const updated = getDB().clients[0];
-    expect(updated.payStatus).toBe('действует');
+    expect(updated.payStatus).toBe('задолженность');
     expect(updated.placements[0]?.payDate).toBe('2024-01-15T00:00:00.000Z');
   });
   await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());
