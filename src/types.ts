@@ -118,6 +118,7 @@ export interface ClientPlacementFormValues {
   payAmount: string;
   payActual: string;
   remainingLessons: string;
+  frozenLessons: string;
 }
 
 export type AttendanceStatus = "came" | "absent" | "frozen";

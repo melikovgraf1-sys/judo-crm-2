@@ -405,7 +405,7 @@ test('update: edits client name', async () => {
   await waitFor(() => expect(screen.getByText(/^New/)).toBeInTheDocument());
 });
 
-test('update: editing payment keeps active status visible for selected month', async () => {
+test('update: editing payment status hides payment fact fields', async () => {
   const db = makeDB();
   db.clients = [
     makeClient({
@@ -415,7 +415,16 @@ test('update: editing payment keeps active status visible for selected month', a
       payActual: undefined,
       payAmount: 60,
       payDate: '2024-01-05T00:00:00.000Z',
-      payHistory: [],
+      payHistory: [
+        {
+          id: 'fact-c-pay',
+          paidAt: '2024-01-05T00:00:00.000Z',
+          amount: 55,
+          area: 'Area1',
+          group: 'Group1',
+          subscriptionPlan: 'monthly',
+        },
+      ],
       phone: '12345',
     }),
   ];
@@ -431,46 +440,39 @@ test('update: editing payment keeps active status visible for selected month', a
   await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
 
   const modal = screen.getByText('Редактирование клиента').parentElement;
-  const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select');
-  const payDateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input');
-  const payActualInput = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input');
+  const planSelect = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
+  const payDateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement;
+  const factInput = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
+  const payAmountInput = within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
+
+  expect(planSelect).toBeDisabled();
+  expect(payDateInput).toBeDisabled();
+  expect(factInput).toBeDisabled();
+  expect(payAmountInput).toBeDisabled();
+  expect(within(modal).getByText(/Укажите статус оплаты «действует»/)).toBeInTheDocument();
+
+  const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select') as HTMLSelectElement;
 
   await userEvent.selectOptions(payStatusSelect, 'действует');
-  fireEvent.change(payDateInput, { target: { value: '2024-02-05' } });
-  await userEvent.clear(payActualInput);
-  await userEvent.type(payActualInput, '60');
+  await waitFor(() => expect(within(modal).queryByText(/Укажите статус оплаты «действует»/)).not.toBeInTheDocument());
+  await waitFor(() => {
+    const select = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
+    expect(select).not.toBeDisabled();
+  });
+  await waitFor(() => {
+    const dateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement;
+    expect(dateInput).not.toBeDisabled();
+  });
+  await waitFor(() => {
+    const factField = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
+    expect(factField).not.toBeDisabled();
+  });
 
   const save = within(modal).getByRole('button', { name: 'Сохранить' });
   await waitFor(() => expect(save).toBeEnabled());
   await userEvent.click(save);
 
   await waitFor(() => expect(getDB().clients[0].payStatus).toBe('действует'));
-  await waitFor(() =>
-    expect(
-      getDB().clients[0].payHistory?.some(
-        entry => entry && entry.paidAt === '2024-02-05T00:00:00.000Z',
-      ),
-    ).toBe(true),
-  );
-  await waitFor(() => expect(getDB().clients[0].payActual).toBe(60));
-
-  const monthInput = screen.getByLabelText('Фильтр по месяцу');
-  fireEvent.change(monthInput, { target: { value: '2' } });
-
-  const columnSettingsButton = screen.getByRole('button', { name: 'Настроить столбцы' });
-  await userEvent.click(columnSettingsButton);
-  const factColumnCheckbox = screen.getByRole('checkbox', { name: 'Факт оплаты' });
-  if (!(factColumnCheckbox as HTMLInputElement).checked) {
-    await userEvent.click(factColumnCheckbox);
-  }
-  await userEvent.click(columnSettingsButton);
-
-  const updatedRow = await screen.findByText('Оплатил');
-  const updatedTableRow = updatedRow.closest('tr');
-  expect(updatedTableRow).not.toBeNull();
-
-  await waitFor(() => expect(within(updatedTableRow!).getByText('действует')).toBeInTheDocument());
-  await waitFor(() => expect(within(updatedTableRow!).getByText('60 EUR')).toBeInTheDocument());
 });
 
 test('update: moving client between groups clears manual-only fields', async () => {
@@ -823,21 +825,28 @@ test('individual group allows custom payment amount', async () => {
   const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');
   const birthDate = within(modal).getByText('Дата рождения').parentElement.querySelector('input');
   const startDate = within(modal).getByText('Дата начала').parentElement.querySelector('input');
-  const payAmount = within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input');
+  expect(
+    within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement,
+  ).toBeDisabled();
+  expect(
+    within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input') as HTMLInputElement,
+  ).toBeDisabled();
+  expect(
+    within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement,
+  ).toBeDisabled();
+  expect(
+    within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement,
+  ).toBeDisabled();
 
   await userEvent.type(firstName, 'Люба');
   await userEvent.type(phone, '999');
   fireEvent.change(birthDate, { target: { value: '2010-01-01' } });
   fireEvent.change(startDate, { target: { value: '2024-01-01' } });
 
-  await waitFor(() => expect(payAmount).toHaveValue(130));
-  await userEvent.clear(payAmount);
-  await userEvent.type(payAmount, '200');
-
   const saveBtn = within(modal).getByText('Сохранить');
   await waitFor(() => expect(saveBtn).toBeEnabled());
   await userEvent.click(saveBtn);
 
   await waitFor(() => expect(getDB().clients[0].group).toBe('индивидуальные'));
-  expect(getDB().clients[0].payAmount).toBe(200);
+  expect(getDB().clients[0].payAmount).toBeDefined();
 });

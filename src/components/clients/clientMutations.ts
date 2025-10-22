@@ -74,6 +74,18 @@ const normalizePlacement = (
     resolvedRemaining = undefined;
   }
 
+  const resolvedFrozenLessons = (() => {
+    const normalized = placement.frozenLessons?.trim() ?? "";
+    if (!normalized.length) {
+      return undefined;
+    }
+    const parsed = Number.parseInt(normalized, 10);
+    if (Number.isNaN(parsed)) {
+      return previous?.frozenLessons;
+    }
+    return parsed;
+  })();
+
   return {
     id: ensurePlacementId(placement, previous),
     area: placement.area,
@@ -85,7 +97,7 @@ const normalizePlacement = (
     ...(resolvedPayActual != null ? { payActual: resolvedPayActual } : {}),
     ...(resolvedRemaining != null ? { remainingLessons: resolvedRemaining } : {}),
     ...(placement.payDate ? { payDate: parseDateInput(placement.payDate) } : {}),
-    ...(previous?.frozenLessons != null ? { frozenLessons: previous.frozenLessons } : {}),
+    ...(resolvedFrozenLessons != null ? { frozenLessons: resolvedFrozenLessons } : {}),
   };
 };
 
