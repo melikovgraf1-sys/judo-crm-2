@@ -136,6 +136,51 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.athleteStats.attendanceRate).toBe(100);
   });
 
+  it("keeps canceled clients out of the roster but counts their payments for the period", () => {
+    const db = buildDB();
+    const canceledClient = {
+      ...db.clients[0],
+      id: "c3",
+      firstName: "Вера",
+      status: "отмена" as const,
+      payStatus: "ожидание" as const,
+      payAmount: 80,
+      payActual: 80,
+      payDate: "2024-01-15T00:00:00.000Z",
+      placements: [
+        {
+          id: "pl-c3-canceled",
+          area: "Area1",
+          group: "Group1",
+          payStatus: "ожидание",
+          status: "отмена",
+          payDate: "2024-01-15T00:00:00.000Z",
+          payAmount: 80,
+          payActual: 80,
+          remainingLessons: 0,
+        },
+      ],
+      payHistory: [
+        {
+          id: "fact-c3-2024-01",
+          paidAt: "2024-01-06T00:00:00.000Z",
+          amount: 80,
+        },
+      ],
+    };
+
+    db.clients.push(canceledClient);
+
+    const period: PeriodFilter = { year: 2024, month: 1 };
+    const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
+
+    expect(snapshot.metrics.athletes.values.forecast).toBe(2);
+    expect(snapshot.metrics.revenue.values.actual).toBe(210);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(210);
+    expect(snapshot.athleteStats.canceled).toBe(1);
+    expect(snapshot.athleteStats.payments).toBe(3);
+  });
+
   it("prefers payment facts for forecast when they exist in the period", () => {
     const db = buildDB();
     db.clients[1].status = "отмена";
@@ -161,7 +206,7 @@ describe("computeAnalyticsSnapshot with period", () => {
     const period: PeriodFilter = { year: 2024, month: 1 };
     const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
 
-    expect(snapshot.metrics.revenue.values.forecast).toBe(130);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(200);
     expect(snapshot.metrics.revenue.values.remaining).toBe(0);
   });
 
@@ -215,7 +260,7 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.forecast).toBe(0);
   });
 
-  it("ignores canceled placements when computing group forecast", () => {
+  it("ignores canceled placements when computing group forecast but keeps their payments", () => {
     const db = buildDB();
     const client = db.clients[0];
     client.placements.push({
@@ -235,7 +280,7 @@ describe("computeAnalyticsSnapshot with period", () => {
     const period: PeriodFilter = { year: 2024, month: 1 };
     const snapshot = computeAnalyticsSnapshot(db, "Area1", period, "Group1");
 
-    expect(snapshot.metrics.revenue.values.forecast).toBe(60);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(130);
     expect(snapshot.metrics.athletes.values.forecast).toBe(1);
   });
 

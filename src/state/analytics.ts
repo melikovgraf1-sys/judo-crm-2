@@ -8,7 +8,16 @@ import {
 import { normalizePaymentFacts } from "./paymentFacts";
 import { convertMoney, isReserveArea } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
-import type { Area, Client, Currency, DB, Group, Lead, LeadLifecycleEvent } from "../types";
+import type {
+  Area,
+  Client,
+  ClientPlacement,
+  Currency,
+  DB,
+  Group,
+  Lead,
+  LeadLifecycleEvent,
+} from "../types";
 
 const CANCELED_STATUSES = new Set(["отмена", "отменен", "отменён", "cancelled"]);
 
@@ -18,6 +27,51 @@ const isCanceledStatus = (status?: Client["status"] | string | null): boolean =>
   }
   const normalized = status.toString().toLowerCase();
   return CANCELED_STATUSES.has(normalized);
+};
+
+type ClientPlacements = ReturnType<typeof getClientPlacements>;
+
+const buildPlacementFromClient = (client: Client): ClientPlacement => ({
+  id: client.id,
+  area: client.area,
+  group: client.group,
+  payStatus: client.payStatus,
+  status: client.status,
+  subscriptionPlan: client.subscriptionPlan,
+  payDate: client.payDate,
+  payAmount: client.payAmount,
+  payActual: client.payActual,
+  remainingLessons: client.remainingLessons,
+  frozenLessons: client.frozenLessons,
+});
+
+const selectLatestPlacement = (
+  placements: ClientPlacements,
+  client: Client,
+): ClientPlacement => {
+  if (!placements.length) {
+    return buildPlacementFromClient(client);
+  }
+  const latest = placements[placements.length - 1];
+  return {
+    ...latest,
+    area: latest.area || client.area,
+    group: latest.group || client.group,
+  };
+};
+
+const resolveScopePlacements = (
+  client: Client,
+  placements: ClientPlacements,
+): ClientPlacements => {
+  if (!placements.length) {
+    return [buildPlacementFromClient(client)];
+  }
+  const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
+  if (activePlacements.length) {
+    return activePlacements;
+  }
+  return [selectLatestPlacement(placements, client)];
 };
 
 export type AreaScope = Area | "all";
@@ -363,16 +417,16 @@ function getClientForecastAmount(
       if (!matchesPeriod(fact, period)) {
         return false;
       }
-      return factMatchesScope(fact.area, fact.group, effectiveScope, placements);
+      return factMatchesScope(fact.area, fact.group, effectiveScope, placements, client);
     });
     actualFactsTotal = matchingFacts.reduce((sum, fact) => sum + ensureNumber(fact.amount ?? 0), 0);
   }
 
-  const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
+  const scopedPlacements = resolveScopePlacements(client, placements);
 
   const placementsMatchingPeriod = !period
-    ? activePlacements
-    : activePlacements.filter(placement => {
+    ? scopedPlacements
+    : scopedPlacements.filter(placement => {
         const referenceDate = placement.payDate ?? client.payDate ?? null;
         if (!referenceDate) {
           return true;
@@ -454,8 +508,9 @@ function factMatchesScope(
   factGroup: Group | undefined,
   scope: AnalyticsScope,
   placements: ReturnType<typeof getClientPlacements>,
+  client: Client,
 ): boolean {
-  const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
+  const scopedPlacements = resolveScopePlacements(client, placements);
 
   if (scope.area !== "all") {
     if (factArea) {
@@ -463,13 +518,13 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const placementsInScopeArea = activePlacements.filter(
+      const placementsInScopeArea = scopedPlacements.filter(
         placement => placement.area === scope.area,
       );
       if (!placementsInScopeArea.length) {
         return false;
       }
-      const isAreaUnambiguous = activePlacements.every(placement => placement.area === scope.area);
+      const isAreaUnambiguous = scopedPlacements.every(placement => placement.area === scope.area);
       if (!isAreaUnambiguous) {
         return false;
       }
@@ -482,7 +537,7 @@ function factMatchesScope(
         return false;
       }
     } else {
-      const placementsInScopedArea = activePlacements.filter(placement => {
+      const placementsInScopedArea = scopedPlacements.filter(placement => {
         if (scope.area !== "all" && placement.area !== scope.area) {
           return false;
         }
@@ -525,7 +580,7 @@ function getClientActualAmount(
         return false;
       }
 
-      return factMatchesScope(fact.area, fact.group, scope, placements);
+      return factMatchesScope(fact.area, fact.group, scope, placements, client);
     });
     if (!matchingFacts.length) {
       return 0;
@@ -653,18 +708,18 @@ export function computeAnalyticsSnapshot(
   };
   const periodClients = db.clients.filter(client => {
     const placements = getClientPlacements(client);
-    const activePlacements = placements.filter(placement => !isCanceledStatus(placement.status));
+    const scopedPlacements = resolveScopePlacements(client, placements);
     const matchesArea =
       area === "all"
-        ? activePlacements.some(placement => relevantAreaSet.has(placement.area))
+        ? scopedPlacements.some(placement => relevantAreaSet.has(placement.area))
         : isReserveScope
           ? false
-          : activePlacements.some(placement => placement.area === area);
+          : scopedPlacements.some(placement => placement.area === area);
     if (!matchesArea) {
       return false;
     }
     if (hasGroupScope) {
-      const matchesGroup = activePlacements.some(
+      const matchesGroup = scopedPlacements.some(
         placement => placement.area === area && placement.group === scopedGroup,
       );
       if (!matchesGroup) {
@@ -688,11 +743,11 @@ export function computeAnalyticsSnapshot(
   const rent = hasGroupScope ? 0 : rentForAreas(db, relevantAreas);
   const coachSalary = hasGroupScope ? 0 : coachSalaryForAreas(db, relevantAreas);
 
-  const actualRevenue = rosterClients.reduce(
+  const actualRevenue = periodClients.reduce(
     (sum, client) => sum + getClientActualAmount(client, period, scope),
     0,
   );
-  const forecastRevenue = rosterClients.reduce(
+  const forecastRevenue = periodClients.reduce(
     (sum, client) => sum + getClientForecastAmount(client, targetArea, targetGroup, period, scope),
     0,
   );
@@ -764,7 +819,7 @@ export function computeAnalyticsSnapshot(
 
   const athleteStats: AthleteStats = {
     total: rosterClients.length,
-    payments: rosterClients.filter(client => getClientActualAmount(client, period, scope) > 0).length,
+    payments: periodClients.filter(client => getClientActualAmount(client, period, scope) > 0).length,
     new: rosterClients.filter(client => client.status === "новый").length,
     firstRenewals: rosterClients.filter(client => client.status === "продлившийся").length,
     canceled: periodClients.filter(client => isCanceledStatus(client.status)).length,
