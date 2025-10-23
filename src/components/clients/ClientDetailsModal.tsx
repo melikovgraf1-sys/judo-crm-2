@@ -93,7 +93,11 @@ export default function ClientDetailsModal({
       return placementStatus;
     }
 
-    if (placementStatus === "задолженность" || placementStatus === "ожидание") {
+    if (
+      placementStatus === "задолженность" ||
+      placementStatus === "ожидание" ||
+      placementStatus === "перенос"
+    ) {
       return placementStatus;
     }
 

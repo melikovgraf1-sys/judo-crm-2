@@ -13,7 +13,9 @@ import { applyClientStatusAutoTransition } from "./clientLifecycle";
 import { getClientPlacements } from "./clients";
 import {
   getLatestFactDueDate,
+  getLatestPaymentFact,
   getPaymentFactComparableDate,
+  getPaymentFactDueDate,
   normalizePaymentFacts,
 } from "./paymentFacts";
 import { todayISO } from "./utils";
@@ -380,6 +382,30 @@ const factMatchesPeriod = (fact: PaymentFact, period: PeriodFilter): boolean => 
   return month != null && month === period.month;
 };
 
+const isAfterPeriod = (iso: string | null | undefined, period: PeriodFilter): boolean => {
+  if (!iso) {
+    return false;
+  }
+  const year = parseYearPart(iso);
+  if (year == null) {
+    return false;
+  }
+  if (year > period.year) {
+    return true;
+  }
+  if (year < period.year) {
+    return false;
+  }
+  if (period.month == null) {
+    return false;
+  }
+  const month = parseMonthPart(iso);
+  if (month == null) {
+    return false;
+  }
+  return month > period.month;
+};
+
 export function getClientPaymentTotalsForPeriod(
   client: Client,
   period: PeriodFilter = getCurrentPeriod(),
@@ -478,7 +504,15 @@ export function derivePaymentStatus(
       if (hasRecentFact) {
         status = "действует";
       } else {
-        status = "ожидание";
+        const latestFact = getLatestPaymentFact(history, placement);
+        const planHint = placement.subscriptionPlan ?? client.subscriptionPlan ?? null;
+        const comparable = getPaymentFactComparableDate(latestFact);
+        const dueISO = latestFact ? getPaymentFactDueDate(latestFact, { plan: planHint }) : null;
+        const hasDeferredFact = Boolean(
+          latestFact && (isAfterPeriod(comparable, period) || isAfterPeriod(dueISO, period)),
+        );
+
+        status = hasDeferredFact ? "перенос" : "ожидание";
       }
     }
 
@@ -492,6 +526,8 @@ export function derivePaymentStatus(
     clientStatus = "задолженность";
   } else if (derivedStatuses.includes("действует")) {
     clientStatus = "действует";
+  } else if (derivedStatuses.includes("перенос")) {
+    clientStatus = "перенос";
   } else if (derivedStatuses.length > 0) {
     clientStatus = "ожидание";
   } else {

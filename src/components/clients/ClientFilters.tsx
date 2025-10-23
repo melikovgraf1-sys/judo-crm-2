@@ -118,6 +118,7 @@ export default function ClientFilters({
           <option value="all">Все статусы оплаты</option>
           <option value="ожидание">ожидание</option>
           <option value="действует">действует</option>
+          <option value="перенос">перенос</option>
           <option value="задолженность">задолженность</option>
         </select>
         <div className="text-xs text-slate-500">

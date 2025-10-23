@@ -47,6 +47,10 @@ export const getClientPlacementDisplayStatus = (client: Client): PaymentStatus =
     return "задолженность";
   }
 
+  if (statuses.includes("перенос")) {
+    return "перенос";
+  }
+
   if (statuses.includes("ожидание")) {
     return "ожидание";
   }
