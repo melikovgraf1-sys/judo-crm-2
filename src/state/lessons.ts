@@ -1,5 +1,5 @@
 import type { Area, Client, Group, ScheduleSlot } from "../types";
-import { getLatestFactPaidAt } from "./paymentFacts";
+import { getLatestFactDueDate } from "./paymentFacts";
 import {
   isAdultGroup,
   isIndividualGroup,
@@ -33,8 +33,11 @@ export function estimateGroupRemainingLessons(
   today: Date = new Date(),
 ): number | null {
   const referencePayDate =
-    getLatestFactPaidAt(client.payHistory ?? [], { area: client.area, group: client.group }) ??
-    client.payDate;
+    getLatestFactDueDate(
+      client.payHistory ?? [],
+      { area: client.area, group: client.group },
+      client.subscriptionPlan ?? null,
+    ) ?? client.payDate;
 
   return estimateGroupRemainingLessonsByParams(
     client.area,

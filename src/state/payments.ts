@@ -11,7 +11,11 @@ import type {
 import type { PeriodFilter } from "./period";
 import { applyClientStatusAutoTransition } from "./clientLifecycle";
 import { getClientPlacements } from "./clients";
-import { getPaymentFactComparableDate, normalizePaymentFacts } from "./paymentFacts";
+import {
+  getLatestFactDueDate,
+  getPaymentFactComparableDate,
+  normalizePaymentFacts,
+} from "./paymentFacts";
 import { todayISO } from "./utils";
 
 export const SUBSCRIPTION_PLANS: { value: SubscriptionPlan; label: string; amount: number | null }[] = [
@@ -285,13 +289,42 @@ const getNextPayDate = (client: Client, placements: ClientPlacement[]): Date | n
     .map(placement => parseISODate(placement.payDate))
     .filter((date): date is Date => date != null);
 
-  if (!candidateDates.length) {
-    return parseISODate(client.payDate);
+  if (candidateDates.length) {
+    return candidateDates.reduce((earliest, current) =>
+      current.getTime() < earliest.getTime() ? current : earliest,
+    );
   }
 
-  return candidateDates.reduce((earliest, current) =>
-    current.getTime() < earliest.getTime() ? current : earliest,
+  const clientPayDate = parseISODate(client.payDate);
+  if (clientPayDate) {
+    return clientPayDate;
+  }
+
+  const history = normalizePaymentFacts(client.payHistory);
+  if (!history.length) {
+    return null;
+  }
+
+  const factCandidateDates = placements
+    .map(placement => {
+      const planHint = placement.subscriptionPlan ?? client.subscriptionPlan ?? null;
+      const dueISO = getLatestFactDueDate(history, placement, planHint);
+      return parseISODate(dueISO);
+    })
+    .filter((date): date is Date => date != null);
+
+  if (factCandidateDates.length) {
+    return factCandidateDates.reduce((earliest, current) =>
+      current.getTime() < earliest.getTime() ? current : earliest,
+    );
+  }
+
+  const fallbackDueISO = getLatestFactDueDate(
+    history,
+    { area: client.area, group: client.group },
+    client.subscriptionPlan ?? null,
   );
+  return parseISODate(fallbackDueISO);
 };
 
 const isCanceledStatus = (status?: Client["status"] | string | null): boolean => {

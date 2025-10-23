@@ -202,32 +202,122 @@ export function matchesPaymentFactPlacement(
   return matchesArea && matchesGroup;
 }
 
-export function getLatestFactPaidAt(
+const toUTCDate = (value?: string | null): Date | null => {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+};
+
+const addMonths = (date: Date, count: number) => {
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const targetMonthIndex = month + count;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+  const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, maxDay);
+  return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
+};
+
+const addDays = (date: Date, count: number) => {
+  const result = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  result.setUTCDate(result.getUTCDate() + count);
+  return result;
+};
+
+const getComparableTimestamp = (fact: PaymentFact): number | null => {
+  const comparable = getPaymentFactComparableDate(fact);
+  if (!comparable) {
+    return null;
+  }
+  const timestamp = new Date(comparable).getTime();
+  if (!Number.isFinite(timestamp)) {
+    return null;
+  }
+  return timestamp;
+};
+
+export function getLatestPaymentFact(
   facts: PaymentFact[],
   placement?: PlacementLike,
-): string | undefined {
-  let latestISO: string | undefined;
+): PaymentFact | undefined {
+  let latest: PaymentFact | undefined;
   let latestTimestamp = Number.NEGATIVE_INFINITY;
 
   for (const fact of facts) {
-    if (!fact.paidAt) {
-      continue;
-    }
-
     if (placement && !matchesPaymentFactPlacement(placement, fact)) {
       continue;
     }
 
-    const timestamp = new Date(fact.paidAt).getTime();
-    if (!Number.isFinite(timestamp)) {
+    const timestamp = getComparableTimestamp(fact);
+    if (timestamp == null) {
       continue;
     }
 
     if (timestamp > latestTimestamp) {
       latestTimestamp = timestamp;
-      latestISO = fact.paidAt;
+      latest = fact;
     }
   }
 
-  return latestISO;
+  return latest;
+}
+
+export function getPaymentFactDueDate(
+  fact: PaymentFact,
+  options: { plan?: SubscriptionPlan | null } = {},
+): string | undefined {
+  const plan = fact.subscriptionPlan ?? options.plan ?? undefined;
+  if (!plan) {
+    return undefined;
+  }
+
+  const comparable = getPaymentFactComparableDate(fact);
+  if (!comparable) {
+    return undefined;
+  }
+
+  const base = toUTCDate(comparable);
+  if (!base) {
+    return undefined;
+  }
+
+  let next: Date | null = base;
+
+  if (plan === "half-month") {
+    next = addDays(base, 14);
+  } else if (plan === "monthly" || plan === "weekly" || plan === "discount") {
+    next = addMonths(base, 1);
+  }
+
+  return next ? next.toISOString() : undefined;
+}
+
+export function getLatestFactDueDate(
+  facts: PaymentFact[],
+  placement?: PlacementLike,
+  planHint?: SubscriptionPlan | null,
+): string | undefined {
+  const latestFact = getLatestPaymentFact(facts, placement);
+  if (!latestFact) {
+    return undefined;
+  }
+  return getPaymentFactDueDate(latestFact, { plan: planHint });
+}
+
+export function getLatestFactPaidAt(
+  facts: PaymentFact[],
+  placement?: PlacementLike,
+): string | undefined {
+  const latest = getLatestPaymentFact(facts, placement);
+  if (!latest || !latest.paidAt) {
+    return undefined;
+  }
+  return latest.paidAt;
 }

@@ -14,6 +14,7 @@ describe("derivePaymentStatus", () => {
     payMethod: "наличные",
     payStatus: "ожидание",
     status: "новый",
+    subscriptionPlan: "monthly",
     placements: [],
   };
 
@@ -79,5 +80,37 @@ describe("derivePaymentStatus", () => {
     const tasks: TaskItem[] = [{ ...baseTask, status: "open" }];
 
     expect(derivePaymentStatus(client, tasks, [])).toBe("задолженность");
+  });
+
+  it("keeps active status when future due date is derived from payment facts", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-01T00:00:00.000Z"));
+
+    const client: Client = {
+      ...baseClient,
+      payStatus: "действует",
+      payActual: 0,
+      payHistory: [
+        {
+          id: "fact-future",
+          paidAt: "2099-01-10T00:00:00.000Z",
+          subscriptionPlan: "monthly",
+        },
+      ],
+      placements: [
+        {
+          id: "placement-1",
+          area: baseClient.area,
+          group: baseClient.group,
+          payMethod: "наличные",
+          payStatus: "действует",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+        },
+      ],
+    };
+
+    expect(derivePaymentStatus(client, [], [])).toBe("действует");
+
+    jest.useRealTimers();
   });
 });
