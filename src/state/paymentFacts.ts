@@ -185,3 +185,49 @@ export function getPaymentFactComparableDate(fact: PaymentFact | null | undefine
 export function getPaymentFactPlanLabel(plan: SubscriptionPlan | undefined | null): string | undefined {
   return plan ? getSubscriptionPlanMeta(plan)?.label : undefined;
 }
+
+export type PlacementLike = { area?: Area; group?: Group } | null | undefined;
+
+export function matchesPaymentFactPlacement(
+  placement: PlacementLike,
+  fact: PaymentFact,
+): boolean {
+  if (!placement) {
+    return true;
+  }
+
+  const matchesArea = !placement.area || !fact.area || fact.area === placement.area;
+  const matchesGroup = !placement.group || !fact.group || fact.group === placement.group;
+
+  return matchesArea && matchesGroup;
+}
+
+export function getLatestFactPaidAt(
+  facts: PaymentFact[],
+  placement?: PlacementLike,
+): string | undefined {
+  let latestISO: string | undefined;
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+
+  for (const fact of facts) {
+    if (!fact.paidAt) {
+      continue;
+    }
+
+    if (placement && !matchesPaymentFactPlacement(placement, fact)) {
+      continue;
+    }
+
+    const timestamp = new Date(fact.paidAt).getTime();
+    if (!Number.isFinite(timestamp)) {
+      continue;
+    }
+
+    if (timestamp > latestTimestamp) {
+      latestTimestamp = timestamp;
+      latestISO = fact.paidAt;
+    }
+  }
+
+  return latestISO;
+}

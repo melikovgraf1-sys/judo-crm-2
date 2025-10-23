@@ -1,10 +1,12 @@
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 
 import ClientDetailsModal from "../ClientDetailsModal";
-import type { AttendanceEntry, Client, PerformanceEntry, ScheduleSlot } from "../../../types";
+import type { AttendanceEntry, Client, PaymentFact, PerformanceEntry, ScheduleSlot } from "../../../types";
+import { getLatestFactPaidAt } from "../../../state/paymentFacts";
+let latestClient: Client | null = null;
 
 describe("ClientDetailsModal placements", () => {
   const attendance: AttendanceEntry[] = [];
@@ -180,5 +182,222 @@ describe("ClientDetailsModal placements", () => {
     expect(editor.getByLabelText("Сумма (ожидаемая), €")).toHaveDisplayValue("100");
     expect(editor.getByLabelText(/Остаток занятий/)).toHaveDisplayValue("7");
     expect(editor.getByLabelText(/Заморозка занятий/)).toHaveDisplayValue("2");
+  });
+});
+
+describe("ClientDetailsModal payment fact updates", () => {
+  const currencyRates = { EUR: 1, TRY: 30, RUB: 90 } as const;
+
+  beforeEach(() => {
+    latestClient = null;
+    jest.useRealTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function TestClientDetailsModalHarness({
+    initialClient,
+    schedule,
+  }: {
+    initialClient: Client;
+    schedule: ScheduleSlot[];
+  }) {
+    const [clientState, setClientState] = React.useState<Client>(initialClient);
+
+    React.useEffect(() => {
+      latestClient = clientState;
+    }, [clientState]);
+
+    const handlePaymentFactsChange = React.useCallback(
+      async (clientId: string, nextFacts: PaymentFact[]) => {
+        if (clientState.id !== clientId) {
+          return false;
+        }
+
+        setClientState(prev => {
+          const nextClient: Client = {
+            ...prev,
+            ...(nextFacts.length ? { payHistory: nextFacts } : {}),
+          };
+
+          if (!nextFacts.length) {
+            delete nextClient.payHistory;
+          }
+
+          const placements = Array.isArray(prev.placements) ? prev.placements : [];
+          const updatedPlacements = placements.map(placement => {
+            const latestPaidAt = getLatestFactPaidAt(nextFacts, placement);
+            if (latestPaidAt) {
+              return { ...placement, payDate: latestPaidAt };
+            }
+            const { payDate: _omit, ...rest } = placement;
+            return rest;
+          });
+
+          nextClient.placements = updatedPlacements as Client["placements"];
+
+          const primaryPlacement = updatedPlacements[0] ?? null;
+          const latestPrimaryPaidAt =
+            getLatestFactPaidAt(nextFacts, primaryPlacement ?? { area: prev.area, group: prev.group }) ?? null;
+
+          if (latestPrimaryPaidAt) {
+            nextClient.payDate = latestPrimaryPaidAt;
+          } else if (primaryPlacement?.payDate) {
+            nextClient.payDate = primaryPlacement.payDate;
+          } else if (nextClient.payDate) {
+            delete nextClient.payDate;
+          }
+
+          return nextClient;
+        });
+
+        return true;
+      },
+      [clientState.id, clientState.area, clientState.group],
+    );
+
+    return (
+      <ClientDetailsModal
+        client={clientState}
+        currency="EUR"
+        currencyRates={currencyRates}
+        schedule={schedule}
+        attendance={[]}
+        performance={[]}
+        onClose={() => {}}
+        onPaymentFactsChange={handlePaymentFactsChange}
+      />
+    );
+  }
+
+  it("recalculates remaining lessons and next payment date when fact paidAt changes", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-01T00:00:00.000Z"));
+
+    const schedule: ScheduleSlot[] = Array.from({ length: 7 }).map((_, index) => ({
+      id: `slot-${index}`,
+      area: "DailyArea",
+      group: "DailyGroup",
+      coachId: "coach-1",
+      weekday: index + 1,
+      time: "10:00",
+      location: "Main Hall",
+    }));
+
+    const client: Client = {
+      id: "client-daily",
+      firstName: "Олег",
+      lastName: "",
+      parentName: "",
+      phone: "",
+      whatsApp: "",
+      telegram: "",
+      instagram: "",
+      comment: "",
+      channel: "Telegram",
+      birthDate: "2015-01-01T00:00:00.000Z",
+      gender: "м",
+      area: "DailyArea",
+      group: "DailyGroup",
+      coachId: undefined,
+      startDate: "2024-01-01T00:00:00.000Z",
+      payMethod: "наличные",
+      payStatus: "действует",
+      status: "действующий",
+      statusUpdatedAt: undefined,
+      subscriptionPlan: "monthly",
+      payDate: "2024-03-05T00:00:00.000Z",
+      payAmount: 120,
+      payActual: 120,
+      remainingLessons: undefined,
+      frozenLessons: 0,
+      placements: [
+        {
+          id: "placement-daily",
+          area: "DailyArea",
+          group: "DailyGroup",
+          payMethod: "наличные",
+          payStatus: "действует",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+          payDate: "2024-03-05T00:00:00.000Z",
+          payAmount: 120,
+          payActual: 120,
+          frozenLessons: 0,
+        },
+      ],
+      payHistory: [
+        {
+          id: "fact-daily",
+          area: "DailyArea",
+          group: "DailyGroup",
+          paidAt: "2024-03-05T00:00:00.000Z",
+          amount: 120,
+          subscriptionPlan: "monthly",
+        },
+      ],
+    };
+
+    render(<TestClientDetailsModalHarness initialClient={client} schedule={schedule} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Факты оплат" }));
+    const paymentEntries = await screen.findAllByText("DailyArea · DailyGroup");
+    const paymentEntry = paymentEntries.find(element => element.closest("li"));
+    expect(paymentEntry).toBeTruthy();
+    await userEvent.click(paymentEntry!);
+
+    const viewerHeading = await screen.findByText("Факт оплаты");
+    const viewerDialog = viewerHeading.closest('[role="dialog"]');
+    expect(viewerDialog).not.toBeNull();
+
+    const viewer = within(viewerDialog as HTMLElement);
+    const remainingLabel = viewer.getByText("Остаток занятий");
+    const remainingRow = remainingLabel.closest("div");
+    expect(remainingRow?.querySelectorAll("span")[1]).toHaveTextContent("4");
+
+    await userEvent.click(viewer.getByRole("button", { name: "Редактировать" }));
+
+    const editorHeading = await screen.findByText("Редактирование факта оплаты");
+    const editorDialog = editorHeading.closest('[role="dialog"]');
+    expect(editorDialog).not.toBeNull();
+
+    const editor = within(editorDialog as HTMLElement);
+    const paidAtInput = editor.getByLabelText("Дата оплаты");
+    await userEvent.clear(paidAtInput);
+    await userEvent.type(paidAtInput, "2024-03-10");
+
+    const remainingInput = editor.getByLabelText(/Остаток занятий/);
+    await userEvent.clear(remainingInput);
+
+    await userEvent.click(editor.getByRole("button", { name: "Сохранить" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText("Редактирование факта оплаты")).not.toBeInTheDocument(),
+    );
+
+    await waitFor(() => {
+      expect(latestClient?.placements[0]?.payDate).toBe("2024-03-10T00:00:00.000Z");
+      expect(latestClient?.payDate).toBe("2024-03-10T00:00:00.000Z");
+      expect(latestClient?.payHistory?.[0]?.paidAt).toBe("2024-03-10T00:00:00.000Z");
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText("10.03.2024").length).toBeGreaterThan(0);
+    });
+
+    const updatedEntries = await screen.findAllByText("DailyArea · DailyGroup");
+    const updatedEntry = updatedEntries.find(element => element.closest("li"));
+    expect(updatedEntry).toBeTruthy();
+    await userEvent.click(updatedEntry!);
+
+    const updatedViewerHeading = await screen.findByText("Факт оплаты");
+    const updatedViewerDialog = updatedViewerHeading.closest('[role="dialog"]');
+    expect(updatedViewerDialog).not.toBeNull();
+
+    const updatedViewer = within(updatedViewerDialog as HTMLElement);
+    const updatedRemainingLabel = updatedViewer.getByText("Остаток занятий");
+    const updatedRemainingRow = updatedRemainingLabel.closest("div");
+    expect(updatedRemainingRow?.querySelectorAll("span")[1]).toHaveTextContent("9");
   });
 });

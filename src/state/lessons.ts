@@ -1,4 +1,5 @@
 import type { Area, Client, Group, ScheduleSlot } from "../types";
+import { getLatestFactPaidAt } from "./paymentFacts";
 import {
   isAdultGroup,
   isIndividualGroup,
@@ -27,11 +28,21 @@ const isoWeekday = (date: Date): number => {
 };
 
 export function estimateGroupRemainingLessons(
-  client: Pick<Client, "area" | "group" | "payDate">,
+  client: Pick<Client, "area" | "group" | "payDate" | "payHistory">,
   schedule: ScheduleSlot[],
   today: Date = new Date(),
 ): number | null {
-  return estimateGroupRemainingLessonsByParams(client.area, client.group, client.payDate, schedule, today);
+  const referencePayDate =
+    getLatestFactPaidAt(client.payHistory ?? [], { area: client.area, group: client.group }) ??
+    client.payDate;
+
+  return estimateGroupRemainingLessonsByParams(
+    client.area,
+    client.group,
+    referencePayDate,
+    schedule,
+    today,
+  );
 }
 
 export function estimateGroupRemainingLessonsByParams(
