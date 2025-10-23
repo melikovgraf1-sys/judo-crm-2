@@ -429,10 +429,17 @@ describe("transformClientFormValues", () => {
     const result = transformClientFormValues(formValues, editing);
 
     expect(result.placements).toEqual([]);
-    expect(result.area).toBe(editing.area);
-    expect(result.group).toBe(editing.group);
-    expect(result.payStatus).toBe(editing.payStatus);
-    expect(result.status).toBe(editing.status);
+    expect(result.payMethod).toBe(formValues.payMethod);
+    expect(result).not.toHaveProperty("area");
+    expect(result).not.toHaveProperty("group");
+    expect(result).not.toHaveProperty("payStatus");
+    expect(result).not.toHaveProperty("status");
+    expect(result).not.toHaveProperty("subscriptionPlan");
+    expect(result).not.toHaveProperty("payDate");
+    expect(result).not.toHaveProperty("payAmount");
+    expect(result).not.toHaveProperty("payActual");
+    expect(result).not.toHaveProperty("remainingLessons");
+    expect(result).not.toHaveProperty("frozenLessons");
   });
 
   it("does not create a payment fact when payment details are edited manually", () => {

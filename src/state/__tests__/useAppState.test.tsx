@@ -202,6 +202,48 @@ describe('useAppState with local persistence', () => {
     }
   });
 
+  it('preserves clients that have no placements without synthesizing fallback data', async () => {
+    const legacy = makeSeedDB();
+
+    const [sampleClient] = legacy.clients;
+    const clientWithoutPlacements = {
+      ...sampleClient,
+      id: 'client-without-placements',
+      payMethod: sampleClient?.payMethod ?? 'перевод',
+      payStatus: 'ожидание',
+      status: 'архив',
+      placements: [],
+    };
+
+    delete clientWithoutPlacements.area;
+    delete clientWithoutPlacements.group;
+    delete clientWithoutPlacements.subscriptionPlan;
+    delete clientWithoutPlacements.payDate;
+    delete clientWithoutPlacements.payAmount;
+    delete clientWithoutPlacements.payActual;
+    delete clientWithoutPlacements.remainingLessons;
+    delete clientWithoutPlacements.frozenLessons;
+
+    legacy.clients = [clientWithoutPlacements];
+
+    localStorage.setItem(LS_KEYS.db, JSON.stringify(legacy));
+
+    const { result } = renderHook(() => useAppState());
+    await act(async () => {});
+
+    const normalizedClient = result.current.db.clients.find(client => client.id === 'client-without-placements');
+    expect(normalizedClient).toBeDefined();
+    expect(normalizedClient?.placements).toEqual([]);
+    expect(normalizedClient).not.toHaveProperty('area');
+    expect(normalizedClient).not.toHaveProperty('group');
+    expect(normalizedClient).not.toHaveProperty('subscriptionPlan');
+    expect(normalizedClient).not.toHaveProperty('payDate');
+    expect(normalizedClient).not.toHaveProperty('payAmount');
+    expect(normalizedClient).not.toHaveProperty('payActual');
+    expect(normalizedClient).not.toHaveProperty('remainingLessons');
+    expect(normalizedClient).not.toHaveProperty('frozenLessons');
+  });
+
   it('reloads data and shows a warning toast on DB conflict', async () => {
     const { result } = renderHook(() => useAppState());
 
