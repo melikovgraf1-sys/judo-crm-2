@@ -962,8 +962,13 @@ export function formatMetricValue(
       );
     case "percent":
       return `${formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)}%`;
-    default:
-      return formatNumber("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value);
+    default: {
+      const options =
+        unit === "number"
+          ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+          : { minimumFractionDigits: 1, maximumFractionDigits: 1 };
+      return formatNumber("ru-RU", options).format(value);
+    }
   }
 }
 
