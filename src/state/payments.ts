@@ -272,6 +272,28 @@ const ensureNumber = (value: number | null | undefined): number => {
   return 0;
 };
 
+const parseISODate = (value?: string | null): Date | null => {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getNextPayDate = (client: Client, placements: ClientPlacement[]): Date | null => {
+  const candidateDates = placements
+    .map(placement => parseISODate(placement.payDate))
+    .filter((date): date is Date => date != null);
+
+  if (!candidateDates.length) {
+    return parseISODate(client.payDate);
+  }
+
+  return candidateDates.reduce((earliest, current) =>
+    current.getTime() < earliest.getTime() ? current : earliest,
+  );
+};
+
 const isCanceledStatus = (status?: Client["status"] | string | null): boolean => {
   if (!status) {
     return false;
@@ -369,15 +391,7 @@ export function derivePaymentStatus(
   tasks: TaskItem[],
   archivedTasks: TaskItem[] = [],
 ): PaymentStatus {
-  const { expected, actual } = getClientPaymentTotalsForPeriod(client);
-  const hasActiveStatus =
-    client.payStatus === "действует" ||
-    getClientPlacements(client).some(placement => placement.payStatus === "действует");
-
-  if (hasActiveStatus && expected > 0 && actual + PAYMENT_SHORTFALL_TOLERANCE < expected) {
-    return "задолженность";
-  }
-
+  const placements = getClientPlacements(client);
   const relevantTasks = tasks.concat(archivedTasks.filter(task => task.status === "done"));
   const relatedTasks = relevantTasks.filter(
     task =>
@@ -385,12 +399,30 @@ export function derivePaymentStatus(
       task.assigneeType === "client" &&
       task.assigneeId === client.id,
   );
+  const hasOpenRelatedTask = relatedTasks.some(task => task.status !== "done");
+  const nextPayDate = getNextPayDate(client, placements);
+  const shouldSkipDebtCheck =
+    !hasOpenRelatedTask && nextPayDate != null && nextPayDate.getTime() > Date.now();
+
+  const { expected, actual } = getClientPaymentTotalsForPeriod(client);
+  const hasActiveStatus =
+    client.payStatus === "действует" ||
+    placements.some(placement => placement.payStatus === "действует");
+
+  if (
+    hasActiveStatus &&
+    expected > 0 &&
+    actual + PAYMENT_SHORTFALL_TOLERANCE < expected &&
+    !shouldSkipDebtCheck
+  ) {
+    return "задолженность";
+  }
 
   if (!relatedTasks.length) {
     return client.payStatus;
   }
 
-  if (relatedTasks.some(task => task.status !== "done")) {
+  if (hasOpenRelatedTask) {
     return "задолженность";
   }
 

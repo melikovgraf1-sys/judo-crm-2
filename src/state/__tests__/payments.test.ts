@@ -56,4 +56,28 @@ describe("derivePaymentStatus", () => {
 
     expect(derivePaymentStatus(client, [], [])).toBe("задолженность");
   });
+
+  it("skips debt check when the next pay date is in the future and there are no open payment tasks", () => {
+    const client: Client = {
+      ...baseClient,
+      payStatus: "действует",
+      payActual: 0,
+      payDate: "2099-01-01T00:00:00.000Z",
+    };
+
+    expect(derivePaymentStatus(client, [], [])).toBe("действует");
+  });
+
+  it("still marks debt when future-due payments have open tasks", () => {
+    const client: Client = {
+      ...baseClient,
+      payStatus: "действует",
+      payActual: 0,
+      payDate: "2099-01-01T00:00:00.000Z",
+    };
+
+    const tasks: TaskItem[] = [{ ...baseTask, status: "open" }];
+
+    expect(derivePaymentStatus(client, tasks, [])).toBe("задолженность");
+  });
 });
