@@ -201,6 +201,9 @@ export default function LeadsTab({
                         {l.name}
                       </div>
                       <div className="text-xs text-slate-500">{l.source}{formatLeadContactSummary(l)}</div>
+                      <div className="text-xs text-slate-500">
+                        {(l.area?.trim() || "—") + " · " + (l.group?.trim() || "—")}
+                      </div>
                       <div className="flex gap-1 mt-2">
                         <button
                           onClick={event => {
