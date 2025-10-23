@@ -11,11 +11,7 @@ import {
 } from "../../state/payments";
 import { parseDateInput, todayISO, uid } from "../../state/utils";
 import { requiresManualRemainingLessons } from "../../state/lessons";
-import {
-  createPaymentFact,
-  getPaymentFactComparableDate,
-  normalizePaymentFacts,
-} from "../../state/paymentFacts";
+import { normalizePaymentFacts } from "../../state/paymentFacts";
 import type {
   Client,
   ClientFormValues,
@@ -189,64 +185,7 @@ export function transformClientFormValues(
   const normalizedComment = comment.trim();
 
   const previousPayHistory = normalizePaymentFacts(editing?.payHistory);
-
-  let nextPayHistory = previousPayHistory;
-
-  const primaryFormPlacement = placements[0];
-  const payActualProvided = Boolean(primaryFormPlacement?.payActual?.trim().length);
-  const payDateProvided = Boolean(primaryFormPlacement?.payDate?.trim().length);
-  const previousPrimaryPlacement = previousPlacements.find(prev => prev.id === primary.id);
-  const normalizePayDateForComparison = (value?: string) => {
-    if (!value) {
-      return null;
-    }
-    const normalized = parseDateInput(value);
-    return normalized || value;
-  };
-  const previousPayDate = normalizePayDateForComparison(previousPrimaryPlacement?.payDate);
-  const previousPayAmount =
-    previousPrimaryPlacement?.payActual ?? previousPrimaryPlacement?.payAmount ?? null;
-  const nextPayDate = normalizePayDateForComparison(primary.payDate);
-  const nextPayAmount = primary.payActual ?? primary.payAmount ?? null;
-  const paymentFieldsChanged =
-    !previousPrimaryPlacement || previousPayDate !== nextPayDate || previousPayAmount !== nextPayAmount;
-
-  const shouldRecordPayment =
-    primary.payStatus === "действует" && (payActualProvided || payDateProvided) && paymentFieldsChanged;
-
-  if (shouldRecordPayment) {
-    const parsedPayDate = parseDateInput(primaryFormPlacement?.payDate ?? "");
-    const now = todayISO();
-    const fallbackDate = primary.payDate ?? now;
-    const historyEntry = parsedPayDate || fallbackDate;
-
-    if (historyEntry) {
-      const candidate = createPaymentFact({
-        id: uid(),
-        area: primary.area,
-        group: primary.group,
-        paidAt: historyEntry,
-        recordedAt: now,
-        amount: primary.payActual ?? primary.payAmount ?? null,
-        subscriptionPlan: primary.subscriptionPlan,
-      });
-
-      const candidateDate = getPaymentFactComparableDate(candidate);
-      const duplicate = nextPayHistory.some(existing => {
-        const existingDate = getPaymentFactComparableDate(existing);
-        return (
-          existingDate === candidateDate &&
-          existing.area === candidate.area &&
-          existing.group === candidate.group &&
-          (existing.subscriptionPlan ?? null) === (candidate.subscriptionPlan ?? null)
-        );
-      });
-
-      if (!duplicate) {
-        nextPayHistory = [...nextPayHistory, candidate];
-      }
-    }
-  }
+  const nextPayHistory = previousPayHistory;
 
   let result: Omit<Client, "id"> = {
     ...base,
