@@ -305,22 +305,7 @@ function normalizeGroupsInDB(db: DB): DB {
           },
           ...basePlacements.slice(1),
         ]
-      : [
-          {
-            id: `placement-${client.id}`,
-            area: client.area,
-            group: client.group,
-            payMethod: client.payMethod,
-            payStatus: client.payStatus,
-            status: client.status,
-            subscriptionPlan: client.subscriptionPlan,
-            payDate: client.payDate,
-            payAmount: client.payAmount,
-            payActual: client.payActual,
-            remainingLessons: client.remainingLessons,
-            frozenLessons: client.frozenLessons,
-          },
-        ];
+      : [];
 
     const normalizedPlacements = sourcePlacements.map((placement, index) => {
       const normalizedGroup = normalizeRequired(placement.group);
@@ -341,6 +326,13 @@ function normalizeGroupsInDB(db: DB): DB {
         ...(placement.frozenLessons != null ? { frozenLessons: placement.frozenLessons } : {}),
       };
     });
+
+    if (!normalizedPlacements.length) {
+      return {
+        ...client,
+        placements: [],
+      };
+    }
 
     const primary = normalizedPlacements[0];
 

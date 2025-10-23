@@ -167,19 +167,9 @@ export function transformClientFormValues(
 
     const normalizedComment = comment.trim();
 
-    const result: Omit<Client, "id"> = {
+    const result: Partial<Omit<Client, "id">> = {
       ...base,
-      area: editing.area,
-      group: editing.group,
-      payMethod: payMethod ?? editing.payMethod,
-      payStatus: editing.payStatus,
-      status: editing.status,
-      subscriptionPlan: editing.subscriptionPlan,
-      ...(editing.payDate ? { payDate: editing.payDate } : {}),
-      ...(editing.payAmount != null ? { payAmount: editing.payAmount } : {}),
-      ...(editing.payActual != null ? { payActual: editing.payActual } : {}),
-      ...(editing.remainingLessons != null ? { remainingLessons: editing.remainingLessons } : {}),
-      ...(editing.frozenLessons != null ? { frozenLessons: editing.frozenLessons } : {}),
+      ...(payMethod ? { payMethod } : {}),
       placements: [],
       ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
       ...(parentName.trim() ? { parentName: parentName.trim() } : {}),
@@ -188,13 +178,12 @@ export function transformClientFormValues(
       ...(telegram.trim() ? { telegram: telegram.trim() } : {}),
       ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
       ...(normalizedComment ? { comment: normalizedComment } : {}),
-      ...(editing.statusUpdatedAt ? { statusUpdatedAt: editing.statusUpdatedAt } : {}),
       ...(previousPayHistory.length ? { payHistory: previousPayHistory } : {}),
       birthDate: parseDateInput(data.birthDate),
       startDate: parseDateInput(data.startDate),
     };
 
-    return result;
+    return result as Omit<Client, "id">;
   }
 
   if (placements.length > MAX_PLACEMENTS) {
