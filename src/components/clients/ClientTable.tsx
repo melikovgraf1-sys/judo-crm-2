@@ -223,7 +223,7 @@ export default function ClientTable({
         return placementStatus ?? aggregateStatus;
       }
 
-      if (baseStatus === "задолженность" || baseStatus === "ожидание") {
+      if (baseStatus === "задолженность" || baseStatus === "ожидание" || baseStatus === "перенос") {
         return baseStatus;
       }
 
@@ -237,6 +237,9 @@ export default function ClientTable({
       const status = getDisplayPayStatus(client);
       if (status === "действует") {
         return "rounded-full bg-emerald-100 text-emerald-700";
+      }
+      if (status === "перенос") {
+        return "rounded-full bg-sky-100 text-sky-700";
       }
       if (status === "задолженность") {
         return "rounded-full bg-rose-100 text-rose-700";

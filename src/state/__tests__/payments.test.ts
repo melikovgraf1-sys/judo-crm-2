@@ -144,6 +144,27 @@ describe("derivePaymentStatus", () => {
     });
     expect(result.client).toBe("действует");
   });
+
+  it("marks placements with future payment facts as 'перенос'", () => {
+    const client: Client = {
+      ...baseClient,
+      payHistory: [
+        {
+          id: "fact-future",
+          paidAt: "2024-04-05T10:00:00.000Z",
+          area: "area-1",
+          group: "group-1",
+        },
+      ],
+    };
+
+    const result = derivePaymentStatus(client, [], []);
+
+    expect(result).toEqual({
+      client: "перенос",
+      placements: { "placement-1": "перенос" },
+    });
+  });
 });
 
 describe("applyPaymentStatusRules", () => {

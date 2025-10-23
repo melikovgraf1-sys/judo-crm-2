@@ -12,7 +12,7 @@ export const PAYMENT_METHODS = ["перевод", "наличные", "долл�
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const DEFAULT_PAYMENT_METHOD: PaymentMethod = "перевод";
 
-export type PaymentStatus = "ожидание" | "действует" | "задолженность";
+export type PaymentStatus = "ожидание" | "действует" | "перенос" | "задолженность";
 
 export type SubscriptionPlan = "monthly" | "weekly" | "half-month" | "discount" | "single";
 

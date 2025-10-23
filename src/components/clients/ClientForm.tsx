@@ -117,7 +117,7 @@ const placementSchema: yup.ObjectSchema<ClientPlacementFormValues> = yup.object(
     .required("Укажите способ оплаты"),
   payStatus: yup
     .mixed<ClientPlacementFormValues["payStatus"]>()
-    .oneOf(["ожидание", "действует", "задолженность"], "Укажите статус оплаты")
+    .oneOf(["ожидание", "действует", "перенос", "задолженность"], "Укажите статус оплаты")
     .required("Укажите статус оплаты"),
   status: yup
     .mixed<ClientPlacementFormValues["status"]>()
@@ -559,6 +559,7 @@ function PlacementFields({
           <select className={selectClass} {...register(`placements.${index}.payStatus` as const)}>
             <option value="ожидание">ожидание</option>
             <option value="действует">действует</option>
+            <option value="перенос">перенос</option>
             <option value="задолженность">задолженность</option>
           </select>
           {placementErrors?.payStatus && (

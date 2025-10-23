@@ -424,6 +424,9 @@ function getClientForecastAmount(
 
   const scopedPlacements = resolveScopePlacements(client, placements);
 
+  const hasDeferredStatus =
+    client.payStatus === "перенос" || scopedPlacements.some(placement => placement.payStatus === "перенос");
+
   const placementsMatchingPeriod = !period
     ? scopedPlacements
     : scopedPlacements.filter(placement => {
@@ -489,6 +492,10 @@ function getClientForecastAmount(
     } else if (!period) {
       expectedRevenue = getExpectedRevenueForPlacement();
     }
+  }
+
+  if (period && hasDeferredStatus) {
+    return actualFactsTotal;
   }
 
   if (period && actualFactsTotal > 0) {
