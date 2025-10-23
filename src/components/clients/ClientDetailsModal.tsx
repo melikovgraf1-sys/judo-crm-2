@@ -156,7 +156,9 @@ export default function ClientDetailsModal({
 
     const planHint = place.subscriptionPlan ?? client.subscriptionPlan ?? null;
     const referencePayDate =
-      getLatestFactDueDate(paymentFacts, place, planHint) ?? place.payDate ?? client.payDate;
+      getLatestFactDueDate(paymentFacts, place, planHint, normalizedSchedule) ??
+      place.payDate ??
+      client.payDate;
 
     if (manual != null) {
       effectiveRemainingLessons = manual;

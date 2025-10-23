@@ -794,7 +794,13 @@ export function useAppState(): AppState {
     }
 
     const nextTasks = [...newTasks, ...currentDB.tasks];
-    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive, updates);
+    const nextClients = applyPaymentStatusRules(
+      currentDB.clients,
+      nextTasks,
+      currentDB.tasksArchive,
+      updates,
+      currentDB.schedule,
+    );
     const next: DB = {
       ...currentDB,
       tasks: nextTasks,

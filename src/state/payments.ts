@@ -5,6 +5,7 @@ import type {
   Group,
   PaymentFact,
   PaymentStatus,
+  ScheduleSlot,
   SubscriptionPlan,
   TaskItem,
 } from "../types";
@@ -467,6 +468,7 @@ export function derivePaymentStatus(
   client: Client,
   tasks: TaskItem[],
   archivedTasks: TaskItem[] = [],
+  schedule: ScheduleSlot[] = [],
 ): DerivedPaymentStatuses {
   const placements = getClientPlacements(client);
   const period = getCurrentPeriod();
@@ -507,7 +509,9 @@ export function derivePaymentStatus(
         const latestFact = getLatestPaymentFact(history, placement);
         const planHint = placement.subscriptionPlan ?? client.subscriptionPlan ?? null;
         const comparable = getPaymentFactComparableDate(latestFact);
-        const dueISO = latestFact ? getPaymentFactDueDate(latestFact, { plan: planHint }) : null;
+        const dueISO = latestFact
+          ? getPaymentFactDueDate(latestFact, { plan: planHint, placement, schedule })
+          : null;
         const hasDeferredFact = Boolean(
           latestFact && (isAfterPeriod(comparable, period) || isAfterPeriod(dueISO, period)),
         );
@@ -542,6 +546,7 @@ export function applyPaymentStatusRules(
   tasks: TaskItem[],
   archivedTasks: TaskItem[] = [],
   updates: Partial<Record<string, Partial<Client>>> = {},
+  schedule: ScheduleSlot[] = [],
 ): Client[] {
   return clients.map(client => {
     const patch = updates[client.id];
@@ -550,6 +555,7 @@ export function applyPaymentStatusRules(
       base,
       tasks,
       archivedTasks,
+      schedule,
     );
     const shouldUpdateStatus = base.payStatus !== nextStatus;
     let updatedPlacements = base.placements;
