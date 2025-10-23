@@ -17,16 +17,6 @@ jest.mock('../../state/utils', () => ({
   fmtMoney: (v: number) => String(v),
   calcAgeYears: () => 0,
   calcExperience: () => 0,
-  isReserveArea: () => false,
-  ensureReserveAreaIncluded: (areas: string[]) => areas,
-  RESERVE_AREA_NAME: 'резерв',
-}));
-
-jest.mock('../../state/reserve', () => ({
-  __esModule: true,
-  isReserveArea: () => false,
-  ensureReserveAreaIncluded: (areas: string[]) => areas,
-  RESERVE_AREA_NAME: 'резерв',
 }));
 
 jest.mock('../VirtualizedTable', () => (props) => <table>{props.children}</table>);

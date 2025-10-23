@@ -6,7 +6,7 @@ import {
   getSubscriptionPlanCadenceMultiplier,
 } from "./payments";
 import { normalizePaymentFacts } from "./paymentFacts";
-import { convertMoney, isReserveArea } from "./utils";
+import { convertMoney } from "./utils";
 import { isAttendanceInPeriod, isClientActiveInPeriod, matchesPeriod, type PeriodFilter } from "./period";
 import type {
   Area,
@@ -339,8 +339,7 @@ function collectActiveAreas(db: DB): Area[] {
       result.push(area);
     }
   }
-  const areas = result.length ? result : [...db.settings.areas];
-  return areas.filter(area => !isReserveArea(area));
+  return result.length ? result : [...db.settings.areas];
 }
 
 function groupsForArea(db: DB, area: Area): string[] {
@@ -687,17 +686,14 @@ export function computeAnalyticsSnapshot(
   group?: Group | null,
 ): AnalyticsSnapshot {
   const activeAreas = collectActiveAreas(db);
-  const isReserveScope = area !== "all" && isReserveArea(area);
   const relevantAreas =
     area === "all"
-      ? activeAreas.filter(activeArea => !isReserveArea(activeArea))
-      : isReserveScope
-        ? []
-        : activeAreas.includes(area)
-          ? [area]
-          : [];
-  if (!relevantAreas.length && area !== "all" && !isReserveScope) {
-    relevantAreas.push(area);
+      ? [...activeAreas]
+      : activeAreas.includes(area)
+        ? [area]
+        : [];
+  if (!relevantAreas.length && area !== "all") {
+    relevantAreas.push(area as Area);
   }
 
   const relevantAreaSet = new Set(relevantAreas);
@@ -713,9 +709,7 @@ export function computeAnalyticsSnapshot(
     const matchesArea =
       area === "all"
         ? scopedPlacements.some(placement => relevantAreaSet.has(placement.area))
-        : isReserveScope
-          ? false
-          : scopedPlacements.some(placement => placement.area === area);
+        : scopedPlacements.some(placement => placement.area === area);
     if (!matchesArea) {
       return false;
     }
