@@ -358,7 +358,7 @@ describe("ClientDetailsModal payment fact updates", () => {
     const viewer = within(viewerDialog as HTMLElement);
     const remainingLabel = viewer.getByText("Остаток занятий");
     const remainingRow = remainingLabel.closest("div");
-    expect(remainingRow?.querySelectorAll("span")[1]).toHaveTextContent("4");
+    expect(remainingRow?.querySelectorAll("span")[1]).toHaveTextContent("35");
 
     await userEvent.click(viewer.getByRole("button", { name: "Редактировать" }));
 
