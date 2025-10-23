@@ -580,33 +580,22 @@ test('update: editing payment status hides payment fact fields', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
 
   const modal = screen.getByText('Редактирование клиента').parentElement;
-  const planSelect = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
-  const payDateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement;
-  const factInput = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
-  const payAmountInput = within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
+  const planSelect = within(modal)
+    .getByText('Форма абонемента')
+    .parentElement.querySelector('select') as HTMLSelectElement;
+  const expectedAmount = within(modal)
+    .getByText('Ожидаемая сумма, €')
+    .nextElementSibling as HTMLElement;
 
   expect(planSelect).toBeDisabled();
-  expect(payDateInput).toBeDisabled();
-  expect(factInput).toBeDisabled();
-  expect(payAmountInput).toBeDisabled();
+  expect(expectedAmount).toHaveTextContent('55');
   expect(within(modal).getByText(/Укажите статус оплаты «действует»/)).toBeInTheDocument();
 
   const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select') as HTMLSelectElement;
 
   await userEvent.selectOptions(payStatusSelect, 'действует');
   await waitFor(() => expect(within(modal).queryByText(/Укажите статус оплаты «действует»/)).not.toBeInTheDocument());
-  await waitFor(() => {
-    const select = within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement;
-    expect(select).not.toBeDisabled();
-  });
-  await waitFor(() => {
-    const dateInput = within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement;
-    expect(dateInput).not.toBeDisabled();
-  });
-  await waitFor(() => {
-    const factField = within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement;
-    expect(factField).not.toBeDisabled();
-  });
+  await waitFor(() => expect(planSelect).not.toBeDisabled());
 
   const save = within(modal).getByRole('button', { name: 'Сохранить' });
   await waitFor(() => expect(save).toBeEnabled());
@@ -961,10 +950,10 @@ test('standard group exposes all plans and default expected amount', async () =>
   const planValues = Array.from(planSelect.options).map(option => option.value);
   expect(planValues).toEqual(['monthly', 'weekly', 'half-month', 'discount', 'single']);
 
-  const payAmountInput = within(modal!)
-    .getByText('Сумма оплаты, €')
-    .parentElement!.querySelector('input') as HTMLInputElement;
-  expect(payAmountInput.value).toBe('55');
+  const expectedAmount = within(modal!)
+    .getByText('Ожидаемая сумма, €')
+    .nextElementSibling as HTMLElement;
+  expect(expectedAmount).toHaveTextContent('55');
 });
 
 test('adult group restricts plans and seeds expected amount', async () => {
@@ -985,10 +974,10 @@ test('adult group restricts plans and seeds expected amount', async () => {
   const planValues = Array.from(planSelect.options).map(option => option.value);
   expect(planValues).toEqual(['monthly', 'discount', 'single']);
 
-  const payAmountInput = within(modal!)
-    .getByText('Сумма оплаты, €')
-    .parentElement!.querySelector('input') as HTMLInputElement;
-  expect(payAmountInput.value).toBe('55');
+  const expectedAmount = within(modal!)
+    .getByText('Ожидаемая сумма, €')
+    .nextElementSibling as HTMLElement;
+  expect(expectedAmount).toHaveTextContent('55');
 });
 
 test('focus group applies override and allowed plans', async () => {
@@ -1008,10 +997,10 @@ test('focus group applies override and allowed plans', async () => {
   const planValues = Array.from(planSelect.options).map(option => option.value);
   expect(planValues).toEqual(['weekly', 'single']);
 
-  const payAmountInput = within(modal!)
-    .getByText('Сумма оплаты, €')
-    .parentElement!.querySelector('input') as HTMLInputElement;
-  await waitFor(() => expect(payAmountInput.value).toBe('25'));
+  const expectedAmount = within(modal!)
+    .getByText('Ожидаемая сумма, €')
+    .nextElementSibling as HTMLElement;
+  await waitFor(() => expect(expectedAmount).toHaveTextContent('25'));
 });
 
 test('individual group allows custom payment amount', async () => {
@@ -1030,10 +1019,10 @@ test('individual group allows custom payment amount', async () => {
   const planValues = Array.from(planSelect.options).map(option => option.value);
   expect(planValues).toEqual(['monthly', 'single']);
 
-  const payAmountInput = within(modal)
-    .getByText('Сумма оплаты, €')
-    .parentElement.querySelector('input') as HTMLInputElement;
-  expect(payAmountInput.value).toBe('130');
+  const expectedAmount = within(modal)
+    .getByText('Ожидаемая сумма, €')
+    .nextElementSibling as HTMLElement;
+  expect(expectedAmount).toHaveTextContent('130');
 
   const firstName = within(modal).getByText('Имя').parentElement.querySelector('input');
   const phone = within(modal).getByText('Телефон').parentElement.querySelector('input');
@@ -1042,15 +1031,7 @@ test('individual group allows custom payment amount', async () => {
   expect(
     within(modal).getByText('Форма абонемента').parentElement.querySelector('select') as HTMLSelectElement,
   ).toBeDisabled();
-  expect(
-    within(modal).getByText('Сумма оплаты, €').parentElement.querySelector('input') as HTMLInputElement,
-  ).toBeDisabled();
-  expect(
-    within(modal).getByText('Факт оплаты, €').parentElement.querySelector('input') as HTMLInputElement,
-  ).toBeDisabled();
-  expect(
-    within(modal).getByText('Дата оплаты').parentElement.querySelector('input') as HTMLInputElement,
-  ).toBeDisabled();
+  expect(within(modal).getByText(/Укажите статус оплаты «действует»/)).toBeInTheDocument();
 
   await userEvent.type(firstName, 'Люба');
   await userEvent.type(phone, '999');
