@@ -79,16 +79,47 @@ export default function ClientPaymentFactViewer({
     return Number.isFinite(value) ? value : null;
   };
 
+  const placementForLessons =
+    matchingPlacement ??
+    (() => {
+      const area = fact.area ?? null;
+      const group = fact.group ?? null;
+
+      const matchesFactPlacement =
+        area != null || group != null
+          ? placements.find(place => {
+              if (getFiniteNumber(place.effectiveRemainingLessons) == null) {
+                return false;
+              }
+              if (area != null && place.area !== area) {
+                return false;
+              }
+              if (group != null && place.group !== group) {
+                return false;
+              }
+              return true;
+            }) ?? null
+          : null;
+
+      if (matchesFactPlacement) {
+        return matchesFactPlacement;
+      }
+
+      return (
+        placements.find(place => getFiniteNumber(place.effectiveRemainingLessons) != null) ?? null
+      );
+    })();
+
   const factRemainingLessons = getFiniteNumber(fact.remainingLessons);
   const remainingLessons =
     factRemainingLessons ??
-    getFiniteNumber(matchingPlacement?.effectiveRemainingLessons) ??
-    getFiniteNumber(matchingPlacement?.remainingLessons) ??
+    getFiniteNumber(placementForLessons?.effectiveRemainingLessons) ??
+    getFiniteNumber(placementForLessons?.remainingLessons) ??
     getFiniteNumber(defaultRemainingLessons);
   const factFrozenLessons = getFiniteNumber(fact.frozenLessons);
   const frozenLessons =
     factFrozenLessons ??
-    getFiniteNumber(matchingPlacement?.frozenLessons) ??
+    getFiniteNumber(placementForLessons?.frozenLessons) ??
     getFiniteNumber(defaultFrozenLessons);
 
   return (
