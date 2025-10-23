@@ -25,17 +25,6 @@ jest.mock('../../state/utils', () => ({
   calcAgeYears: jest.fn(),
   calcExperience: jest.fn(),
   calcExperienceMonths: jest.fn(),
-  isReserveArea: jest.fn(() => false),
-  ensureReserveAreaIncluded: jest.fn(v => v),
-  RESERVE_AREA_NAME: 'резерв',
-
-}));
-
-jest.mock('../../state/reserve', () => ({
-  __esModule: true,
-  isReserveArea: jest.fn(() => false),
-  ensureReserveAreaIncluded: jest.fn(v => v),
-  RESERVE_AREA_NAME: 'резерв',
 }));
 
 import ClientsTab from '../ClientsTab';

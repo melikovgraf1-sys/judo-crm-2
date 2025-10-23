@@ -28,7 +28,6 @@ jest.mock('../../firebase', () => ({
 
 import { commitDBUpdate, DB_CONFLICT_EVENT, LS_KEYS, LOCAL_ONLY_MESSAGE, useAppState } from '../appState';
 import type { TaskItem } from '../../types';
-import { RESERVE_AREA_NAME } from '../reserve';
 import * as seedModule from '../seed';
 
 const { makeSeedDB } = seedModule;
@@ -88,17 +87,6 @@ describe('useAppState with local persistence', () => {
     expect(loginResult).toEqual({ ok: true });
     expect(result.current.currentUser).not.toBeNull();
     expect(result.current.currentUser?.login).toBe('admin1');
-  });
-
-  it('ensures the reserve area is available even if missing from stored settings', async () => {
-    const legacy = seedModule.makeSeedDB();
-    legacy.settings.areas = legacy.settings.areas.filter(area => area !== RESERVE_AREA_NAME);
-    localStorage.setItem(LS_KEYS.db, JSON.stringify(legacy));
-
-    const { result } = renderHook(() => useAppState());
-    await act(async () => {});
-
-    expect(result.current.db.settings.areas).toContain(RESERVE_AREA_NAME);
   });
 
   it('normalizes legacy group names in stored data', async () => {
