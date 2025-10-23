@@ -28,7 +28,7 @@ const isoWeekday = (date: Date): number => {
 };
 
 export function estimateGroupRemainingLessons(
-  client: Pick<Client, "area" | "group" | "payDate" | "payHistory">,
+  client: Pick<Client, "area" | "group" | "payDate" | "payHistory" | "subscriptionPlan">,
   schedule: ScheduleSlot[],
   today: Date = new Date(),
 ): number | null {
