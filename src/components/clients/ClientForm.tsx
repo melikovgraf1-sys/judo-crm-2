@@ -422,7 +422,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
           )}
         </div>
 
-        {fields.length > 0 && (
+        {fields.length > 0 && !editing && (
           <PrimaryPaymentFields
             index={0}
             db={db}
