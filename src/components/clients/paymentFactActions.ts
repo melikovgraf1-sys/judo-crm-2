@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { commitDBUpdate } from "../../state/appState";
-import { getLatestFactPaidAt } from "../../state/paymentFacts";
+import { getLatestFactDueDate } from "../../state/paymentFacts";
 import { todayISO, uid } from "../../state/utils";
 import type { Client, ClientPlacement, DB, PaymentFact } from "../../types";
 
@@ -38,13 +38,14 @@ export async function commitClientPaymentFactsChange({
 
     if (existingPlacements.length) {
       const updatedPlacements = existingPlacements.map<ClientPlacement>(placement => {
-        const latestPaidAt = getLatestFactPaidAt(nextFacts, placement);
+        const planHint = placement.subscriptionPlan ?? target.subscriptionPlan ?? null;
+        const latestDueDate = getLatestFactDueDate(nextFacts, placement, planHint);
 
-        if (latestPaidAt) {
-          if (placement.payDate === latestPaidAt) {
+        if (latestDueDate) {
+          if (placement.payDate === latestDueDate) {
             return placement;
           }
-          return { ...placement, payDate: latestPaidAt };
+          return { ...placement, payDate: latestDueDate };
         }
 
         if (placement.payDate) {
@@ -64,20 +65,21 @@ export async function commitClientPaymentFactsChange({
       }
 
       const primaryPlacement = updatedPlacements[0] ?? null;
-      const latestPrimaryPaidAt = getLatestFactPaidAt(nextFacts, primaryPlacement);
+      const primaryPlan = primaryPlacement?.subscriptionPlan ?? target.subscriptionPlan ?? null;
+      const latestPrimaryDueDate = getLatestFactDueDate(nextFacts, primaryPlacement, primaryPlan);
 
-      if (latestPrimaryPaidAt) {
-        base.payDate = latestPrimaryPaidAt;
+      if (latestPrimaryDueDate) {
+        base.payDate = latestPrimaryDueDate;
       } else if (primaryPlacement?.payDate) {
         base.payDate = primaryPlacement.payDate;
       } else if (base.payDate) {
         delete base.payDate;
       }
     } else {
-      const latestClientPaidAt = getLatestFactPaidAt(nextFacts, {
+      const latestClientPaidAt = getLatestFactDueDate(nextFacts, {
         area: target.area,
         group: target.group,
-      });
+      }, target.subscriptionPlan ?? null);
 
       if (latestClientPaidAt) {
         base.payDate = latestClientPaidAt;
