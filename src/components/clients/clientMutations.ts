@@ -214,24 +214,5 @@ export function transformClientFormValues(
     startDate: parseDateInput(data.startDate),
   };
 
-  if (result.payStatus === "действует") {
-    const candidate = {
-      ...(editing ?? {}),
-      ...result,
-      id: editing?.id ?? "preview-client",
-      payHistory: nextPayHistory,
-      placements: result.placements,
-    } as Client;
-    const { expected, actual } = getClientPaymentTotalsForPeriod(candidate);
-    if (expected > 0 && actual + PAYMENT_SHORTFALL_TOLERANCE < expected) {
-      const adjustedPlacements = result.placements.map(placement =>
-        placement.payStatus === "действует"
-          ? { ...placement, payStatus: "задолженность" as const }
-          : placement,
-      );
-      result = { ...result, payStatus: "задолженность", placements: adjustedPlacements };
-    }
-  }
-
   return result;
 }
