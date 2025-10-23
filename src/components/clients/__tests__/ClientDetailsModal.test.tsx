@@ -145,6 +145,31 @@ describe("ClientDetailsModal placements", () => {
     expect(secondStatusValue).toHaveTextContent("ожидание");
   });
 
+  it("shows a placeholder when the client has no placements", () => {
+    const clientWithoutPlacements: Client = {
+      ...baseClient,
+      placements: [],
+    };
+
+    render(
+      <ClientDetailsModal
+        client={clientWithoutPlacements}
+        currency="EUR"
+        currencyRates={currencyRates}
+        schedule={schedule}
+        attendance={attendance}
+        performance={performance}
+        billingPeriod={{ year: 2024, month: 3 }}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(
+      screen.getByText("Нет закреплённых тренировочных мест"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("client-placement-card")).not.toBeInTheDocument();
+  });
+
   it("shows payment fact details for editing", async () => {
     render(
       <ClientDetailsModal

@@ -414,6 +414,27 @@ describe("transformClientFormValues", () => {
     expect(result).not.toHaveProperty("payHistory");
   });
 
+  it("allows clearing placements when editing a client", () => {
+    const editing: Client = {
+      id: "client-no-placements",
+      ...transformClientFormValues(baseFormValues),
+    };
+
+    const formValues: ClientFormValues = {
+      ...baseFormValues,
+      placements: [],
+      comment: "",
+    };
+
+    const result = transformClientFormValues(formValues, editing);
+
+    expect(result.placements).toEqual([]);
+    expect(result.area).toBe(editing.area);
+    expect(result.group).toBe(editing.group);
+    expect(result.payStatus).toBe(editing.payStatus);
+    expect(result.status).toBe(editing.status);
+  });
+
   it("does not create a payment fact when payment details are edited manually", () => {
     const existingFact = createPaymentFact({
       id: "fact-1",

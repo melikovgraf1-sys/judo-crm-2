@@ -157,15 +157,49 @@ export function transformClientFormValues(
     ...base
   } = data;
 
+  const previousPlacements = editing?.placements ?? [];
+  const previousPayHistory = normalizePaymentFacts(editing?.payHistory);
+
   if (!placements.length) {
-    throw new Error("Укажите хотя бы одно тренировочное место");
+    if (!editing) {
+      throw new Error("Укажите хотя бы одно тренировочное место");
+    }
+
+    const normalizedComment = comment.trim();
+
+    const result: Omit<Client, "id"> = {
+      ...base,
+      area: editing.area,
+      group: editing.group,
+      payMethod: payMethod ?? editing.payMethod,
+      payStatus: editing.payStatus,
+      status: editing.status,
+      subscriptionPlan: editing.subscriptionPlan,
+      ...(editing.payDate ? { payDate: editing.payDate } : {}),
+      ...(editing.payAmount != null ? { payAmount: editing.payAmount } : {}),
+      ...(editing.payActual != null ? { payActual: editing.payActual } : {}),
+      ...(editing.remainingLessons != null ? { remainingLessons: editing.remainingLessons } : {}),
+      ...(editing.frozenLessons != null ? { frozenLessons: editing.frozenLessons } : {}),
+      placements: [],
+      ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
+      ...(parentName.trim() ? { parentName: parentName.trim() } : {}),
+      ...(phone.trim() ? { phone: phone.trim() } : {}),
+      ...(whatsApp.trim() ? { whatsApp: whatsApp.trim() } : {}),
+      ...(telegram.trim() ? { telegram: telegram.trim() } : {}),
+      ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
+      ...(normalizedComment ? { comment: normalizedComment } : {}),
+      ...(editing.statusUpdatedAt ? { statusUpdatedAt: editing.statusUpdatedAt } : {}),
+      ...(previousPayHistory.length ? { payHistory: previousPayHistory } : {}),
+      birthDate: parseDateInput(data.birthDate),
+      startDate: parseDateInput(data.startDate),
+    };
+
+    return result;
   }
 
   if (placements.length > MAX_PLACEMENTS) {
     throw new Error(`Допускается не более ${MAX_PLACEMENTS} тренировочных мест`);
   }
-
-  const previousPlacements = editing?.placements ?? [];
 
   const normalizedPlacements = placements.map((placement, index) =>
     normalizePlacement(
@@ -184,7 +218,6 @@ export function transformClientFormValues(
   const statusUpdatedAt = statusChanged ? todayISO() : editing?.statusUpdatedAt;
   const normalizedComment = comment.trim();
 
-  const previousPayHistory = normalizePaymentFacts(editing?.payHistory);
   const nextPayHistory = previousPayHistory;
 
   let result: Omit<Client, "id"> = {

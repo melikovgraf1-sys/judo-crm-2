@@ -172,16 +172,22 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         .string()
         .required("Дата начала обязательна")
         .matches(/\d{4}-\d{2}-\d{2}/, "Неверный формат даты"),
-      placements: yup
-        .array()
-        .of(placementSchema)
-        .min(1, "Добавьте хотя бы одно тренировочное место")
-        .max(MAX_PLACEMENTS, `Не более ${MAX_PLACEMENTS} тренировочных мест`)
-        .test("area-limit", "Можно выбрать максимум 3 района", placements => {
-          if (!placements) return false;
-          const unique = new Set(placements.map(p => p?.area).filter(Boolean));
-          return unique.size <= MAX_AREAS;
-        }),
+    placements: yup
+      .array()
+      .of(placementSchema)
+      .default([])
+      .max(MAX_PLACEMENTS, `Не более ${MAX_PLACEMENTS} тренировочных мест`)
+      .test("area-limit", "Можно выбрать максимум 3 района", placements => {
+        if (!placements || placements.length === 0) {
+          return true;
+        }
+        const unique = new Set(
+          placements
+            .map(p => p?.area)
+            .filter((area): area is Area => Boolean(area)),
+        );
+        return unique.size <= MAX_AREAS;
+      }),
     })
     .test("contact-required", "Укажите хотя бы один контакт", value => {
       if (!value) return false;
@@ -208,7 +214,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
 
   useEffect(() => {
     if (editing) {
-      const placements = (editing.placements && editing.placements.length
+      const placementsSource = Array.isArray(editing.placements)
         ? editing.placements
         : [
             {
@@ -225,7 +231,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
               remainingLessons: editing.remainingLessons != null ? String(editing.remainingLessons) : "",
               frozenLessons: editing.frozenLessons != null ? String(editing.frozenLessons) : "",
             },
-        ]).map(item => ({
+        ];
+
+      const placements = placementsSource.map(item => ({
         ...item,
         payMethod: item.payMethod ?? editing.payMethod,
         payDate: item.payDate?.slice(0, 10) ?? "",
@@ -263,6 +271,9 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
   }) as PaymentMethod | undefined;
 
   useEffect(() => {
+    if (fields.length === 0) {
+      return;
+    }
     if (!primaryPayMethod && formPayMethod) {
       setValue("placements.0.payMethod", formPayMethod, {
         shouldDirty: false,
@@ -270,7 +281,7 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
         shouldValidate: false,
       });
     }
-  }, [formPayMethod, primaryPayMethod, setValue]);
+  }, [fields.length, formPayMethod, primaryPayMethod, setValue]);
 
   useEffect(() => {
     if (primaryPayMethod && primaryPayMethod !== formPayMethod) {
@@ -396,21 +407,24 @@ export default function ClientForm({ db, editing, onSave, onClose }: Props) {
             </button>
           </div>
 
-          {fields.map((field, index) => (
-            <PlacementFields
-              key={field.id}
-              index={index}
-              db={db}
-              control={control}
-              register={register}
-              setValue={setValue}
-              errors={errors.placements}
-              areaOptions={db.settings.areas}
-              groupsByArea={groupsByArea}
-              onRemove={fields.length > 1 ? () => remove(index) : undefined}
-              isPrimary={index === 0}
-            />
-          ))}
+          {fields.map((field, index) => {
+            const canRemovePlacement = editing != null || fields.length > 1;
+            return (
+              <PlacementFields
+                key={field.id}
+                index={index}
+                db={db}
+                control={control}
+                register={register}
+                setValue={setValue}
+                errors={errors.placements}
+                areaOptions={db.settings.areas}
+                groupsByArea={groupsByArea}
+                onRemove={canRemovePlacement ? () => remove(index) : undefined}
+                isPrimary={index === 0}
+              />
+            );
+          })}
 
           {areaLimitExceeded && (
             <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500 dark:bg-amber-900/30 dark:text-amber-100">
@@ -494,15 +508,14 @@ function PlacementFields({
         <div className="text-sm font-semibold text-slate-700 dark:text-slate-100">
           {isPrimary ? "Основное место" : "Дополнительное место"}
         </div>
-        {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-xs text-rose-600 hover:text-rose-700"
-          >
-            Удалить
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-xs text-rose-600 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!onRemove}
+        >
+          Удалить
+        </button>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
