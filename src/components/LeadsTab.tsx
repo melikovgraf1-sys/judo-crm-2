@@ -9,6 +9,7 @@ import Modal from "./Modal";
 import { FixedSizeList, ListChildComponentProps } from "react-window";
 import { todayISO, uid, fmtDate } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
+import { buildGroupsByArea } from "../state/lessons";
 import {
   DEFAULT_SUBSCRIPTION_PLAN,
   SUBSCRIPTION_PLANS,
@@ -29,8 +30,34 @@ import type {
   LeadLifecycleEvent,
   LeadLifecycleOutcome,
   SubscriptionPlan,
+  Area,
+  Group,
 } from "../types";
 import { DEFAULT_PAYMENT_METHOD } from "../types";
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1 rounded-full border text-xs ${
+        active
+          ? "bg-sky-600 text-white border-sky-600"
+          : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function LeadsTab({
   db,
@@ -42,11 +69,39 @@ export default function LeadsTab({
   const stages: LeadStage[] = ["Очередь", "Задержка", "Пробное", "Ожидание оплаты"];
   const [open, setOpen] = useState<Lead | null>(null);
   const [editing, setEditing] = useState<Lead | null>(null);
-  const groupedLeads = useMemo((): Record<LeadStage, Lead[]> =>
-    db.leads.reduce((acc, l) => {
+  const [selectedArea, setSelectedArea] = useState<Area | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const groupsByArea = useMemo(() => buildGroupsByArea(db.schedule), [db.schedule]);
+  const availableGroups = useMemo(() => {
+    if (!selectedArea) return [];
+    return groupsByArea.get(selectedArea) ?? [];
+  }, [groupsByArea, selectedArea]);
+  useEffect(() => {
+    if (!selectedArea) {
+      if (selectedGroup !== null) {
+        setSelectedGroup(null);
+      }
+      return;
+    }
+    if (selectedGroup && !availableGroups.includes(selectedGroup)) {
+      setSelectedGroup(null);
+    }
+  }, [availableGroups, selectedArea, selectedGroup]);
+  const groupedLeads = useMemo((): Record<LeadStage, Lead[]> => {
+    const filtered = db.leads.filter(lead => {
+      if (selectedArea && lead.area !== selectedArea) {
+        return false;
+      }
+      if (selectedGroup && lead.group !== selectedGroup) {
+        return false;
+      }
+      return true;
+    });
+    return filtered.reduce((acc, l) => {
       if (acc[l.stage]) acc[l.stage].push(l); else acc[l.stage] = [l];
       return acc;
-    }, {} as Record<LeadStage, Lead[]>), [db.leads]);
+    }, {} as Record<LeadStage, Lead[]>);
+  }, [db.leads, selectedArea, selectedGroup]);
   const move = async (id: string, dir: 1 | -1) => {
     const current = db.leads.find(x => x.id === id);
     if (!current) return;
@@ -165,6 +220,47 @@ export default function LeadsTab({
   return (
     <div className="space-y-3">
       <Breadcrumbs items={["Лиды"]} />
+      <div className="flex flex-wrap gap-2 items-center">
+        <Chip
+          active={selectedArea === null && selectedGroup === null}
+          onClick={() => {
+            setSelectedArea(null);
+            setSelectedGroup(null);
+          }}
+        >
+          Сбросить фильтры
+        </Chip>
+        {db.settings.areas.map(area => (
+          <Chip
+            key={area}
+            active={selectedArea === area}
+            onClick={() => {
+              setSelectedArea(area);
+              setSelectedGroup(null);
+            }}
+          >
+            {area}
+          </Chip>
+        ))}
+        <div className="flex-1" />
+        <select
+          className="px-2 py-2 rounded-md border border-slate-300 text-sm bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
+          value={selectedGroup ?? ""}
+          onChange={event => {
+            const value = event.target.value;
+            setSelectedGroup(value ? (value as Group) : null);
+          }}
+          disabled={!selectedArea || availableGroups.length === 0}
+          aria-label="Фильтр по группе"
+        >
+          <option value="">Все группы</option>
+          {availableGroups.map(group => (
+            <option key={group} value={group}>
+              {group}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {stages.map(s => {
 
