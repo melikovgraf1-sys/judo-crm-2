@@ -10,7 +10,6 @@ import { fmtDate, todayISO, uid } from "../state/utils";
 import { commitDBUpdate } from "../state/appState";
 import { buildGroupsByArea } from "../state/lessons";
 import { transformClientFormValues } from "./clients/clientMutations";
-import { isReserveArea } from "../state/areas";
 import { getClientPlacements } from "../state/clients";
 import type {
   Area,
@@ -98,9 +97,6 @@ export default function PerformanceTab({
     if (!area || group || !availableGroups.length) {
       return;
     }
-    if (isReserveArea(area)) {
-      return;
-    }
     setGroup(availableGroups[0] ?? null);
   }, [area, availableGroups, group]);
 
@@ -130,8 +126,7 @@ export default function PerformanceTab({
         placement =>
           placement.area === area &&
           placement.group === group &&
-          placement.status !== "отмена" &&
-          !isReserveArea(placement.area),
+          placement.status !== "отмена",
       );
     });
   }, [area, group, db.clients]);

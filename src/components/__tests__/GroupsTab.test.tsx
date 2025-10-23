@@ -32,17 +32,6 @@ jest.mock('../../state/utils', () => ({
   fmtDate: jest.fn(),
   calcAgeYears: jest.fn(),
   calcExperience: jest.fn(),
-  isReserveArea: jest.fn(() => false),
-  ensureReserveAreaIncluded: jest.fn(v => v),
-  RESERVE_AREA_NAME: 'резерв',
-
-}));
-
-jest.mock('../../state/reserve', () => ({
-  __esModule: true,
-  isReserveArea: jest.fn(() => false),
-  ensureReserveAreaIncluded: jest.fn(v => v),
-  RESERVE_AREA_NAME: 'резерв',
 }));
 
 import GroupsTab from '../GroupsTab';
@@ -56,7 +45,6 @@ import {
   calcAgeYears,
   calcExperience,
 } from '../../state/utils';
-import { isReserveArea } from '../../state/reserve';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -72,7 +60,6 @@ beforeEach(() => {
   fmtDate.mockImplementation((iso) => iso);
   calcAgeYears.mockReturnValue(10);
   calcExperience.mockReturnValue('1 год');
-  isReserveArea.mockImplementation(area => area?.trim().toLowerCase() === 'резерв');
   global.confirm = jest.fn(() => true);
   window.alert = jest.fn();
 });
@@ -500,22 +487,6 @@ test('clients with multiple placements appear in each matching group', async () 
   await waitFor(() => expect(screen.getByText('МультиГруппа')).toBeInTheDocument());
 });
 
-test('hides clients assigned to reserve area', () => {
-  const db = makeDB();
-  db.settings.areas = [...db.settings.areas, 'резерв'];
-  db.settings.groups = [...db.settings.groups, 'ReserveGroup'];
-  db.schedule.push({ id: 'slot-res', area: 'резерв', group: 'ReserveGroup', coachId: 's1', weekday: 4, time: '15:00', location: '' });
-  db.clients = [
-    makeClient({ id: 'regular', firstName: 'Обычный', area: 'Area1', group: 'Group1' }),
-    makeClient({ id: 'reserve', firstName: 'Резерв', area: 'резерв', group: 'ReserveGroup' }),
-  ];
-
-  renderGroups(db, makeUI(), { initialArea: 'резерв', initialGroup: 'ReserveGroup' });
-
-  expect(screen.queryByText('Резерв')).not.toBeInTheDocument();
-  expect(screen.getByText('Найдено: 0')).toBeInTheDocument();
-});
-
 test('update: edits client name', async () => {
   const db = makeDB();
   db.clients = [
@@ -661,22 +632,6 @@ test('delete: removes payment task after confirmation', async () => {
   await waitFor(() => expect(getDB().tasks).toHaveLength(0));
   expect(getDB().tasksArchive[0]).toMatchObject({ id: 'task-1' });
   await waitFor(() => expect(within(row.closest('tr')).queryByRole('button', { name: 'Удалить задачу' })).not.toBeInTheDocument());
-});
-
-test('reserve: moves client to reserve area', async () => {
-  const db = makeDB();
-  db.clients = [makeClient({ id: 'c1', firstName: 'Reserve' })];
-
-  const { getDB } = renderGroups(db, makeUI(), { initialArea: 'Area1', initialGroup: 'Group1' });
-  const row = await screen.findByText('Reserve');
-  const reserveBtn = within(row.closest('tr')).getByRole('button', { name: 'Резерв' });
-
-  await userEvent.click(reserveBtn);
-
-  expect(global.confirm).toHaveBeenCalled();
-  await waitFor(() => expect(screen.queryByText('Reserve')).not.toBeInTheDocument());
-  const updated = getDB().clients.find(c => c.id === 'c1');
-  expect(updated?.area).toBe('резерв');
 });
 
 test('creates payment task with client info', async () => {

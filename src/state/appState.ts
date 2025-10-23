@@ -9,7 +9,6 @@ import { makeSeedDB } from "./seed";
 import { fmtMoney, todayISO, uid } from "./utils";
 import { applyPaymentStatusRules, DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
 import { getClientPlacements } from "./clients";
-import { ensureReserveAreaIncluded } from "./areas";
 import type {
   AttendanceEntry,
   Area,
@@ -186,16 +185,14 @@ function normalizeSettings(value: unknown): Settings {
   if (!value || typeof value !== "object") {
     return {
       ...DEFAULT_SETTINGS,
-      areas: ensureReserveAreaIncluded(DEFAULT_SETTINGS.areas) as Settings["areas"],
+      areas: DEFAULT_SETTINGS.areas,
     };
   }
 
   const raw = value as Partial<Settings>;
   const areas = ensureArray<string>(raw.areas);
   const groups = ensureArray<string>(raw.groups);
-  const normalizedAreas = ensureReserveAreaIncluded(
-    areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
-  ) as Settings["areas"];
+  const normalizedAreas = (areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas).slice();
 
   const normalizedGroups = normalizeGroupList(
     groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,

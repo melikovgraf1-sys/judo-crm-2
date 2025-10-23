@@ -583,22 +583,28 @@ export default function ClientDetailsModal({
                 Тренировочные места
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {placementsWithDetails.map(place => (
-                  <div
-                    key={`${place.id}-${place.area}-${place.group}`}
-                    data-testid="client-placement-card"
-                    className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <dl className="grid gap-1 text-slate-600 dark:text-slate-300">
-                      <ClientPlacementInfoCell label="Район" value={place.area || "—"} />
-                      <ClientPlacementInfoCell label="Группа" value={place.group || "—"} />
-                      <ClientPlacementInfoCell
-                        label="Статус оплаты"
-                        value={place.displayPayStatus || "—"}
-                      />
-                    </dl>
+                {placementsWithDetails.length > 0 ? (
+                  placementsWithDetails.map(place => (
+                    <div
+                      key={`${place.id}-${place.area}-${place.group}`}
+                      data-testid="client-placement-card"
+                      className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <dl className="grid gap-1 text-slate-600 dark:text-slate-300">
+                        <ClientPlacementInfoCell label="Район" value={place.area || "—"} />
+                        <ClientPlacementInfoCell label="Группа" value={place.group || "—"} />
+                        <ClientPlacementInfoCell
+                          label="Статус оплаты"
+                          value={place.displayPayStatus || "—"}
+                        />
+                      </dl>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Нет закреплённых тренировочных мест
                   </div>
-                ))}
+                )}
               </div>
             </div>
 

@@ -145,6 +145,31 @@ describe("ClientDetailsModal placements", () => {
     expect(secondStatusValue).toHaveTextContent("ожидание");
   });
 
+  it("shows a placeholder when the client has no placements", () => {
+    const clientWithoutPlacements: Client = {
+      ...baseClient,
+      placements: [],
+    };
+
+    render(
+      <ClientDetailsModal
+        client={clientWithoutPlacements}
+        currency="EUR"
+        currencyRates={currencyRates}
+        schedule={schedule}
+        attendance={attendance}
+        performance={performance}
+        billingPeriod={{ year: 2024, month: 3 }}
+        onClose={() => {}}
+      />,
+    );
+
+    expect(
+      screen.getByText("Нет закреплённых тренировочных мест"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("client-placement-card")).not.toBeInTheDocument();
+  });
+
   it("shows payment fact details for editing", async () => {
     render(
       <ClientDetailsModal
@@ -182,6 +207,85 @@ describe("ClientDetailsModal placements", () => {
     expect(editor.getByLabelText("Сумма (ожидаемая), €")).toHaveDisplayValue("100");
     expect(editor.getByLabelText(/Остаток занятий/)).toHaveDisplayValue("7");
     expect(editor.getByLabelText(/Заморозка занятий/)).toHaveDisplayValue("2");
+  });
+
+  it("shows derived totals for payment facts with outdated placement references", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-10T00:00:00.000Z"));
+
+    const outdatedClient: Client = {
+      ...baseClient,
+      area: "Area3",
+      group: "Group3",
+      subscriptionPlan: "single",
+      payDate: "2024-03-05T00:00:00.000Z",
+      remainingLessons: undefined,
+      frozenLessons: undefined,
+      placements: [
+        {
+          id: "pl-legacy",
+          area: "Area3",
+          group: "Group3",
+          payMethod: "наличные",
+          payStatus: "действует",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+          payDate: "2024-03-05T00:00:00.000Z",
+          payAmount: 120,
+          payActual: 120,
+          remainingLessons: null,
+          frozenLessons: 4,
+        },
+      ],
+      payHistory: [
+        {
+          id: "fact-legacy",
+          area: "LegacyArea",
+          group: "LegacyGroup",
+          paidAt: "2024-03-08T00:00:00.000Z",
+          recordedAt: "2024-03-08T00:00:00.000Z",
+          amount: 120,
+          subscriptionPlan: "monthly",
+          periodLabel: "Март",
+        },
+      ],
+    };
+
+    try {
+      render(
+        <ClientDetailsModal
+          client={outdatedClient}
+          currency="EUR"
+          currencyRates={currencyRates}
+          schedule={[]}
+          attendance={attendance}
+          performance={performance}
+          billingPeriod={{ year: 2024, month: 3 }}
+          onClose={() => {}}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Факты оплат" }));
+
+      await userEvent.click(screen.getByText("LegacyArea · LegacyGroup"));
+
+      const viewerHeading = await screen.findByText("Факт оплаты");
+      const viewerDialog = viewerHeading.closest('[role="dialog"]');
+      expect(viewerDialog).not.toBeNull();
+
+      const remainingLessonsValue = within(viewerDialog as HTMLElement)
+        .getByText("Остаток занятий")
+        .nextElementSibling as HTMLElement | null;
+      expect(remainingLessonsValue).not.toBeNull();
+      expect(remainingLessonsValue).toHaveTextContent("0");
+
+      const frozenLessonsValue = within(viewerDialog as HTMLElement)
+        .getByText("Заморозка")
+        .nextElementSibling as HTMLElement | null;
+      expect(frozenLessonsValue).not.toBeNull();
+      expect(frozenLessonsValue).toHaveTextContent("4");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
