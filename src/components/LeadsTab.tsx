@@ -174,7 +174,7 @@ export default function LeadsTab({
             <div key={s} className="p-3 rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
               <div className="text-xs text-slate-500 mb-2">{s}</div>
               <FixedSizeList
-                height={200}
+                height={380}
                 itemCount={leads.length}
                 itemSize={90}
                 width="100%"
