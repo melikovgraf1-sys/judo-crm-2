@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { transformClientFormValues } from "./clientMutations";
-import { normalizePaymentFacts } from "../../state/paymentFacts";
+import { createPaymentFact, normalizePaymentFacts } from "../../state/paymentFacts";
 import type { Client, ClientFormValues, ClientPlacementFormValues } from "../../types";
 
 describe("transformClientFormValues", () => {
@@ -329,7 +329,7 @@ describe("transformClientFormValues", () => {
     const result = transformClientFormValues(updatedForm, editing);
 
     expect(result.comment).toBe("обновленный комментарий");
-    expect(result.payHistory).toEqual(normalizePaymentFacts(editing.payHistory));
+    expect(result).not.toHaveProperty("payHistory");
   });
 
   it("keeps pay history empty for legacy clients when payment fields stay the same", () => {
@@ -393,6 +393,84 @@ describe("transformClientFormValues", () => {
 
     expect(result.comment).toBe("обновленный комментарий");
     expect(result).not.toHaveProperty("payHistory");
+  });
+
+  it("does not create a payment fact when payment details are edited manually", () => {
+    const existingFact = createPaymentFact({
+      id: "fact-1",
+      area: "Area1",
+      group: "индивидуальные",
+      paidAt: "2024-02-10T00:00:00.000Z",
+      recordedAt: "2024-02-11T00:00:00.000Z",
+      amount: 150,
+      subscriptionPlan: "monthly",
+    });
+
+    const editing: Client = {
+      id: "client-payment",
+      firstName: "Имя",
+      lastName: "",
+      parentName: "",
+      phone: "",
+      whatsApp: "",
+      telegram: "",
+      instagram: "",
+      comment: "комментарий",
+      channel: "Telegram",
+      birthDate: "2010-01-01",
+      gender: "м",
+      area: "Area1",
+      group: "индивидуальные",
+      startDate: "2024-01-01",
+      payMethod: "перевод",
+      payStatus: "действует",
+      status: "действующий",
+      subscriptionPlan: "monthly",
+      payDate: "2024-02-10",
+      payAmount: 150,
+      payActual: 150,
+      placements: [
+        {
+          id: "pl-payment",
+          area: "Area1",
+          group: "индивидуальные",
+          payMethod: "перевод",
+          payStatus: "действует",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+          payDate: "2024-02-10",
+          payAmount: 150,
+          payActual: 150,
+        },
+      ],
+      payHistory: [existingFact],
+    };
+
+    const updatedForm: ClientFormValues = {
+      ...baseFormValues,
+      placements: [
+        {
+          ...basePlacement(),
+          id: "pl-payment",
+          group: "индивидуальные",
+          payStatus: "действует",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+          payDate: "2024-03-10",
+          payAmount: "200",
+          payActual: "200",
+        },
+      ],
+    };
+
+    const result = transformClientFormValues(updatedForm, editing);
+
+    expect(result).toMatchObject({
+      payAmount: 200,
+      payActual: 200,
+      payDate: "2024-03-10T00:00:00.000Z",
+    });
+    expect(result.payHistory).toEqual(normalizePaymentFacts(editing.payHistory));
   });
 
   it("throws when trying to add more than four placements", () => {
