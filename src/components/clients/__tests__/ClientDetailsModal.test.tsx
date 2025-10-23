@@ -6,6 +6,7 @@ import "@testing-library/jest-dom";
 import ClientDetailsModal from "../ClientDetailsModal";
 import type { AttendanceEntry, Client, PaymentFact, PerformanceEntry, ScheduleSlot } from "../../../types";
 import { getLatestFactDueDate } from "../../../state/paymentFacts";
+import { getEffectiveRemainingLessons } from "../../../state/lessons";
 let latestClient: Client | null = null;
 
 describe("ClientDetailsModal placements", () => {
@@ -168,6 +169,91 @@ describe("ClientDetailsModal placements", () => {
       screen.getByText("Нет закреплённых тренировочных мест"),
     ).toBeInTheDocument();
     expect(screen.queryByTestId("client-placement-card")).not.toBeInTheDocument();
+  });
+
+  it("shows fallback remaining lessons for payment facts without placements", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-01T00:00:00.000Z"));
+
+    const scheduleWithSessions: ScheduleSlot[] = [
+      {
+        id: "slot-1",
+        area: "Area1",
+        group: "Group1",
+        coachId: "coach-1",
+        weekday: 1,
+        time: "10:00",
+        location: "Main Hall",
+      },
+      {
+        id: "slot-2",
+        area: "Area1",
+        group: "Group1",
+        coachId: "coach-1",
+        weekday: 3,
+        time: "10:00",
+        location: "Main Hall",
+      },
+    ];
+
+    const clientWithHistoryOnly: Client = {
+      ...baseClient,
+      placements: [],
+      remainingLessons: undefined,
+      frozenLessons: undefined,
+      payDate: "2024-03-08T00:00:00.000Z",
+      payHistory: [
+        {
+          id: "fact-history-only",
+          area: "Area1",
+          group: "Group1",
+          paidAt: "2024-02-28T00:00:00.000Z",
+          recordedAt: "2024-02-28T00:00:00.000Z",
+          amount: 100,
+          subscriptionPlan: "monthly",
+          periodLabel: "Март",
+        },
+      ],
+    };
+
+    const expectedRemainingLessons = getEffectiveRemainingLessons(
+      clientWithHistoryOnly,
+      scheduleWithSessions,
+      new Date("2024-03-01T00:00:00.000Z"),
+    );
+    expect(expectedRemainingLessons).not.toBeNull();
+
+    try {
+      render(
+        <ClientDetailsModal
+          client={clientWithHistoryOnly}
+          currency="EUR"
+          currencyRates={currencyRates}
+          schedule={scheduleWithSessions}
+          attendance={attendance}
+          performance={performance}
+          billingPeriod={{ year: 2024, month: 3 }}
+          onClose={() => {}}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole("button", { name: "Факты оплат" }));
+
+      await userEvent.click(screen.getByText("Area1 · Group1"));
+
+      const viewerHeading = await screen.findByText("Факт оплаты");
+      const viewerDialog = viewerHeading.closest('[role="dialog"]');
+      expect(viewerDialog).not.toBeNull();
+
+      const remainingLessonsValue = within(viewerDialog as HTMLElement)
+        .getByText("Остаток занятий")
+        .nextElementSibling as HTMLElement | null;
+      expect(remainingLessonsValue).not.toBeNull();
+      expect(remainingLessonsValue).toHaveTextContent(
+        String(expectedRemainingLessons as number),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("shows payment fact details for editing", async () => {

@@ -105,6 +105,8 @@ export default function ClientDetailsModal({
   }, [billingPeriod, client, paidInSelectedPeriod]);
 
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
+  const paymentFactsRemainingLessonsFallback =
+    typeof totalRemainingLessons === "number" ? totalRemainingLessons : null;
 
   const totalFrozenLessons = placements.reduce(
     (sum, place) => sum + Math.max(0, place.frozenLessons ?? 0),
@@ -283,8 +285,13 @@ export default function ClientDetailsModal({
     if (editingFactPlacement?.effectiveRemainingLessons != null) {
       return editingFactPlacement.effectiveRemainingLessons;
     }
-    return derivedRemainingLessons ?? null;
-  }, [derivedRemainingLessons, editingFact, editingFactPlacement]);
+    return derivedRemainingLessons ?? paymentFactsRemainingLessonsFallback ?? null;
+  }, [
+    derivedRemainingLessons,
+    editingFact,
+    editingFactPlacement,
+    paymentFactsRemainingLessonsFallback,
+  ]);
   const editingFactDefaultFrozenLessons = useMemo(() => {
     if (!editingFact) {
       return displayedFrozenLessons;
@@ -724,6 +731,7 @@ export default function ClientDetailsModal({
           availableGroups={paymentFactGroups}
           saving={savingFact}
           defaultRemainingLessons={editingFactDefaultRemainingLessons}
+          fallbackRemainingLessons={paymentFactsRemainingLessonsFallback}
           defaultFrozenLessons={editingFactDefaultFrozenLessons}
           defaultExpectedAmount={editingFactExpectedAmount}
           placementSubscriptionPlan={editingFactPlacement?.subscriptionPlan ?? null}
@@ -742,6 +750,7 @@ export default function ClientDetailsModal({
           currencyRates={currencyRates}
           placements={placementsWithDetails}
           defaultRemainingLessons={derivedRemainingLessons}
+          fallbackRemainingLessons={paymentFactsRemainingLessonsFallback}
           defaultFrozenLessons={displayedFrozenLessons}
           onClose={() => setPreviewingFactId(null)}
           onEdit={canManagePaymentFacts ? () => handleEditPaymentFact(previewingFact.id) : undefined}
