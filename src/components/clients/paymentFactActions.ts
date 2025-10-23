@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { commitDBUpdate } from "../../state/appState";
 import { getLatestFactPaidAt } from "../../state/paymentFacts";
 import { todayISO, uid } from "../../state/utils";
-import type { Client, DB, PaymentFact } from "../../types";
+import type { Client, ClientPlacement, DB, PaymentFact } from "../../types";
 
 export type PaymentFactsChangeAction = "update" | "delete";
 
@@ -37,7 +37,7 @@ export async function commitClientPaymentFactsChange({
     const existingPlacements = Array.isArray(target.placements) ? target.placements : [];
 
     if (existingPlacements.length) {
-      const updatedPlacements = existingPlacements.map(placement => {
+      const updatedPlacements = existingPlacements.map<ClientPlacement>(placement => {
         const latestPaidAt = getLatestFactPaidAt(nextFacts, placement);
 
         if (latestPaidAt) {
