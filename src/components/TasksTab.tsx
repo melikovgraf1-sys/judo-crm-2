@@ -309,7 +309,7 @@ export default function TasksTab({
     tasks: TaskItem[],
     archive: TaskItem[],
     updates: Partial<Record<string, Partial<Client>>> = {},
-  ) => applyPaymentStatusRules(db.clients, tasks, archive, updates);
+  ) => applyPaymentStatusRules(db.clients, tasks, archive, updates, db.schedule);
 
   const complete = async (id: string) => {
     const task = db.tasks.find(t => t.id === id);

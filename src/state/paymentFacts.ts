@@ -1,4 +1,4 @@
-import type { Area, Group, PaymentFact, SubscriptionPlan } from "../types";
+import type { Area, Group, PaymentFact, ScheduleSlot, SubscriptionPlan } from "../types";
 import { getSubscriptionPlanMeta } from "./payments";
 
 const parseAmountValue = (value: unknown): number | undefined => {
@@ -186,7 +186,105 @@ export function getPaymentFactPlanLabel(plan: SubscriptionPlan | undefined | nul
   return plan ? getSubscriptionPlanMeta(plan)?.label : undefined;
 }
 
-export type PlacementLike = { area?: Area; group?: Group } | null | undefined;
+export type PlacementLike = { area?: Area; group?: Group; frozenLessons?: number | null } | null | undefined;
+
+const MAX_FROZEN_LOOKAHEAD_DAYS = 366 * 2;
+
+const isoWeekday = (date: Date): number => {
+  const day = date.getUTCDay();
+  return day === 0 ? 7 : day;
+};
+
+const buildSessionsPerWeekday = (
+  schedule: ScheduleSlot[] | undefined,
+  area: Area,
+  group: Group,
+): Map<number, number> | null => {
+  if (!schedule?.length) {
+    return null;
+  }
+
+  const relevant = schedule.filter(slot => slot.area === area && slot.group === group);
+  if (!relevant.length) {
+    return null;
+  }
+
+  const sessionsPerWeekday = new Map<number, number>();
+  for (const slot of relevant) {
+    sessionsPerWeekday.set(slot.weekday, (sessionsPerWeekday.get(slot.weekday) ?? 0) + 1);
+  }
+
+  return sessionsPerWeekday;
+};
+
+const findNthSessionDate = (
+  sessionsPerWeekday: Map<number, number>,
+  start: Date,
+  occurrence: number,
+): Date | null => {
+  if (occurrence < 1) {
+    return null;
+  }
+
+  let count = 0;
+  const cursor = new Date(start.getTime());
+
+  for (let i = 0; i < MAX_FROZEN_LOOKAHEAD_DAYS; i += 1) {
+    const weekday = isoWeekday(cursor);
+    const sessions = sessionsPerWeekday.get(weekday) ?? 0;
+    if (sessions > 0) {
+      for (let index = 0; index < sessions; index += 1) {
+        count += 1;
+        if (count === occurrence) {
+          return new Date(cursor.getTime());
+        }
+      }
+    }
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return null;
+};
+
+const adjustDueDateByFrozenLessons = (
+  baseDueDate: Date,
+  options: {
+    schedule?: ScheduleSlot[];
+    area?: Area;
+    group?: Group;
+    frozenLessons?: number | null;
+  },
+): Date | null => {
+  const { area, group, schedule, frozenLessons } = options;
+  if (!area || !group || !schedule?.length) {
+    return null;
+  }
+
+  const rawFrozen = typeof frozenLessons === "number" ? Math.floor(frozenLessons) : 0;
+  const effectiveFrozen = rawFrozen > 0 ? rawFrozen : 0;
+  if (effectiveFrozen === 0) {
+    return null;
+  }
+
+  const sessionsPerWeekday = buildSessionsPerWeekday(schedule, area, group);
+  if (!sessionsPerWeekday) {
+    return null;
+  }
+
+  const start = new Date(baseDueDate.getTime());
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() + 1);
+
+  const occurrencesToFind = effectiveFrozen;
+  const target = findNthSessionDate(sessionsPerWeekday, start, occurrencesToFind);
+  if (!target) {
+    return null;
+  }
+
+  target.setUTCHours(0, 0, 0, 0);
+  return target;
+};
 
 export function matchesPaymentFactPlacement(
   placement: PlacementLike,
@@ -271,7 +369,7 @@ export function getLatestPaymentFact(
 
 export function getPaymentFactDueDate(
   fact: PaymentFact,
-  options: { plan?: SubscriptionPlan | null } = {},
+  options: { plan?: SubscriptionPlan | null; placement?: PlacementLike; schedule?: ScheduleSlot[] } = {},
 ): string | undefined {
   const plan = fact.subscriptionPlan ?? options.plan ?? undefined;
   if (!plan) {
@@ -296,19 +394,40 @@ export function getPaymentFactDueDate(
     next = addMonths(base, 1);
   }
 
-  return next ? next.toISOString() : undefined;
+  if (!next) {
+    return undefined;
+  }
+
+  const frozenLessons =
+    typeof fact.frozenLessons === "number"
+      ? fact.frozenLessons
+      : options.placement && typeof options.placement.frozenLessons === "number"
+      ? options.placement.frozenLessons
+      : null;
+
+  const area = fact.area ?? options.placement?.area;
+  const group = fact.group ?? options.placement?.group;
+  const adjusted = adjustDueDateByFrozenLessons(next, {
+    schedule: options.schedule,
+    area: area ?? undefined,
+    group: group ?? undefined,
+    frozenLessons,
+  });
+
+  return (adjusted ?? next).toISOString();
 }
 
 export function getLatestFactDueDate(
   facts: PaymentFact[],
   placement?: PlacementLike,
   planHint?: SubscriptionPlan | null,
+  schedule?: ScheduleSlot[],
 ): string | undefined {
   const latestFact = getLatestPaymentFact(facts, placement);
   if (!latestFact) {
     return undefined;
   }
-  return getPaymentFactDueDate(latestFact, { plan: planHint });
+  return getPaymentFactDueDate(latestFact, { plan: planHint, placement, schedule });
 }
 
 export function getLatestFactPaidAt(

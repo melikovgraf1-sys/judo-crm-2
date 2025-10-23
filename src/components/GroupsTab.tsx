@@ -312,6 +312,7 @@ export default function GroupsTab({
       nextTasks,
       db.tasksArchive,
       updates ? { [client.id]: updates } : {},
+      db.schedule,
     );
     const next = {
       ...db,
@@ -342,9 +343,13 @@ export default function GroupsTab({
       manualLessonsIncrement: 8,
     });
 
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
-      [client.id]: updates,
-    });
+    const nextClients = applyPaymentStatusRules(
+      db.clients,
+      nextTasks,
+      nextArchive,
+      { [client.id]: updates },
+      db.schedule,
+    );
     const next = {
       ...db,
       tasks: nextTasks,
@@ -368,7 +373,13 @@ export default function GroupsTab({
 
     const nextTasks = db.tasks.filter(t => t.id !== task.id);
     const nextArchive = [task, ...db.tasksArchive];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive);
+    const nextClients = applyPaymentStatusRules(
+      db.clients,
+      nextTasks,
+      nextArchive,
+      {},
+      db.schedule,
+    );
 
     const next = {
       ...db,

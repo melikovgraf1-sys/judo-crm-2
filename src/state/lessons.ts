@@ -37,6 +37,7 @@ export function estimateGroupRemainingLessons(
       client.payHistory ?? [],
       { area: client.area, group: client.group },
       client.subscriptionPlan ?? null,
+      schedule,
     ) ?? client.payDate;
 
   return estimateGroupRemainingLessonsByParams(
