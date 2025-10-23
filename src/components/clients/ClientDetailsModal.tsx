@@ -22,6 +22,7 @@ import type {
 } from "../../types";
 import {
   createPaymentFact,
+  getLatestFactPaidAt,
   getPaymentFactComparableDate,
   getPaymentFactPlanLabel,
   normalizePaymentFacts,
@@ -149,13 +150,16 @@ export default function ClientDetailsModal({
     const manual = deriveRemainingLessons(place.remainingLessons ?? null);
     let effectiveRemainingLessons: number | null = null;
 
+    const referencePayDate =
+      getLatestFactPaidAt(paymentFacts, place) ?? place.payDate ?? client.payDate;
+
     if (manual != null) {
       effectiveRemainingLessons = manual;
     } else {
       const estimated = estimateGroupRemainingLessonsByParams(
         place.area,
         place.group,
-        place.payDate,
+        referencePayDate,
         normalizedSchedule,
       );
 
