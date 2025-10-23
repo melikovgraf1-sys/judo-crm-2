@@ -1,4 +1,4 @@
-import { derivePaymentStatus } from "../payments";
+import { applyPaymentStatusRules, derivePaymentStatus } from "../payments";
 import type { Client, TaskItem } from "../../types";
 
 describe("derivePaymentStatus", () => {
@@ -15,7 +15,17 @@ describe("derivePaymentStatus", () => {
     payStatus: "ожидание",
     status: "новый",
     subscriptionPlan: "monthly",
-    placements: [],
+    placements: [
+      {
+        id: "placement-1",
+        area: "area-1",
+        group: "group-1",
+        payMethod: "наличные",
+        payStatus: "ожидание",
+        status: "действующий",
+        subscriptionPlan: "monthly",
+      },
+    ],
   };
 
   const baseTask: TaskItem = {
@@ -28,89 +38,178 @@ describe("derivePaymentStatus", () => {
     topic: "оплата",
   };
 
-  it("returns the current client pay status when there are no related tasks", () => {
-    const client: Client = { ...baseClient, payStatus: "действует", payActual: 55 };
-
-    expect(derivePaymentStatus(client, [], [])).toBe("действует");
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-15T00:00:00.000Z"));
   });
 
-  it("returns debt status when there is an open related task", () => {
-    const client: Client = { ...baseClient, payStatus: "ожидание", payActual: 55 };
-    const tasks: TaskItem[] = [{ ...baseTask, status: "open" }];
-
-    expect(derivePaymentStatus(client, tasks, [])).toBe("задолженность");
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
-  it("returns active status when all related tasks are done", () => {
-    const client: Client = { ...baseClient, payStatus: "ожидание", payActual: 55 };
-    const tasks: TaskItem[] = [{ ...baseTask, status: "done" }];
-
-    expect(derivePaymentStatus(client, tasks, [])).toBe("действует");
-  });
-
-  it("marks active clients with insufficient payments as debt", () => {
+  it("returns 'ожидание' when a placement has no payment tasks", () => {
     const client: Client = {
       ...baseClient,
-      payStatus: "действует",
-      payActual: 20,
+      placements: baseClient.placements,
     };
 
-    expect(derivePaymentStatus(client, [], [])).toBe("задолженность");
+    const result = derivePaymentStatus(client, [], []);
+
+    expect(result).toEqual({
+      client: "ожидание",
+      placements: { "placement-1": "ожидание" },
+    });
   });
 
-  it("skips debt check when the next pay date is in the future and there are no open payment tasks", () => {
+  it("flags debt only for placements with open payment tasks", () => {
     const client: Client = {
       ...baseClient,
-      payStatus: "действует",
-      payActual: 0,
-      payDate: "2099-01-01T00:00:00.000Z",
-    };
-
-    expect(derivePaymentStatus(client, [], [])).toBe("действует");
-  });
-
-  it("still marks debt when future-due payments have open tasks", () => {
-    const client: Client = {
-      ...baseClient,
-      payStatus: "действует",
-      payActual: 0,
-      payDate: "2099-01-01T00:00:00.000Z",
-    };
-
-    const tasks: TaskItem[] = [{ ...baseTask, status: "open" }];
-
-    expect(derivePaymentStatus(client, tasks, [])).toBe("задолженность");
-  });
-
-  it("keeps active status when future due date is derived from payment facts", () => {
-    jest.useFakeTimers().setSystemTime(new Date("2024-03-01T00:00:00.000Z"));
-
-    const client: Client = {
-      ...baseClient,
-      payStatus: "действует",
-      payActual: 0,
-      payHistory: [
-        {
-          id: "fact-future",
-          paidAt: "2099-01-10T00:00:00.000Z",
-          subscriptionPlan: "monthly",
-        },
-      ],
       placements: [
+        ...baseClient.placements,
         {
-          id: "placement-1",
-          area: baseClient.area,
-          group: baseClient.group,
+          id: "placement-2",
+          area: "area-2",
+          group: "group-2",
           payMethod: "наличные",
-          payStatus: "действует",
+          payStatus: "ожидание",
           status: "действующий",
           subscriptionPlan: "monthly",
         },
       ],
     };
 
-    expect(derivePaymentStatus(client, [], [])).toBe("действует");
+    const tasks: TaskItem[] = [
+      { ...baseTask, id: "task-2", placementId: "placement-2", status: "open" },
+    ];
 
+    const result = derivePaymentStatus(client, tasks, []);
+
+    expect(result.placements).toEqual({
+      "placement-1": "ожидание",
+      "placement-2": "задолженность",
+    });
+    expect(result.client).toBe("задолженность");
+  });
+
+  it("switches to 'действует' when a payment fact exists for the current period", () => {
+    const client: Client = {
+      ...baseClient,
+      payHistory: [
+        {
+          id: "fact-1",
+          paidAt: "2024-03-05T10:00:00.000Z",
+          area: "area-1",
+          group: "group-1",
+        },
+      ],
+    };
+
+    const result = derivePaymentStatus(client, [], []);
+
+    expect(result).toEqual({
+      client: "действует",
+      placements: { "placement-1": "действует" },
+    });
+  });
+
+  it("keeps unaffected placements in 'ожидание' when another placement has a fact", () => {
+    const client: Client = {
+      ...baseClient,
+      placements: [
+        ...baseClient.placements,
+        {
+          id: "placement-2",
+          area: "area-2",
+          group: "group-2",
+          payMethod: "наличные",
+          payStatus: "ожидание",
+          status: "действующий",
+          subscriptionPlan: "monthly",
+        },
+      ],
+      payHistory: [
+        {
+          id: "fact-1",
+          paidAt: "2024-03-05T10:00:00.000Z",
+          area: "area-2",
+          group: "group-2",
+        },
+      ],
+    };
+
+    const result = derivePaymentStatus(client, [], []);
+
+    expect(result.placements).toEqual({
+      "placement-1": "ожидание",
+      "placement-2": "действует",
+    });
+    expect(result.client).toBe("действует");
+  });
+});
+
+describe("applyPaymentStatusRules", () => {
+  const baseClient: Client = {
+    id: "client-1",
+    firstName: "Ivan",
+    channel: "Telegram",
+    birthDate: "2020-01-01",
+    gender: "м",
+    area: "area-1",
+    group: "group-1",
+    startDate: "2020-01-01",
+    payMethod: "наличные",
+    payStatus: "действует",
+    status: "новый",
+    subscriptionPlan: "monthly",
+    placements: [
+      {
+        id: "placement-1",
+        area: "area-1",
+        group: "group-1",
+        payMethod: "наличные",
+        payStatus: "действует",
+        status: "действующий",
+        subscriptionPlan: "monthly",
+      },
+      {
+        id: "placement-2",
+        area: "area-2",
+        group: "group-2",
+        payMethod: "наличные",
+        payStatus: "действует",
+        status: "действующий",
+        subscriptionPlan: "monthly",
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date("2024-03-15T00:00:00.000Z"));
+  });
+
+  afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it("updates individual placements and the client status", () => {
+    const tasks: TaskItem[] = [
+      {
+        id: "task-1",
+        title: "Оплата",
+        due: "2024-03-20",
+        assigneeType: "client",
+        assigneeId: baseClient.id,
+        status: "open",
+        topic: "оплата",
+        placementId: "placement-2",
+      },
+    ];
+
+    const [updated] = applyPaymentStatusRules([baseClient], tasks, []);
+
+    expect(updated.payStatus).toBe("задолженность");
+    expect(updated.placements).toEqual([
+      { ...baseClient.placements[0], payStatus: "ожидание" },
+      { ...baseClient.placements[1], payStatus: "задолженность" },
+    ]);
   });
 });

@@ -546,6 +546,7 @@ test('update: edits client name', async () => {
 });
 
 test('update: editing payment status hides payment fact fields', async () => {
+  jest.useFakeTimers().setSystemTime(new Date('2024-01-15T00:00:00.000Z'));
   const db = makeDB();
   db.clients = [
     makeClient({
@@ -580,28 +581,19 @@ test('update: editing payment status hides payment fact fields', async () => {
   await userEvent.click(screen.getByRole('button', { name: 'Редактировать' }));
 
   const modal = screen.getByText('Редактирование клиента').parentElement;
-  const planSelect = within(modal)
-    .getByText('Форма абонемента')
-    .parentElement.querySelector('select') as HTMLSelectElement;
-  const expectedAmount = within(modal)
-    .getByText('Ожидаемая сумма, €')
-    .nextElementSibling as HTMLElement;
-
-  expect(planSelect).toBeDisabled();
-  expect(expectedAmount).toHaveTextContent('55');
-  expect(within(modal).getByText(/Укажите статус оплаты «действует»/)).toBeInTheDocument();
-
   const payStatusSelect = within(modal).getByText('Статус оплаты').parentElement.querySelector('select') as HTMLSelectElement;
 
+  expect(within(modal).queryByText('Форма абонемента')).not.toBeInTheDocument();
+
   await userEvent.selectOptions(payStatusSelect, 'действует');
-  await waitFor(() => expect(within(modal).queryByText(/Укажите статус оплаты «действует»/)).not.toBeInTheDocument());
-  await waitFor(() => expect(planSelect).not.toBeDisabled());
+  await waitFor(() => expect(within(modal).queryByText('Форма абонемента')).not.toBeInTheDocument());
 
   const save = within(modal).getByRole('button', { name: 'Сохранить' });
   await waitFor(() => expect(save).toBeEnabled());
   await userEvent.click(save);
 
   await waitFor(() => expect(getDB().clients[0].payStatus).toBe('действует'));
+  jest.useRealTimers();
 });
 
 test('update: moving client between groups clears manual-only fields', async () => {
@@ -881,7 +873,7 @@ test('half-month subscription advances payDate by 14 days on payment completion'
     expect(getDB().tasks).toHaveLength(0);
     expect(getDB().tasksArchive).toHaveLength(1);
     const updated = getDB().clients[0];
-    expect(updated.payStatus).toBe('задолженность');
+    expect(updated.payStatus).toBe('действует');
     expect(updated.placements[0]?.payDate).toBe('2024-01-15T00:00:00.000Z');
   });
   await waitFor(() => expect(screen.queryByText('Пол')).not.toBeInTheDocument());

@@ -419,47 +419,86 @@ export function getClientPaymentTotalsForPeriod(
   return { expected, actual: ensureNumber(client.payActual) };
 }
 
+export type DerivedPaymentStatuses = {
+  client: PaymentStatus;
+  placements: Record<string, PaymentStatus>;
+};
+
+const paymentFactMatchesPlacement = (
+  fact: PaymentFact,
+  placement: ClientPlacement,
+): boolean => {
+  if (fact.area && fact.area !== placement.area) {
+    return false;
+  }
+  if (fact.group && fact.group !== placement.group) {
+    return false;
+  }
+  return true;
+};
+
 export function derivePaymentStatus(
   client: Client,
   tasks: TaskItem[],
   archivedTasks: TaskItem[] = [],
-): PaymentStatus {
+): DerivedPaymentStatuses {
   const placements = getClientPlacements(client);
-  const relevantTasks = tasks.concat(archivedTasks.filter(task => task.status === "done"));
-  const relatedTasks = relevantTasks.filter(
-    task =>
-      task.topic === "оплата" &&
-      task.assigneeType === "client" &&
-      task.assigneeId === client.id,
-  );
-  const hasOpenRelatedTask = relatedTasks.some(task => task.status !== "done");
-  const nextPayDate = getNextPayDate(client, placements);
-  const shouldSkipDebtCheck =
-    !hasOpenRelatedTask && nextPayDate != null && nextPayDate.getTime() > Date.now();
+  const period = getCurrentPeriod();
+  const history = normalizePaymentFacts(client.payHistory);
+  const relevantTasks = tasks
+    .concat(archivedTasks.filter(task => task.status === "done"))
+    .filter(
+      task =>
+        task.topic === "оплата" &&
+        task.assigneeType === "client" &&
+        task.assigneeId === client.id,
+    );
 
-  const { expected, actual } = getClientPaymentTotalsForPeriod(client);
-  const hasActiveStatus =
-    client.payStatus === "действует" ||
-    placements.some(placement => placement.payStatus === "действует");
+  const placementStatuses: Record<string, PaymentStatus> = {};
 
-  if (
-    hasActiveStatus &&
-    expected > 0 &&
-    actual + PAYMENT_SHORTFALL_TOLERANCE < expected &&
-    !shouldSkipDebtCheck
-  ) {
-    return "задолженность";
+  placements.forEach((placement, index) => {
+    const placementId = placement.id ?? `${client.id}-${index}`;
+    const placementTasks = relevantTasks.filter(task => {
+      if (task.placementId) {
+        return task.placementId === placementId;
+      }
+      return true;
+    });
+
+    const hasOpenTask = placementTasks.some(task => task.status !== "done");
+
+    let status: PaymentStatus;
+    if (hasOpenTask) {
+      status = "задолженность";
+    } else {
+      const hasRecentFact = history.some(
+        fact => factMatchesPeriod(fact, period) && paymentFactMatchesPlacement(fact, placement),
+      );
+
+      if (hasRecentFact) {
+        status = "действует";
+      } else {
+        status = "ожидание";
+      }
+    }
+
+    placementStatuses[placementId] = status;
+  });
+
+  const derivedStatuses = Object.values(placementStatuses);
+  let clientStatus: PaymentStatus;
+
+  if (derivedStatuses.includes("задолженность")) {
+    clientStatus = "задолженность";
+  } else if (derivedStatuses.includes("действует")) {
+    clientStatus = "действует";
+  } else if (derivedStatuses.length > 0) {
+    clientStatus = "ожидание";
+  } else {
+    clientStatus = client.payStatus;
   }
 
-  if (!relatedTasks.length) {
-    return client.payStatus;
-  }
-
-  if (hasOpenRelatedTask) {
-    return "задолженность";
-  }
-
-  return "действует";
+  return { client: clientStatus, placements: placementStatuses };
 }
 
 export function applyPaymentStatusRules(
@@ -471,18 +510,24 @@ export function applyPaymentStatusRules(
   return clients.map(client => {
     const patch = updates[client.id];
     const base = patch ? { ...client, ...patch } : client;
-    const nextStatus = derivePaymentStatus(base, tasks, archivedTasks);
+    const { client: nextStatus, placements: placementStatuses } = derivePaymentStatus(
+      base,
+      tasks,
+      archivedTasks,
+    );
     const shouldUpdateStatus = base.payStatus !== nextStatus;
     let updatedPlacements = base.placements;
 
-    if (shouldUpdateStatus && Array.isArray(base.placements) && base.placements.length > 0) {
+    if (Array.isArray(base.placements) && base.placements.length > 0) {
       let mutated = false;
-      updatedPlacements = base.placements.map(placement => {
-        if (placement.payStatus === base.payStatus) {
-          mutated = true;
-          return { ...placement, payStatus: nextStatus };
+      updatedPlacements = base.placements.map((placement, index) => {
+        const placementId = placement.id ?? `${base.id}-${index}`;
+        const derivedStatus = placementStatuses[placementId];
+        if (!derivedStatus || placement.payStatus === derivedStatus) {
+          return placement;
         }
-        return placement;
+        mutated = true;
+        return { ...placement, payStatus: derivedStatus };
       });
       if (!mutated) {
         updatedPlacements = base.placements;
