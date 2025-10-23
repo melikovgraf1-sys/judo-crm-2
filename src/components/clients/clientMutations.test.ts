@@ -280,6 +280,25 @@ describe("transformClientFormValues", () => {
     });
   });
 
+  it("preserves manually selected payStatus when payments are short", () => {
+    const data: ClientFormValues = {
+      ...baseFormValues,
+      placements: [
+        {
+          ...basePlacement(),
+          id: "pl-shortfall",
+          payStatus: "действует",
+          payActual: "20",
+        },
+      ],
+    };
+
+    const result = transformClientFormValues(data);
+
+    expect(result.payStatus).toBe("действует");
+    expect(result.placements[0].payStatus).toBe("действует");
+  });
+
   it("allows clearing comment when editing", () => {
     const data: ClientFormValues = {
       ...baseFormValues,
