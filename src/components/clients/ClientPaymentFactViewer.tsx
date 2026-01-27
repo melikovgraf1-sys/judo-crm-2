@@ -118,7 +118,6 @@ export default function ClientPaymentFactViewer({
     factRemainingLessons ??
     getFiniteNumber(placementForLessons?.effectiveRemainingLessons) ??
     getFiniteNumber(placementForLessons?.remainingLessons) ??
-    fallbackRemainingLessonsValue ??
     getFiniteNumber(defaultRemainingLessons);
   const factFrozenLessons = getFiniteNumber(fact.frozenLessons);
   const frozenLessons =
