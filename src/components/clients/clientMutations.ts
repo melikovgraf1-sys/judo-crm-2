@@ -157,15 +157,38 @@ export function transformClientFormValues(
     ...base
   } = data;
 
+  const previousPlacements = editing?.placements ?? [];
+  const previousPayHistory = normalizePaymentFacts(editing?.payHistory);
+
   if (!placements.length) {
-    throw new Error("Укажите хотя бы одно тренировочное место");
+    if (!editing) {
+      throw new Error("Укажите хотя бы одно тренировочное место");
+    }
+
+    const normalizedComment = comment.trim();
+
+    const result: Partial<Omit<Client, "id">> = {
+      ...base,
+      ...(payMethod ? { payMethod } : {}),
+      placements: [],
+      ...(lastName.trim() ? { lastName: lastName.trim() } : {}),
+      ...(parentName.trim() ? { parentName: parentName.trim() } : {}),
+      ...(phone.trim() ? { phone: phone.trim() } : {}),
+      ...(whatsApp.trim() ? { whatsApp: whatsApp.trim() } : {}),
+      ...(telegram.trim() ? { telegram: telegram.trim() } : {}),
+      ...(instagram.trim() ? { instagram: instagram.trim() } : {}),
+      ...(normalizedComment ? { comment: normalizedComment } : {}),
+      ...(previousPayHistory.length ? { payHistory: previousPayHistory } : {}),
+      birthDate: parseDateInput(data.birthDate),
+      startDate: parseDateInput(data.startDate),
+    };
+
+    return result as Omit<Client, "id">;
   }
 
   if (placements.length > MAX_PLACEMENTS) {
     throw new Error(`Допускается не более ${MAX_PLACEMENTS} тренировочных мест`);
   }
-
-  const previousPlacements = editing?.placements ?? [];
 
   const normalizedPlacements = placements.map((placement, index) =>
     normalizePlacement(
@@ -184,7 +207,6 @@ export function transformClientFormValues(
   const statusUpdatedAt = statusChanged ? todayISO() : editing?.statusUpdatedAt;
   const normalizedComment = comment.trim();
 
-  const previousPayHistory = normalizePaymentFacts(editing?.payHistory);
   const nextPayHistory = previousPayHistory;
 
   let result: Omit<Client, "id"> = {

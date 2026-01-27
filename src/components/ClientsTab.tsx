@@ -343,6 +343,7 @@ export default function ClientsTab({ db, setDB, ui, setUI }: ClientsTabProps) {
       nextTasks,
       db.tasksArchive,
       updates ? { [client.id]: updates } : {},
+      db.schedule,
     );
     const next = {
       ...db,

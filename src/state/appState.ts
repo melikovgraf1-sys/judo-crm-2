@@ -9,7 +9,6 @@ import { makeSeedDB } from "./seed";
 import { fmtMoney, todayISO, uid } from "./utils";
 import { applyPaymentStatusRules, DEFAULT_SUBSCRIPTION_PLAN, getSubscriptionPlanMeta } from "./payments";
 import { getClientPlacements } from "./clients";
-import { ensureReserveAreaIncluded } from "./areas";
 import type {
   AttendanceEntry,
   Area,
@@ -186,16 +185,14 @@ function normalizeSettings(value: unknown): Settings {
   if (!value || typeof value !== "object") {
     return {
       ...DEFAULT_SETTINGS,
-      areas: ensureReserveAreaIncluded(DEFAULT_SETTINGS.areas) as Settings["areas"],
+      areas: DEFAULT_SETTINGS.areas,
     };
   }
 
   const raw = value as Partial<Settings>;
   const areas = ensureArray<string>(raw.areas);
   const groups = ensureArray<string>(raw.groups);
-  const normalizedAreas = ensureReserveAreaIncluded(
-    areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas,
-  ) as Settings["areas"];
+  const normalizedAreas = (areas.length ? (areas as Settings["areas"]) : DEFAULT_SETTINGS.areas).slice();
 
   const normalizedGroups = normalizeGroupList(
     groups.length ? (groups as Settings["groups"]) : DEFAULT_SETTINGS.groups,
@@ -308,22 +305,7 @@ function normalizeGroupsInDB(db: DB): DB {
           },
           ...basePlacements.slice(1),
         ]
-      : [
-          {
-            id: `placement-${client.id}`,
-            area: client.area,
-            group: client.group,
-            payMethod: client.payMethod,
-            payStatus: client.payStatus,
-            status: client.status,
-            subscriptionPlan: client.subscriptionPlan,
-            payDate: client.payDate,
-            payAmount: client.payAmount,
-            payActual: client.payActual,
-            remainingLessons: client.remainingLessons,
-            frozenLessons: client.frozenLessons,
-          },
-        ];
+      : [];
 
     const normalizedPlacements = sourcePlacements.map((placement, index) => {
       const normalizedGroup = normalizeRequired(placement.group);
@@ -344,6 +326,13 @@ function normalizeGroupsInDB(db: DB): DB {
         ...(placement.frozenLessons != null ? { frozenLessons: placement.frozenLessons } : {}),
       };
     });
+
+    if (!normalizedPlacements.length) {
+      return {
+        ...client,
+        placements: [],
+      };
+    }
 
     const primary = normalizedPlacements[0];
 
@@ -797,7 +786,13 @@ export function useAppState(): AppState {
     }
 
     const nextTasks = [...newTasks, ...currentDB.tasks];
-    const nextClients = applyPaymentStatusRules(currentDB.clients, nextTasks, currentDB.tasksArchive, updates);
+    const nextClients = applyPaymentStatusRules(
+      currentDB.clients,
+      nextTasks,
+      currentDB.tasksArchive,
+      updates,
+      currentDB.schedule,
+    );
     const next: DB = {
       ...currentDB,
       tasks: nextTasks,

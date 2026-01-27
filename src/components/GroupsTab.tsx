@@ -33,7 +33,6 @@ import {
   type PeriodFilter,
 } from "../state/period";
 
-import { RESERVE_AREA_NAME, isReserveArea } from "../state/areas";
 import {
   commitClientPaymentFactsChange,
   type PaymentFactsChangeContext,
@@ -52,8 +51,7 @@ export const clientMatchesGroup = (
     placement =>
       placement.area === area &&
       placement.group === group &&
-      placement.status !== "отмена" &&
-      !isReserveArea(placement.area),
+      placement.status !== "отмена",
   );
 };
 
@@ -119,9 +117,6 @@ export default function GroupsTab({
 
   useEffect(() => {
     if (!area || group || !availableGroups.length) {
-      return;
-    }
-    if (isReserveArea(area)) {
       return;
     }
     setGroup(availableGroups[0] ?? null);
@@ -317,6 +312,7 @@ export default function GroupsTab({
       nextTasks,
       db.tasksArchive,
       updates ? { [client.id]: updates } : {},
+      db.schedule,
     );
     const next = {
       ...db,
@@ -347,9 +343,13 @@ export default function GroupsTab({
       manualLessonsIncrement: 8,
     });
 
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive, {
-      [client.id]: updates,
-    });
+    const nextClients = applyPaymentStatusRules(
+      db.clients,
+      nextTasks,
+      nextArchive,
+      { [client.id]: updates },
+      db.schedule,
+    );
     const next = {
       ...db,
       tasks: nextTasks,
@@ -373,7 +373,13 @@ export default function GroupsTab({
 
     const nextTasks = db.tasks.filter(t => t.id !== task.id);
     const nextArchive = [task, ...db.tasksArchive];
-    const nextClients = applyPaymentStatusRules(db.clients, nextTasks, nextArchive);
+    const nextClients = applyPaymentStatusRules(
+      db.clients,
+      nextTasks,
+      nextArchive,
+      {},
+      db.schedule,
+    );
 
     const next = {
       ...db,
@@ -389,47 +395,6 @@ export default function GroupsTab({
     const result = await commitDBUpdate(next, setDB);
     if (!result.ok && result.reason === "error") {
       window.alert("Не удалось удалить задачу. Проверьте доступ к базе данных.");
-    }
-  };
-
-  const reserveClient = async (client: Client) => {
-    if (!window.confirm("Переместить клиента в резерв?")) return;
-
-    const reserveGroup = db.settings.groups.includes(RESERVE_AREA_NAME) ? RESERVE_AREA_NAME : client.group;
-    const nextClients = db.clients.map(c => {
-      if (c.id !== client.id) {
-        return c;
-      }
-
-      const updated: Client = {
-        ...c,
-        area: RESERVE_AREA_NAME,
-        group: reserveGroup,
-      };
-
-      if (Array.isArray(c.placements) && c.placements.length) {
-        updated.placements = c.placements.map(place => ({
-          ...place,
-          area: RESERVE_AREA_NAME,
-          group: reserveGroup,
-        }));
-      }
-
-      return applyClientStatusAutoTransition(updated);
-    });
-
-    const next = {
-      ...db,
-      clients: nextClients,
-      changelog: [
-        ...db.changelog,
-        { id: uid(), who: "UI", what: `Клиент ${client.firstName} перемещён в резерв`, when: todayISO() },
-      ],
-    };
-
-    const result = await commitDBUpdate(next, setDB);
-    if (!result.ok && result.reason === "error") {
-      window.alert("Не удалось переместить клиента в резерв. Проверьте доступ к базе данных.");
     }
   };
 
@@ -476,7 +441,6 @@ export default function GroupsTab({
           onCreateTask={createPaymentTask}
           openPaymentTasks={openPaymentTasks}
           onCompletePaymentTask={completePaymentTask}
-          onReserve={reserveClient}
           schedule={db.schedule}
           attendance={db.attendance}
           performance={db.performance}

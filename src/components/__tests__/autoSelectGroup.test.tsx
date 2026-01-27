@@ -42,7 +42,6 @@ const createDB = (): DB => ({
     { id: "slot-1", area: "Area1", group: "Group1", coachId: "coach", weekday: 1, time: "10:00", location: "" },
     { id: "slot-2", area: "Area1", group: "Group2", coachId: "coach", weekday: 2, time: "11:00", location: "" },
     { id: "slot-3", area: "Area2", group: "Group3", coachId: "coach", weekday: 3, time: "12:00", location: "" },
-    { id: "slot-4", area: "резерв", group: "ReserveGroup", coachId: "coach", weekday: 4, time: "13:00", location: "" },
   ],
   leads: [],
   leadsArchive: [],
@@ -51,8 +50,8 @@ const createDB = (): DB => ({
   tasksArchive: [],
   staff: [{ id: "coach", name: "Coach", role: "Тренер" }],
   settings: {
-    areas: ["Area1", "Area2", "резерв"],
-    groups: ["Group1", "Group2", "Group3", "ReserveGroup"],
+    areas: ["Area1", "Area2"],
+    groups: ["Group1", "Group2", "Group3"],
     limits: {},
     rentByAreaEUR: {},
     coachSalaryByAreaEUR: {},
@@ -148,26 +147,6 @@ test("GroupsTab selects the first group when an area is chosen", async () => {
   const groupSelect = screen.getByLabelText("Фильтр по группе");
 
   await waitFor(() => expect(groupSelect).toHaveValue("Group1"));
-});
-
-test("GroupsTab keeps reserve areas without auto-selecting a group", async () => {
-  const db = createDB();
-  const ui = createUI();
-
-  const Wrapper = () => {
-    const [state, setState] = React.useState(db);
-    const [uiState] = React.useState(ui);
-    return <GroupsTab db={state} setDB={setState} ui={uiState} />;
-  };
-
-  render(<Wrapper />);
-
-  await userEvent.click(screen.getByRole("button", { name: "Area1" }));
-  const groupSelect = screen.getByLabelText("Фильтр по группе");
-  await waitFor(() => expect(groupSelect).toHaveValue("Group1"));
-
-  await userEvent.click(screen.getByRole("button", { name: "резерв" }));
-  await waitFor(() => expect(groupSelect).toHaveValue(""));
 });
 
 test("AttendanceTab binds the first group after picking an area", async () => {

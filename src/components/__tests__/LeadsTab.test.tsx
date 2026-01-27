@@ -20,16 +20,6 @@ jest.mock('../../state/utils', () => ({
   todayISO: jest.fn(() => '2024-01-01T00:00:00.000Z'),
   uid: jest.fn(() => 'uid-123'),
   fmtDate: (iso: string) => iso,
-  isReserveArea: () => false,
-  ensureReserveAreaIncluded: (areas: string[]) => areas,
-  RESERVE_AREA_NAME: 'резерв',
-}));
-
-jest.mock('../../state/reserve', () => ({
-  __esModule: true,
-  isReserveArea: () => false,
-  ensureReserveAreaIncluded: (areas: string[]) => areas,
-  RESERVE_AREA_NAME: 'резерв',
 }));
 
 import LeadsTab from '../LeadsTab';

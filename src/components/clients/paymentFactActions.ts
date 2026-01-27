@@ -39,7 +39,7 @@ export async function commitClientPaymentFactsChange({
     if (existingPlacements.length) {
       const updatedPlacements = existingPlacements.map<ClientPlacement>(placement => {
         const planHint = placement.subscriptionPlan ?? target.subscriptionPlan ?? null;
-        const latestDueDate = getLatestFactDueDate(nextFacts, placement, planHint);
+        const latestDueDate = getLatestFactDueDate(nextFacts, placement, planHint, db.schedule);
 
         if (latestDueDate) {
           if (placement.payDate === latestDueDate) {
@@ -66,7 +66,12 @@ export async function commitClientPaymentFactsChange({
 
       const primaryPlacement = updatedPlacements[0] ?? null;
       const primaryPlan = primaryPlacement?.subscriptionPlan ?? target.subscriptionPlan ?? null;
-      const latestPrimaryDueDate = getLatestFactDueDate(nextFacts, primaryPlacement, primaryPlan);
+      const latestPrimaryDueDate = getLatestFactDueDate(
+        nextFacts,
+        primaryPlacement,
+        primaryPlan,
+        db.schedule,
+      );
 
       if (latestPrimaryDueDate) {
         base.payDate = latestPrimaryDueDate;
@@ -76,10 +81,15 @@ export async function commitClientPaymentFactsChange({
         delete base.payDate;
       }
     } else {
-      const latestClientPaidAt = getLatestFactDueDate(nextFacts, {
-        area: target.area,
-        group: target.group,
-      }, target.subscriptionPlan ?? null);
+      const latestClientPaidAt = getLatestFactDueDate(
+        nextFacts,
+        {
+          area: target.area,
+          group: target.group,
+        },
+        target.subscriptionPlan ?? null,
+        db.schedule,
+      );
 
       if (latestClientPaidAt) {
         base.payDate = latestClientPaidAt;

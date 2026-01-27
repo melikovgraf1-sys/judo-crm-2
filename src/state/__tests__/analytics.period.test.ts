@@ -742,6 +742,77 @@ describe("computeAnalyticsSnapshot with period", () => {
     expect(snapshot.metrics.revenue.values.target).toBe(250);
   });
 
+  it("treats deferred payments as roster-only revenue", () => {
+    const db = buildDB();
+    db.settings.areas = ["джикджилли"];
+    db.settings.groups = ["фокус"];
+    db.settings.limits = { "джикджилли|фокус": 10 };
+    db.settings.rentByAreaEUR = { джикджилли: 0 };
+    db.settings.coachSalaryByAreaEUR = { джикджилли: 0 };
+    db.schedule = [
+      {
+        id: "s-focus",
+        area: "джикджилли",
+        group: "фокус",
+        coachId: "coach-1",
+        weekday: 1,
+        time: "10:00",
+        location: "",
+      },
+    ];
+    db.clients = [
+      {
+        id: "focus-athlete",
+        firstName: "Игорь",
+        lastName: "Фокусов",
+        phone: "",
+        channel: "Telegram",
+        birthDate: "2014-01-01T00:00:00.000Z",
+        gender: "м",
+        area: "джикджилли",
+        group: "фокус",
+        startDate: "2023-09-01T00:00:00.000Z",
+        payMethod: "перевод",
+        payStatus: "перенос",
+        status: "действующий",
+        subscriptionPlan: "monthly",
+        payDate: "2024-04-01T00:00:00.000Z",
+        payAmount: 55,
+        remainingLessons: 0,
+        placements: [
+          {
+            id: "pl-focus-athlete",
+            area: "джикджилли",
+            group: "фокус",
+            payMethod: "перевод",
+            payStatus: "перенос",
+            status: "действующий",
+            subscriptionPlan: "monthly",
+            payAmount: 55,
+            remainingLessons: 0,
+          },
+        ],
+        payHistory: [
+          {
+            id: "fact-focus-future",
+            paidAt: "2024-04-05T00:00:00.000Z",
+            amount: 55,
+            area: "джикджилли",
+            group: "фокус",
+          },
+        ],
+      },
+    ];
+    db.attendance = [];
+
+    const period: PeriodFilter = { year: 2024, month: 3 };
+    const snapshot = computeAnalyticsSnapshot(db, "джикджилли", period, "фокус");
+
+    expect(snapshot.metrics.revenue.values.actual).toBe(0);
+    expect(snapshot.metrics.revenue.values.forecast).toBe(0);
+    expect(snapshot.metrics.athletes.values.forecast).toBe(1);
+  });
+
   describe("half-month plan forecasting", () => {
     const period: PeriodFilter = { year: 2023, month: 10 };
 

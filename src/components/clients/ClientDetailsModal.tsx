@@ -93,7 +93,11 @@ export default function ClientDetailsModal({
       return placementStatus;
     }
 
-    if (placementStatus === "задолженность" || placementStatus === "ожидание") {
+    if (
+      placementStatus === "задолженность" ||
+      placementStatus === "ожидание" ||
+      placementStatus === "перенос"
+    ) {
       return placementStatus;
     }
 
@@ -101,6 +105,8 @@ export default function ClientDetailsModal({
   }, [billingPeriod, client, paidInSelectedPeriod]);
 
   const totalRemainingLessons = getEffectiveRemainingLessons(client, normalizedSchedule);
+  const paymentFactsRemainingLessonsFallback =
+    typeof totalRemainingLessons === "number" ? totalRemainingLessons : null;
 
   const totalFrozenLessons = placements.reduce(
     (sum, place) => sum + Math.max(0, place.frozenLessons ?? 0),
@@ -152,7 +158,9 @@ export default function ClientDetailsModal({
 
     const planHint = place.subscriptionPlan ?? client.subscriptionPlan ?? null;
     const referencePayDate =
-      getLatestFactDueDate(paymentFacts, place, planHint) ?? place.payDate ?? client.payDate;
+      getLatestFactDueDate(paymentFacts, place, planHint, normalizedSchedule) ??
+      place.payDate ??
+      client.payDate;
 
     if (manual != null) {
       effectiveRemainingLessons = manual;
@@ -279,8 +287,13 @@ export default function ClientDetailsModal({
     if (editingFactPlacement?.effectiveRemainingLessons != null) {
       return editingFactPlacement.effectiveRemainingLessons;
     }
-    return derivedRemainingLessons ?? null;
-  }, [derivedRemainingLessons, editingFact, editingFactPlacement]);
+    return derivedRemainingLessons ?? paymentFactsRemainingLessonsFallback ?? null;
+  }, [
+    derivedRemainingLessons,
+    editingFact,
+    editingFactPlacement,
+    paymentFactsRemainingLessonsFallback,
+  ]);
   const editingFactDefaultFrozenLessons = useMemo(() => {
     if (!editingFact) {
       return displayedFrozenLessons;
@@ -579,22 +592,28 @@ export default function ClientDetailsModal({
                 Тренировочные места
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {placementsWithDetails.map(place => (
-                  <div
-                    key={`${place.id}-${place.area}-${place.group}`}
-                    data-testid="client-placement-card"
-                    className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
-                  >
-                    <dl className="grid gap-1 text-slate-600 dark:text-slate-300">
-                      <ClientPlacementInfoCell label="Район" value={place.area || "—"} />
-                      <ClientPlacementInfoCell label="Группа" value={place.group || "—"} />
-                      <ClientPlacementInfoCell
-                        label="Статус оплаты"
-                        value={place.displayPayStatus || "—"}
-                      />
-                    </dl>
+                {placementsWithDetails.length > 0 ? (
+                  placementsWithDetails.map(place => (
+                    <div
+                      key={`${place.id}-${place.area}-${place.group}`}
+                      data-testid="client-placement-card"
+                      className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"
+                    >
+                      <dl className="grid gap-1 text-slate-600 dark:text-slate-300">
+                        <ClientPlacementInfoCell label="Район" value={place.area || "—"} />
+                        <ClientPlacementInfoCell label="Группа" value={place.group || "—"} />
+                        <ClientPlacementInfoCell
+                          label="Статус оплаты"
+                          value={place.displayPayStatus || "—"}
+                        />
+                      </dl>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    Нет закреплённых тренировочных мест
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -714,6 +733,7 @@ export default function ClientDetailsModal({
           availableGroups={paymentFactGroups}
           saving={savingFact}
           defaultRemainingLessons={editingFactDefaultRemainingLessons}
+          fallbackRemainingLessons={paymentFactsRemainingLessonsFallback}
           defaultFrozenLessons={editingFactDefaultFrozenLessons}
           defaultExpectedAmount={editingFactExpectedAmount}
           placementSubscriptionPlan={editingFactPlacement?.subscriptionPlan ?? null}
@@ -732,6 +752,7 @@ export default function ClientDetailsModal({
           currencyRates={currencyRates}
           placements={placementsWithDetails}
           defaultRemainingLessons={derivedRemainingLessons}
+          fallbackRemainingLessons={paymentFactsRemainingLessonsFallback}
           defaultFrozenLessons={displayedFrozenLessons}
           onClose={() => setPreviewingFactId(null)}
           onEdit={canManagePaymentFacts ? () => handleEditPaymentFact(previewingFact.id) : undefined}

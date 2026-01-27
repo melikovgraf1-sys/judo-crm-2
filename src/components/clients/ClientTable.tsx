@@ -6,7 +6,6 @@ import { compareValues, toggleSort } from "../tableUtils";
 import { calcAgeYears, calcExperience, calcExperienceMonths, fmtDate, fmtMoney } from "../../state/utils";
 import { getClientRecurringPayDate, matchesPeriod, type PeriodFilter } from "../../state/period";
 import { getEffectiveRemainingLessons } from "../../state/lessons";
-import { isReserveArea } from "../../state/areas";
 import { normalizePaymentFacts } from "../../state/paymentFacts";
 import type {
   Area,
@@ -37,7 +36,6 @@ type Props = {
   openPaymentTasks?: Record<string, TaskItem | undefined>;
   onCompletePaymentTask?: (client: Client, task: TaskItem) => void;
   onRemovePaymentTask?: (client: Client, task: TaskItem) => void;
-  onReserve?: (client: Client) => void;
   schedule: ScheduleSlot[];
   attendance: AttendanceEntry[];
   performance: PerformanceEntry[];
@@ -95,7 +93,6 @@ export default function ClientTable({
   openPaymentTasks,
   onCompletePaymentTask,
   onRemovePaymentTask,
-  onReserve,
   schedule,
   attendance,
   performance,
@@ -226,7 +223,7 @@ export default function ClientTable({
         return placementStatus ?? aggregateStatus;
       }
 
-      if (baseStatus === "задолженность" || baseStatus === "ожидание") {
+      if (baseStatus === "задолженность" || baseStatus === "ожидание" || baseStatus === "перенос") {
         return baseStatus;
       }
 
@@ -240,6 +237,9 @@ export default function ClientTable({
       const status = getDisplayPayStatus(client);
       if (status === "действует") {
         return "rounded-full bg-emerald-100 text-emerald-700";
+      }
+      if (status === "перенос") {
+        return "rounded-full bg-sky-100 text-sky-700";
       }
       if (status === "задолженность") {
         return "rounded-full bg-rose-100 text-rose-700";
@@ -475,7 +475,6 @@ export default function ClientTable({
       cellClassName: "flex justify-end gap-1",
       renderCell: client => {
         const openTask = openPaymentTasks?.[client.id];
-        const showReserveButton = Boolean(onReserve && !isReserveArea(client.area));
         const canSetWaiting =
           onSetWaiting && getClientPlacementDisplayStatus(client) !== "ожидание";
         return (
@@ -524,17 +523,6 @@ export default function ClientTable({
                 Создать задачу
               </button>
             )}
-            {showReserveButton && onReserve && (
-              <button
-                onClick={event => {
-                  event.stopPropagation();
-                  onReserve(client);
-                }}
-                className="px-2 py-1 text-xs rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              >
-                Резерв
-              </button>
-            )}
             {onRemove && (
               <button
                 onClick={event => {
@@ -562,7 +550,6 @@ export default function ClientTable({
     onRemovePaymentTask,
     onCreateTask,
     onRemove,
-    onReserve,
     openPaymentTasks,
     remainingMap,
     onSetWaiting,

@@ -2,7 +2,7 @@ import type { Client, ClientPlacement, PaymentFact, PaymentStatus } from "../../
 import { matchesPaymentFactPlacement } from "../../state/paymentFacts";
 
 export const getClientPlacementsWithFallback = (client: Client): ClientPlacement[] => {
-  if (Array.isArray(client.placements) && client.placements.length > 0) {
+  if (Array.isArray(client.placements)) {
     return client.placements;
   }
 
@@ -45,6 +45,10 @@ export const getClientPlacementDisplayStatus = (client: Client): PaymentStatus =
 
   if (statuses.includes("задолженность")) {
     return "задолженность";
+  }
+
+  if (statuses.includes("перенос")) {
+    return "перенос";
   }
 
   if (statuses.includes("ожидание")) {

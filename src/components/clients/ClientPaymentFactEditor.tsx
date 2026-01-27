@@ -26,6 +26,7 @@ interface Props {
   availableGroups: string[];
   saving: boolean;
   defaultRemainingLessons: number | null;
+  fallbackRemainingLessons: number | null;
   defaultFrozenLessons: number | null;
   defaultExpectedAmount: number | null;
   placementSubscriptionPlan: SubscriptionPlan | null;
@@ -68,6 +69,7 @@ export default function ClientPaymentFactEditor({
   availableGroups,
   saving,
   defaultRemainingLessons,
+  fallbackRemainingLessons,
   defaultFrozenLessons,
   defaultExpectedAmount,
   placementSubscriptionPlan,
@@ -86,6 +88,8 @@ export default function ClientPaymentFactEditor({
         ? String(fact.remainingLessons)
         : defaultRemainingLessons != null
         ? String(defaultRemainingLessons)
+        : fallbackRemainingLessons != null
+        ? String(fallbackRemainingLessons)
         : "",
     frozenLessons:
       fact.frozenLessons != null

@@ -16,11 +16,10 @@ import type {
 import { DEFAULT_PAYMENT_METHOD } from "../types";
 import { clientRequiresManualRemainingLessons } from "./lessons";
 import { SUBSCRIPTION_PLANS } from "./payments";
-import { RESERVE_AREA_NAME } from "./areas";
 
 export function makeSeedDB(): DB {
   const activeAreas: Area[] = ["Махмутлар", "Центр", "Джикджилли"];
-  const areas: Area[] = [...activeAreas, RESERVE_AREA_NAME];
+  const areas: Area[] = [...activeAreas];
   const groups: Group[] = [
     "4–6 лет",
     "7–10 лет",

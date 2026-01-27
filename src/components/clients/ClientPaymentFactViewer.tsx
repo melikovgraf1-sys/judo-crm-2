@@ -25,6 +25,7 @@ interface Props {
   currencyRates: Settings["currencyRates"];
   placements: PlacementSummary[];
   defaultRemainingLessons: number | null;
+  fallbackRemainingLessons: number | null;
   defaultFrozenLessons: number | null;
   onClose: () => void;
   onEdit?: () => void;
@@ -40,6 +41,7 @@ export default function ClientPaymentFactViewer({
   currencyRates,
   placements,
   defaultRemainingLessons,
+  fallbackRemainingLessons,
   defaultFrozenLessons,
   onClose,
   onEdit,
@@ -111,6 +113,7 @@ export default function ClientPaymentFactViewer({
     })();
 
   const factRemainingLessons = getFiniteNumber(fact.remainingLessons);
+  const fallbackRemainingLessonsValue = getFiniteNumber(fallbackRemainingLessons);
   const remainingLessons =
     factRemainingLessons ??
     getFiniteNumber(placementForLessons?.effectiveRemainingLessons) ??
