@@ -112,13 +112,11 @@ export default function ClientPaymentFactViewer({
       );
     })();
 
-  const factRemainingLessons = getFiniteNumber(fact.remainingLessons);
   const fallbackRemainingLessonsValue = getFiniteNumber(fallbackRemainingLessons);
+  const defaultRemainingLessonsValue = getFiniteNumber(defaultRemainingLessons);
+  // Остаток занятий берём как в таблице (fallback = getEffectiveRemainingLessons), иначе default
   const remainingLessons =
-    factRemainingLessons ??
-    getFiniteNumber(placementForLessons?.effectiveRemainingLessons) ??
-    getFiniteNumber(placementForLessons?.remainingLessons) ??
-    getFiniteNumber(defaultRemainingLessons);
+    fallbackRemainingLessonsValue ?? defaultRemainingLessonsValue;
   const factFrozenLessons = getFiniteNumber(fact.frozenLessons);
   const frozenLessons =
     factFrozenLessons ??

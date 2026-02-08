@@ -20,6 +20,7 @@ import type {
   Settings,
   TaskItem,
   Group,
+  SubscriptionPlan,
 } from "../../types";
 import { usePersistentTableSettings } from "../../utils/tableSettings";
 import { getClientPlacementDisplayStatus, matchesPlacement } from "./paymentStatus";
@@ -182,7 +183,7 @@ export default function ClientTable({
         placement ??
         (activeArea == null && activeGroup == null
           ? client.placements?.find(item => typeof item.payActual === "number" && Number.isFinite(item.payActual)) ??
-            null
+          null
           : null);
 
       const fallbackAmount = fallbackPlacement?.payActual;
@@ -223,13 +224,61 @@ export default function ClientTable({
         return placementStatus ?? aggregateStatus;
       }
 
-      if (baseStatus === "задолженность" || baseStatus === "ожидание" || baseStatus === "перенос") {
+      // Для выбранного месяца приоритет:
+      // 1) задолженность всегда важнее;
+      // 2) если есть факт оплаты за период — статус "действует";
+      // 3) затем "перенос" (оплата смещена на будущий период);
+      // 4) иначе "ожидание".
+      if (baseStatus === "задолженность") {
         return baseStatus;
       }
 
-      return isPaidInSelectedPeriod(client) ? "действует" : "ожидание";
+      if (isPaidInSelectedPeriod(client)) {
+        return "действует";
+      }
+
+      if (baseStatus === "перенос") {
+        return baseStatus;
+      }
+
+      return "ожидание";
     },
     [billingPeriod, getActivePlacement, isPaidInSelectedPeriod],
+  );
+
+  const getRowSubscriptionPlan = useCallback(
+    (client: Client): SubscriptionPlan | null => {
+      const placement = getActivePlacement(client) ?? client.placements?.[0] ?? null;
+      return placement?.subscriptionPlan ?? client.subscriptionPlan ?? null;
+    },
+    [getActivePlacement],
+  );
+
+  const getRowPriority = useCallback(
+    (client: Client): number => {
+      const status = getDisplayPayStatus(client);
+      if (status === "задолженность") {
+        // Должники всегда идут внизу таблицы.
+        return 100;
+      }
+
+      const plan = getRowSubscriptionPlan(client);
+      switch (plan) {
+        case "monthly":
+          return 0; // Месячный абонемент
+        case "discount":
+          return 1; // Скидка
+        case "weekly":
+          return 2; // Раз в неделю
+        case "half-month":
+          return 3; // Полмесяца
+        case "single":
+          return 4; // Разовое занятие
+        default:
+          return 5;
+      }
+    },
+    [getDisplayPayStatus, getRowSubscriptionPlan],
   );
 
   const getPayStatusTone = useCallback(
@@ -304,20 +353,20 @@ export default function ClientTable({
         const placements = client.placements?.length
           ? client.placements
           : [
-              {
-                id: client.id,
-                area: client.area,
-                group: client.group,
-                payMethod: client.payMethod,
-                payStatus: client.payStatus,
-                status: client.status,
-                subscriptionPlan: client.subscriptionPlan,
-                payDate: client.payDate,
-                payAmount: client.payAmount,
-                payActual: client.payActual,
-                remainingLessons: client.remainingLessons,
-              },
-            ];
+            {
+              id: client.id,
+              area: client.area,
+              group: client.group,
+              payMethod: client.payMethod,
+              payStatus: client.payStatus,
+              status: client.status,
+              subscriptionPlan: client.subscriptionPlan,
+              payDate: client.payDate,
+              payAmount: client.payAmount,
+              payActual: client.payActual,
+              remainingLessons: client.remainingLessons,
+            },
+          ];
         const uniqueAreas = Array.from(new Set(placements.map(item => item.area)));
         return uniqueAreas.join(", ");
       },
@@ -331,18 +380,18 @@ export default function ClientTable({
         const placements = client.placements?.length
           ? client.placements
           : [{
-              id: client.id,
-              area: client.area,
-              group: client.group,
-              payMethod: client.payMethod,
-              payStatus: client.payStatus,
-              status: client.status,
-              subscriptionPlan: client.subscriptionPlan,
-              payDate: client.payDate,
-              payAmount: client.payAmount,
-              payActual: client.payActual,
-              remainingLessons: client.remainingLessons,
-            }];
+            id: client.id,
+            area: client.area,
+            group: client.group,
+            payMethod: client.payMethod,
+            payStatus: client.payStatus,
+            status: client.status,
+            subscriptionPlan: client.subscriptionPlan,
+            payDate: client.payDate,
+            payAmount: client.payAmount,
+            payActual: client.payActual,
+            remainingLessons: client.remainingLessons,
+          }];
         return placements.map(item => item.group).join(", ");
       },
       sortValue: client => (client.placements?.[0]?.group ?? client.group ?? "").toString(),
@@ -392,9 +441,8 @@ export default function ClientTable({
       width: "minmax(150px, max-content)",
       renderCell: client => (
         <span
-          className={`px-2 py-1 text-xs ${
-            getPayStatusTone(client)
-          }`}
+          className={`px-2 py-1 text-xs ${getPayStatusTone(client)
+            }`}
         >
           {getDisplayPayStatus(client)}
         </span>
@@ -425,10 +473,6 @@ export default function ClientTable({
       label: "Факт оплаты",
       width: "minmax(130px, max-content)",
       renderCell: client => {
-        const placementStatus = getClientPlacementDisplayStatus(client);
-        if (placementStatus === "ожидание") {
-          return "—";
-        }
         const paid = isPaidInSelectedPeriod(client);
         if (billingPeriod?.month != null && !paid) {
           return "—";
@@ -437,10 +481,6 @@ export default function ClientTable({
         return amount != null ? fmtMoney(amount, currency, currencyRates) : "—";
       },
       sortValue: client => {
-        const placementStatus = getClientPlacementDisplayStatus(client);
-        if (placementStatus === "ожидание") {
-          return 0;
-        }
         const paid = isPaidInSelectedPeriod(client);
         if (billingPeriod?.month != null && !paid) {
           return 0;
@@ -546,6 +586,7 @@ export default function ClientTable({
     getPayActualAmount,
     getPayStatusTone,
     isPaidInSelectedPeriod,
+    getRowSubscriptionPlan,
     onCompletePaymentTask,
     onRemovePaymentTask,
     onCreateTask,
@@ -568,16 +609,26 @@ export default function ClientTable({
   );
 
   const sortedList = useMemo(() => {
-    if (!sort) return list;
-    const column = columns.find(col => col.id === sort.columnId);
-    if (!column?.sortValue) return list;
     const copy = [...list];
-    copy.sort((a, b) => {
-      const compare = compareValues(column.sortValue!(a), column.sortValue!(b));
-      return sort.direction === "asc" ? compare : -compare;
-    });
+
+    if (sort) {
+      const column = columns.find(col => col.id === sort.columnId);
+      if (column?.sortValue) {
+        copy.sort((a, b) => {
+          const priorityDiff = getRowPriority(a) - getRowPriority(b);
+          if (priorityDiff !== 0) {
+            return priorityDiff;
+          }
+          const compare = compareValues(column.sortValue!(a), column.sortValue!(b));
+          return sort.direction === "asc" ? compare : -compare;
+        });
+        return copy;
+      }
+    }
+
+    copy.sort((a, b) => getRowPriority(a) - getRowPriority(b));
     return copy;
-  }, [columns, list, sort]);
+  }, [columns, getRowPriority, list, sort]);
 
   const numberColumnWidth = "56px";
   const columnTemplate = activeColumns.length
@@ -602,49 +653,49 @@ export default function ClientTable({
           onChange={setVisibleColumns}
         />
       </div>
-        <div>
+      <div>
         <VirtualizedTable
           header={(
-          <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <tr
-              className="w-full"
-              style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
-            >
-              <th className="p-2 text-center text-xs font-medium uppercase tracking-wide text-slate-500">№</th>
-              {activeColumns.map(column => {
-                const isSorted = sort?.columnId === column.id;
-                const canSort = Boolean(column.sortValue);
-                const indicator = isSorted ? (sort?.direction === "asc" ? "↑" : "↓") : null;
-                const alignment = column.headerAlign ?? "left";
-                const justify = alignment === "right" ? "justify-end" : alignment === "center" ? "justify-center" : "";
-                const content = (
-                  <div className={`flex items-center gap-1 ${justify}`}>
-                    <span>{column.label}</span>
-                    {indicator && <span className="text-xs">{indicator}</span>}
-                  </div>
-                );
-                return (
-                  <th
-                    key={column.id}
-                    className={`p-2 ${column.headerClassName ?? "text-left"}`}
-                    style={{ cursor: canSort ? "pointer" : "default" }}
-                  >
-                    {canSort ? (
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-1 focus:outline-none"
-                        onClick={() => setSort(prev => toggleSort(prev, column.id))}
-                      >
-                        {content}
-                      </button>
-                    ) : (
-                      content
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+            <thead className="bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <tr
+                className="w-full"
+                style={{ display: "grid", gridTemplateColumns: columnTemplate, alignItems: "center" }}
+              >
+                <th className="p-2 text-center text-xs font-medium uppercase tracking-wide text-slate-500">№</th>
+                {activeColumns.map(column => {
+                  const isSorted = sort?.columnId === column.id;
+                  const canSort = Boolean(column.sortValue);
+                  const indicator = isSorted ? (sort?.direction === "asc" ? "↑" : "↓") : null;
+                  const alignment = column.headerAlign ?? "left";
+                  const justify = alignment === "right" ? "justify-end" : alignment === "center" ? "justify-center" : "";
+                  const content = (
+                    <div className={`flex items-center gap-1 ${justify}`}>
+                      <span>{column.label}</span>
+                      {indicator && <span className="text-xs">{indicator}</span>}
+                    </div>
+                  );
+                  return (
+                    <th
+                      key={column.id}
+                      className={`p-2 ${column.headerClassName ?? "text-left"}`}
+                      style={{ cursor: canSort ? "pointer" : "default" }}
+                    >
+                      {canSort ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-1 focus:outline-none"
+                          onClick={() => setSort(prev => toggleSort(prev, column.id))}
+                        >
+                          {content}
+                        </button>
+                      ) : (
+                        content
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
           )}
           items={rows}
           rowHeight={48}
@@ -658,7 +709,12 @@ export default function ClientTable({
                 gridTemplateColumns: columnTemplate,
                 alignItems: "center",
               }}
-              className="group cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+              className={`group cursor-pointer border-t border-slate-100 transition-colors dark:border-slate-700 ${getDisplayPayStatus(row.client) === "задолженность"
+                  ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-900/20 dark:hover:bg-rose-900/30"
+                  : getRowSubscriptionPlan(row.client) && getRowSubscriptionPlan(row.client) !== "monthly"
+                    ? "bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/10 dark:hover:bg-amber-900/20"
+                    : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                }`}
               onClick={() => setSelectedId(row.client.id)}
             >
               <td className="p-2 text-center text-slate-500">{row.index + 1}</td>

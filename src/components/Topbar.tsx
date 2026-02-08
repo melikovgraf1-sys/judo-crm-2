@@ -8,12 +8,21 @@ type TopbarProps = {
   currentUser: AuthUser;
   onLogout: () => void;
   tabs?: React.ReactNode;
+  isLocalOnly?: boolean;
 };
 
 const CONTROL_CLASS =
   "rounded-xl border border-slate-200/60 bg-white/70 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200/60 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-200 dark:focus:border-sky-500/60 dark:focus:ring-sky-500/30";
 
-export default function Topbar({ ui, setUI, onQuickAdd, currentUser, onLogout, tabs }: TopbarProps) {
+export default function Topbar({
+  ui,
+  setUI,
+  onQuickAdd,
+  currentUser,
+  onLogout,
+  tabs,
+  isLocalOnly,
+}: TopbarProps) {
   const searchTimeout = useRef<number | null>(null);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,6 +93,30 @@ export default function Topbar({ ui, setUI, onQuickAdd, currentUser, onLogout, t
               >
                 <span aria-hidden="true">＋</span> Быстро добавить
               </button>
+            <div className="flex items-center gap-2">
+              {isLocalOnly !== undefined && (
+                <div
+                  className={`hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                    isLocalOnly
+                      ? "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700"
+                      : "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700"
+                  }`}
+                  title={
+                    isLocalOnly
+                      ? "Данные сейчас сохраняются только локально"
+                      : "Синхронизация с Firebase активна"
+                  }
+                >
+                  <span
+                    className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${
+                      isLocalOnly
+                        ? "bg-amber-500 animate-pulse"
+                        : "bg-emerald-500"
+                    }`}
+                  />
+                  {isLocalOnly ? "Локальный режим" : "Онлайн"}
+                </div>
+              )}
               <div className="flex items-center gap-3 rounded-xl border border-slate-200/60 bg-white/70 px-3 py-2 text-left shadow-sm transition dark:border-slate-700/60 dark:bg-slate-900/70">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/20 text-sm font-semibold text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
                   {(currentUser.name || currentUser.login).slice(0, 2).toUpperCase()}
@@ -100,6 +133,7 @@ export default function Topbar({ ui, setUI, onQuickAdd, currentUser, onLogout, t
                   Выйти
                 </button>
               </div>
+            </div>
             </div>
           </div>
           {tabs ? <div className="flex-1 overflow-x-auto pt-1">{tabs}</div> : null}

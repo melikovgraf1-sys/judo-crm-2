@@ -49,14 +49,14 @@ const monthFormatter = new Intl.DateTimeFormat("ru-RU", {
   year: "numeric",
 });
 
-const getRecentMonths = (referenceISO?: string, total: number = 12) => {
+const getNearbyMonths = (referenceISO?: string, past: number = 12, future: number = 12) => {
   const months: string[] = [];
   const now = referenceISO ? new Date(referenceISO) : new Date();
   const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
-  for (let index = 0; index < total; index += 1) {
+  for (let offset = -past; offset <= future; offset += 1) {
     const date = new Date(base);
-    date.setUTCMonth(base.getUTCMonth() - index);
+    date.setUTCMonth(base.getUTCMonth() + offset);
     months.push(monthFormatter.format(date));
   }
 
@@ -191,7 +191,7 @@ export default function ClientPaymentFactEditor({
 
   const referenceDate = form.paidAt || undefined;
   const monthOptions = useMemo(
-    () => getRecentMonths(referenceDate),
+    () => getNearbyMonths(referenceDate),
     [referenceDate],
   );
 

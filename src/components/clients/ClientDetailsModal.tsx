@@ -422,11 +422,11 @@ export default function ClientDetailsModal({
       const remainingLessonsValue = values.remainingLessons.trim();
       const nextRemainingLessons = (() => {
         if (!remainingLessonsValue.length) {
-          return null;
+          return editingFactDefaultRemainingLessons ?? null;
         }
         const parsed = Number.parseInt(remainingLessonsValue, 10);
         if (Number.isNaN(parsed)) {
-          return editingFact.remainingLessons ?? null;
+          return editingFact.remainingLessons ?? editingFactDefaultRemainingLessons ?? null;
         }
         return parsed;
       })();

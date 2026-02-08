@@ -18,7 +18,9 @@ jobs:
           cache: 'npm'
 
       - run: npm ci                 # установка зависимостей из package-lock.json
-      - run: npm test -- --watchAll=false
+      - run: npm run build          # проверка сборки и типизации
+      - run: npm run format:check   # проверка форматирования
+      - run: npm run test:ci        # юнит-тесты без watch-режима
 
 env:
   DISABLE_ESLINT_PLUGIN: ${{ vars.DISABLE_ESLINT_PLUGIN }}

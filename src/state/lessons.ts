@@ -5,6 +5,7 @@ import {
   isIndividualGroup,
   subscriptionPlanRequiresManualRemainingLessons,
 } from "./payments";
+import { getClientPlacements } from "./clients";
 
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 const MAX_LOOKAHEAD_DAYS = 366 * 2;
@@ -100,14 +101,43 @@ export function getEffectiveRemainingLessons(
   schedule: ScheduleSlot[],
   today: Date = new Date(),
 ): number | null {
+  const placements = getClientPlacements(client);
+  const primaryPlacement = placements[0] ?? null;
+
+  const resolveEstimatedByPlacement = (): number | null => {
+    if (!primaryPlacement || !primaryPlacement.area || !primaryPlacement.group) {
+      return estimateGroupRemainingLessons(client, schedule, today);
+    }
+
+    const planHint = primaryPlacement.subscriptionPlan ?? client.subscriptionPlan ?? null;
+    const referencePayDate =
+      getLatestFactDueDate(client.payHistory ?? [], primaryPlacement, planHint, schedule) ??
+      primaryPlacement.payDate ??
+      client.payDate;
+
+    if (!referencePayDate) {
+      return estimateGroupRemainingLessons(client, schedule, today);
+    }
+
+    return estimateGroupRemainingLessonsByParams(
+      primaryPlacement.area,
+      primaryPlacement.group,
+      referencePayDate,
+      schedule,
+      today,
+    );
+  };
+
   if (clientRequiresManualRemainingLessons(client)) {
     if (typeof client.remainingLessons === "number") {
       return client.remainingLessons;
     }
-    return null;
+    // Для клиентов с ручным учётом, если явный остаток не задан,
+    // используем оценку по расписанию до даты следующей оплаты.
+    return resolveEstimatedByPlacement();
   }
 
-  return estimateGroupRemainingLessons(client, schedule, today);
+  return resolveEstimatedByPlacement();
 }
 
 const buildSessionsPerWeekday = (schedule: ScheduleSlot[], area: Area, group: Group) => {

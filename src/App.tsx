@@ -18,10 +18,10 @@ import Toasts from "./components/Toasts";
 import ErrorBoundary from "./components/ErrorBoundary";
 import AuthPage from "./components/AuthPage";
 import { useAppState, can, LOCAL_ONLY_MESSAGE } from "./state/appState";
+import type { AppState } from "./state/appState";
 
 export default function App() {
-  /** @type {import("./state/appState").AppState} */
-  const appState = useAppState();
+  const appState: AppState = useAppState();
 
   const {
     db,
@@ -86,6 +86,7 @@ export default function App() {
         onQuickAdd={onQuickAdd}
         currentUser={currentUser}
         onLogout={logoutUser}
+        isLocalOnly={isLocalOnly}
         tabs={<Tabs role={ui.role} />}
       />
       {isLocalOnly && !hideLocalOnly ? (
@@ -108,106 +109,106 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard db={db} ui={ui} />} />
-            <Route
-              path="/analytics"
-              element={
-                can(ui.role, "analytics") ? (
-                  <AnalyticsTab db={db} setDB={setDB} currency={ui.currency} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/groups"
-              element={
-                can(ui.role, "manage_clients") ? (
-                  <GroupsTab db={db} setDB={setDB} ui={ui} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/clients"
-              element={
-                can(ui.role, "manage_clients") ? (
-                  <ClientsTab db={db} setDB={setDB} ui={ui} setUI={setUI} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/attendance"
-              element={
-                can(ui.role, "attendance") ? (
-                  <AttendanceTab db={db} setDB={setDB} currency={ui.currency} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/performance"
-              element={
-                can(ui.role, "performance") ? (
-                  <PerformanceTab db={db} setDB={setDB} currency={ui.currency} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/tasks"
-              element={
-                can(ui.role, "tasks") ? (
-                  <TasksTab db={db} setDB={setDB} currency={ui.currency} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/schedule"
-              element={
-                can(ui.role, "schedule") ? (
-                  <ScheduleTab db={db} setDB={setDB} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/leads"
-              element={
-                can(ui.role, "leads") ? (
-                  <LeadsTab db={db} setDB={setDB} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/appeals"
-              element={
-                can(ui.role, "appeals") ? (
-                  <AppealsTab />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                can(ui.role, "settings") ? (
-                  <SettingsTab db={db} setDB={setDB} />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              }
-            />
+              <Route
+                path="/analytics"
+                element={
+                  can(ui.role, "analytics") ? (
+                    <AnalyticsTab db={db} setDB={setDB} currency={ui.currency} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/groups"
+                element={
+                  can(ui.role, "manage_clients") ? (
+                    <GroupsTab db={db} setDB={setDB} ui={ui} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/clients"
+                element={
+                  can(ui.role, "manage_clients") ? (
+                    <ClientsTab db={db} setDB={setDB} ui={ui} setUI={setUI} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/attendance"
+                element={
+                  can(ui.role, "attendance") ? (
+                    <AttendanceTab db={db} setDB={setDB} currency={ui.currency} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/performance"
+                element={
+                  can(ui.role, "performance") ? (
+                    <PerformanceTab db={db} setDB={setDB} currency={ui.currency} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/tasks"
+                element={
+                  can(ui.role, "tasks") ? (
+                    <TasksTab db={db} setDB={setDB} currency={ui.currency} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/schedule"
+                element={
+                  can(ui.role, "schedule") ? (
+                    <ScheduleTab db={db} setDB={setDB} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/leads"
+                element={
+                  can(ui.role, "leads") ? (
+                    <LeadsTab db={db} setDB={setDB} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/appeals"
+                element={
+                  can(ui.role, "appeals") ? (
+                    <AppealsTab />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  can(ui.role, "settings") ? (
+                    <SettingsTab db={db} setDB={setDB} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
@@ -229,3 +230,4 @@ export default function App() {
     </div>
   );
 }
+
