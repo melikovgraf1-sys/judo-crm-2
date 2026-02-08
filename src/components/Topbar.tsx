@@ -7,6 +7,8 @@ type TopbarProps = {
   onQuickAdd: () => void;
   onUndo: () => void;
   canUndo: boolean;
+  onRedo: () => void;
+  canRedo: boolean;
   currentUser: AuthUser;
   onLogout: () => void;
   tabs?: React.ReactNode;
@@ -22,6 +24,8 @@ export default function Topbar({
   onQuickAdd,
   onUndo,
   canUndo,
+  onRedo,
+  canRedo,
   currentUser,
   onLogout,
   tabs,
@@ -99,6 +103,16 @@ export default function Topbar({
               >
                 <span aria-hidden="true">↩️</span>
                 Отменить
+              </button>
+              <button
+                type="button"
+                onClick={onRedo}
+                disabled={!canRedo}
+                className={`${CONTROL_CLASS} inline-flex items-center gap-2 ${canRedo ? "" : "cursor-not-allowed opacity-60"}`}
+                title="Вернуть последнее отмененное изменение"
+              >
+                <span aria-hidden="true">↪️</span>
+                Вернуть
               </button>
               <button
                 type="button"

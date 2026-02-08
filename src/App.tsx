@@ -28,6 +28,8 @@ export default function App() {
     setDB,
     undoDBChange,
     canUndoDBChange,
+    redoDBChange,
+    canRedoDBChange,
     ui,
     setUI,
     roles,
@@ -88,6 +90,8 @@ export default function App() {
         onQuickAdd={onQuickAdd}
         onUndo={undoDBChange}
         canUndo={canUndoDBChange}
+        onRedo={redoDBChange}
+        canRedo={canRedoDBChange}
         currentUser={currentUser}
         onLogout={logoutUser}
         isLocalOnly={isLocalOnly}
