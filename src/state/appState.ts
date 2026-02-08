@@ -633,6 +633,10 @@ type RegisterPayload = { name: string; login: string; password: string; role: Ro
 export interface AppState {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
+  undoDBChange: () => void;
+  canUndoDBChange: boolean;
+  redoDBChange: () => void;
+  canRedoDBChange: boolean;
   ui: UIState;
   setUI: Dispatch<SetStateAction<UIState>>;
   roles: Role[];
@@ -651,7 +655,74 @@ export interface AppState {
 }
 
 export function useAppState(): AppState {
-  const [db, setDB] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
+  const [db, setDBState] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
+  const undoStackRef = useRef<Array<{ keys: (keyof DB)[]; changes: Partial<DB> }>>([]);
+  const redoStackRef = useRef<Array<{ keys: (keyof DB)[]; changes: Partial<DB> }>>([]);
+  const skipHistoryRef = useRef(false);
+  const [undoCount, setUndoCount] = useState(undoStackRef.current.length);
+  const [redoCount, setRedoCount] = useState(redoStackRef.current.length);
+  const getChangedKeys = useCallback((prev: DB, nextValue: DB) => {
+    return (Object.keys(nextValue) as (keyof DB)[]).filter(key => nextValue[key] !== prev[key]);
+  }, []);
+  const setDB = useCallback<Dispatch<SetStateAction<DB>>>(next => {
+    setDBState(prev => {
+      const nextValue = typeof next === "function" ? (next as (prevState: DB) => DB)(prev) : next;
+      if (skipHistoryRef.current) {
+        skipHistoryRef.current = false;
+        return nextValue;
+      }
+      if (nextValue !== prev) {
+        const keys = getChangedKeys(prev, nextValue);
+        if (keys.length > 0) {
+          const changes: Partial<DB> = {};
+          keys.forEach(key => {
+            changes[key] = prev[key];
+          });
+          undoStackRef.current.push({ keys, changes });
+          redoStackRef.current = [];
+          setUndoCount(undoStackRef.current.length);
+          setRedoCount(0);
+        }
+      }
+      return nextValue;
+    });
+  }, [getChangedKeys]);
+  const undoDBChange = useCallback(() => {
+    const previous = undoStackRef.current.pop();
+    if (!previous) return;
+    skipHistoryRef.current = true;
+    setDBState(prev => {
+      const redoChanges: Partial<DB> = {};
+      previous.keys.forEach(key => {
+        redoChanges[key] = prev[key];
+      });
+      redoStackRef.current.push({ keys: previous.keys, changes: redoChanges });
+      const nextValue = { ...prev, ...previous.changes };
+      writeLocalDB(nextValue);
+      return nextValue;
+    });
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+  }, []);
+  const canUndoDBChange = undoCount > 0;
+  const redoDBChange = useCallback(() => {
+    const nextEntry = redoStackRef.current.pop();
+    if (!nextEntry) return;
+    skipHistoryRef.current = true;
+    setDBState(prev => {
+      const undoChanges: Partial<DB> = {};
+      nextEntry.keys.forEach(key => {
+        undoChanges[key] = prev[key];
+      });
+      undoStackRef.current.push({ keys: nextEntry.keys, changes: undoChanges });
+      const nextValue = { ...prev, ...nextEntry.changes };
+      writeLocalDB(nextValue);
+      return nextValue;
+    });
+    setUndoCount(undoStackRef.current.length);
+    setRedoCount(redoStackRef.current.length);
+  }, []);
+  const canRedoDBChange = redoCount > 0;
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const [auth, setAuth] = usePersistentState<AuthState>(LS_KEYS.auth, makeDefaultAuthState(), 300);
   const dbRef = useRef(db);
@@ -1226,6 +1297,10 @@ export function useAppState(): AppState {
   return {
     db,
     setDB,
+    undoDBChange,
+    canUndoDBChange,
+    redoDBChange,
+    canRedoDBChange,
     ui,
     setUI,
     roles,
@@ -1243,4 +1318,3 @@ export function useAppState(): AppState {
     addQuickTask,
   };
 }
-

@@ -26,6 +26,10 @@ export default function App() {
   const {
     db,
     setDB,
+    undoDBChange,
+    canUndoDBChange,
+    redoDBChange,
+    canRedoDBChange,
     ui,
     setUI,
     roles,
@@ -84,6 +88,10 @@ export default function App() {
         ui={ui}
         setUI={setUI}
         onQuickAdd={onQuickAdd}
+        onUndo={undoDBChange}
+        canUndo={canUndoDBChange}
+        onRedo={redoDBChange}
+        canRedo={canRedoDBChange}
         currentUser={currentUser}
         onLogout={logoutUser}
         isLocalOnly={isLocalOnly}
@@ -230,4 +238,3 @@ export default function App() {
     </div>
   );
 }
-
