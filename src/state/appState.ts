@@ -633,6 +633,8 @@ type RegisterPayload = { name: string; login: string; password: string; role: Ro
 export interface AppState {
   db: DB;
   setDB: Dispatch<SetStateAction<DB>>;
+  undoDBChange: () => void;
+  canUndoDBChange: boolean;
   ui: UIState;
   setUI: Dispatch<SetStateAction<UIState>>;
   roles: Role[];
@@ -651,7 +653,33 @@ export interface AppState {
 }
 
 export function useAppState(): AppState {
-  const [db, setDB] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
+  const [db, setDBState] = useState<DB>(() => readLocalDB() ?? makeSeedDB());
+  const undoStackRef = useRef<DB[]>([]);
+  const skipHistoryRef = useRef(false);
+  const [undoCount, setUndoCount] = useState(undoStackRef.current.length);
+  const setDB = useCallback<Dispatch<SetStateAction<DB>>>(next => {
+    setDBState(prev => {
+      const nextValue = typeof next === "function" ? (next as (prevState: DB) => DB)(prev) : next;
+      if (skipHistoryRef.current) {
+        skipHistoryRef.current = false;
+        return nextValue;
+      }
+      if (nextValue !== prev) {
+        undoStackRef.current.push(prev);
+        setUndoCount(undoStackRef.current.length);
+      }
+      return nextValue;
+    });
+  }, []);
+  const undoDBChange = useCallback(() => {
+    const previous = undoStackRef.current.pop();
+    if (!previous) return;
+    skipHistoryRef.current = true;
+    setDBState(() => previous);
+    writeLocalDB(previous);
+    setUndoCount(undoStackRef.current.length);
+  }, []);
+  const canUndoDBChange = undoCount > 0;
   const [ui, setUI] = usePersistentState<UIState>(LS_KEYS.ui, defaultUI, 300);
   const [auth, setAuth] = usePersistentState<AuthState>(LS_KEYS.auth, makeDefaultAuthState(), 300);
   const dbRef = useRef(db);
@@ -1226,6 +1254,8 @@ export function useAppState(): AppState {
   return {
     db,
     setDB,
+    undoDBChange,
+    canUndoDBChange,
     ui,
     setUI,
     roles,
@@ -1243,4 +1273,3 @@ export function useAppState(): AppState {
     addQuickTask,
   };
 }
-
