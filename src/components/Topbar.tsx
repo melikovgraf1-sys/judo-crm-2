@@ -5,6 +5,8 @@ type TopbarProps = {
   ui: UIState;
   setUI: React.Dispatch<React.SetStateAction<UIState>>;
   onQuickAdd: () => void;
+  onUndo: () => void;
+  canUndo: boolean;
   currentUser: AuthUser;
   onLogout: () => void;
   tabs?: React.ReactNode;
@@ -18,6 +20,8 @@ export default function Topbar({
   ui,
   setUI,
   onQuickAdd,
+  onUndo,
+  canUndo,
   currentUser,
   onLogout,
   tabs,
@@ -85,6 +89,16 @@ export default function Topbar({
                 title="Переключить тему"
               >
                 {ui.theme === "light" ? "🌙" : "☀️"}
+              </button>
+              <button
+                type="button"
+                onClick={onUndo}
+                disabled={!canUndo}
+                className={`${CONTROL_CLASS} inline-flex items-center gap-2 ${canUndo ? "" : "cursor-not-allowed opacity-60"}`}
+                title="Отменить последнее изменение"
+              >
+                <span aria-hidden="true">↩️</span>
+                Отменить
               </button>
               <button
                 type="button"
